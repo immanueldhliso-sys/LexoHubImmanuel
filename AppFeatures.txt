@@ -1,0 +1,117 @@
+App Name: lexo
+Tagline: Your Practice, Amplified. The Advocate's Intelligence Platform.
+
+Vision Statement: lexo is an integrated ecosystem designed to empower the South African advocate. It moves beyond simple administration to provide predictive intelligence, strategic financial tools, and powerful networking capabilities, enabling advocates to build more profitable, resilient, and transformative practices.
+
+Feature Ecosystem
+1. Core Engine: Financial Command & Control
+The foundational tools to manage your day-to-day finances with unparalleled efficiency.
+
+Rule-Aware Fee Lifecycle: Automatically calculates and tracks the 60/90-day payment timelines.
+
+The "Shared Brief" Portal: Secure, instant pro forma approval from instructing attorneys.
+
+Automated, Professional Reminders: System-driven follow-ups via email and WhatsApp to preserve client relationships.
+
+Direct Bank Feed Integration: Automatic reconciliation of your business accounts for real-time payment verification.
+
+Automated Disbursement Recovery: Track and automatically invoice for all matter-related costs, from expert witnesses to travel expenses.
+
+2. Matter & Case Intelligence
+Go beyond invoicing. Understand the health, risk, and trajectory of every brief you accept.
+
+Settlement Probability Predictor: An AI engine that estimates the likelihood and potential timeline of a settlement based on matter type, parties, and historical data.
+
+Budget vs. Actual Tracking: Real-time alerts when a matter's work-in-progress (WIP) is approaching its pre-agreed fee estimate.
+
+Automated WIP Reporting: Daily or weekly email summaries of the total value of unbilled work across your entire practice.
+
+Voice-First Time Capture: Dictate time entries and file notes on the go using natural language.
+
+3. Practice Growth & Referral Engine
+Actively build your practice with intelligent networking and opportunity management.
+
+Overflow Brief Matching: A private marketplace where senior advocates can refer surplus matters to a curated pool of qualified junior advocates.
+
+Specialisation Directory: A detailed, searchable directory where advocates can list niche expertise to receive targeted referrals from colleagues.
+
+Reciprocal Brief Tracking: A dashboard to monitor the give-and-take referral ratios between advocates and chambers, fostering fair network participation.
+
+Automated Conflict Check System: Instantly screen new matters against your entire case history to identify potential conflicts of interest.
+
+4. Document & Data Intelligence
+Turn unstructured information into billable work and valuable insights.
+
+Brief Analysis AI: Upload a new brief, and lexo automatically extracts key dates, parties, and deliverables to pre-populate the matter file.
+
+Automated Fee Narrative Generator: AI assists in creating detailed, justifiable fee descriptions from minimal input, saving hours on invoicing.
+
+Community Precedent Bank: Access a library of community-contributed templates and documents, complete with usage analytics to see what's most effective.
+
+5. Strategic Finance & Optimization
+Move from reactive billing to proactive financial strategy.
+
+Dynamic Fee Optimization: An advisory tool that suggests optimal fee structures (e.g., premium rates for urgent work, bundled pricing for volume) based on market data.
+
+Advanced Cash Flow Management: AI that recognizes seasonal patterns (like the Dec/Jan slowdown) and provides proactive warnings and budgeting advice.
+
+Invoice Factoring Marketplace: Instead of a single provider, lexo Capital becomes a marketplace where multiple financial institutions can bid to finance your invoices, ensuring you get the most competitive rate.
+
+Success Fee Calculator: A modeling tool to calculate and assess the risk/reward of contingency and success-based fee arrangements.
+
+6. Workflow & External Integrations
+Seamlessly connect your practice to the broader legal ecosystem.
+
+Court Integration Module:
+
+Automated Court Diary Sync: Pulls and syncs hearing dates directly from official court system diaries.
+
+Judge Analytics: Provides anonymised, aggregated data on judicial briefing patterns and preferences.
+
+Voice-Activated Queries: Use voice commands like, "Lexo, what is my projected income for October?" or "Lexo, summarise my new brief from XYZ Attorneys."
+
+Language Accessibility: The full interface and transcription services are available in all 11 official languages, with built-in legal translation tools.
+
+7. Professional Development & Transformation (The Academy)
+Invest in career growth and the future of the Bar.
+
+Virtual Shadowing & Brief Simulation: A training module where pupils can shadow virtual hearings and work on AI-generated practice matters to hone their skills.
+
+Peer Review Network: A structured system for advocates to give and receive constructive feedback on written work and arguments.
+
+Automated CPD Credit Tracking: Automatically logs activities and tracks compliance with continuing professional development requirements.
+
+Practice Succession Planning: A complete toolkit including a practice valuation tool and a confidential marketplace to connect retiring advocates with potential successors.
+
+8. Risk Management & Compliance Engine
+Practice with confidence, knowing you are protected by an intelligent compliance framework.
+
+Ethics Rule Alerts: The system proactively warns you before you accept a brief that may pose a conflict of interest or other ethical breach based on Bar Council rules.
+
+Automated Trust Account Auditing: For users with integrated bank feeds, the system can run automated checks to flag transactions that may violate trust account regulations.
+
+One-Click Audit Trail Generator: Instantly produce comprehensive compliance reports required for any Bar Council or LPFF investigation.
+
+lexo Pricing Packages (Revised & Expanded)
+Feature	Junior Start	Advocate Pro	Senior Counsel & Chambers	Chambers Enterprise
+Price	R 349 / month	R 899 / month	R 2,499 / month	Contact for Quote
+Ideal For	Pupils & 1st/2nd Year Advocates	Established Solo Practitioners	SCs & Progressive Advocates	Entire Chambers & Bar Groups
+Core Financial Engine	✅	✅	✅	✅
+Matter Intelligence	✅ (Basic WIP)	✅ (Full Suite)	✅	✅
+Practice Growth Engine	✅ (Receive Referrals)	✅ (Full Access)	✅	✅
+Document Intelligence	-	✅ (Narrative Generator)	✅ (Full Suite)	✅
+Strategic Finance	-	✅ (Cash Flow Basics)	✅ (Full Suite)	✅
+External Integrations	-	✅ (Voice & WhatsApp)	✅ (Full Suite + Court)	✅
+The Academy	✅ (As Pupil)	✅ (Peer Review)	✅ (As Mentor)	✅
+Risk & Compliance	✅ (Basic Alerts)	✅ (Full Suite)	✅	✅
+White-Label Branding	-	-	-	✅
+Group Analytics	-	-	-	✅
+Centralised Admin	-	-	-	✅
+
+Export to Sheets
+Value-Added Services & Revenue Models
+lexo Capital Marketplace: Access competitive invoice financing from multiple providers. Transactional fees apply.
+
+Ethical Data Monetization: We will offer anonymised, aggregated market intelligence products—such as the Annual State of Fees Report—to law societies and legal recruiters to fund our Transformation initiatives. Individual advocate and attorney data will never be sold.
+
+Performance-Based Options: Enterprise clients can opt for models like success-sharing, where a percentage of collected fees is shared in exchange for lower subscription costs.

@@ -1,0 +1,1637 @@
+# The lexo Implementation Playbook - Feature Prompts
+## Production-Ready Prompts for Core Business Features
+
+---
+
+## Phase 3: Financial Engine - Fee Lifecycle & Invoicing
+
+### Prompt 3.1: Invoice Generation with Bar Rules
+```typescript
+// AI_TASK: Implement complete invoice lifecycle with South African Bar-specific rules
+// CONTEXT: 60-day rule for Johannesburg, 90-day for Cape Town, automated reminders
+// REQUIREMENTS: Fee narratives, VAT calculation, trust accounting, payment tracking
+
+// --- INVOICE SERVICE ---
+// AI_TARGET_FILE: src/services/api/invoices.service.ts
+// AI_EXPECTATIONS: Create comprehensive invoice management with Bar rules enforcement
+
+/*
+import { supabase } from '@/lib/supabase';
+import { format, addDays, differenceInDays, isAfter } from 'date-fns';
+import type { Invoice, Matter, TimeEntry, Bar } from '@/types';
+import { toast } from 'react-hot-toast';
+
+// South African Bar Payment Rules
+const BAR_PAYMENT_RULES = {
+  johannesburg: {
+    paymentTermDays: 60,
+    reminderSchedule: [30, 45, 55], // Days after invoice
+    vatRate: 0.15,
+    trustTransferDays: 7,
+    lateFeePercentage: 0.02, // 2% per month
+    prescriptionYears: 3
+  },
+  cape_town: {
+    paymentTermDays: 90,
+    reminderSchedule: [30, 60, 85],
+    vatRate: 0.15,
+    trustTransferDays: 14,
+    lateFeePercentage: 0.015,
+    prescriptionYears: 3
+  }
+};
+
+export class InvoiceService {
+  // Generate invoice from matter with time entries
+  static async generateInvoice(
+    matterId: string,
+    timeEntryIds?: string[],
+    customNarrative?: string
+  ): Promise<Invoice> {
+    try {
+      // Fetch matter details
+      const { data: matter, error: matterError } = await supabase
+        .from('matters')
+        .select('*, advocate:advocates(*)')
+        .eq('id', matterId)
+        .single();
+      
+      if (matterError || !matter) throw new Error('Matter not found');
+      
+      // Fetch unbilled time entries
+      let timeEntriesQuery = supabase
+        .from('time_entries')
+        .select('*')
+        .eq('matter_id', matterId)
+        .eq('billed', false)
+        .is('deleted_at', null);
+      
+      if (timeEntryIds && timeEntryIds.length > 0) {
+        timeEntriesQuery = timeEntriesQuery.in('id', timeEntryIds);
+      }
+      
+      const { data: timeEntries, error: entriesError } = await timeEntriesQuery;
+      
+      if (entriesError) throw entriesError;
+      if (!timeEntries || timeEntries.length === 0) {
+        throw new Error('No unbilled time entries found');
+      }
+      
+      // Calculate fees
+      const totalFees = timeEntries.reduce((sum, entry) => {
+        return sum + ((entry.duration_minutes / 60) * entry.rate);
+      }, 0);
+      
+      // Get disbursements
+      const disbursements = matter.disbursements || 0;
+      
+      // Generate fee narrative
+      const narrative = customNarrative || await this.generateFeeNarrative(
+        matter,
+        timeEntries,
+        disbursements
+      );
+      
+      // Generate invoice number
+      const invoiceNumber = await this.generateInvoiceNumber(matter.bar);
+      
+      // Calculate dates based on Bar rules
+      const rules = BAR_PAYMENT_RULES[matter.bar as keyof typeof BAR_PAYMENT_RULES];
+      const invoiceDate = new Date();
+      const dueDate = addDays(invoiceDate, rules.paymentTermDays);
+      
+      // Create invoice
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          matter_id: matterId,
+          advocate_id: matter.advocate_id,
+          invoice_number: invoiceNumber,
+          invoice_date: format(invoiceDate, 'yyyy-MM-dd'),
+          due_date: format(dueDate, 'yyyy-MM-dd'),
+          bar: matter.bar,
+          fees_amount: totalFees,
+          disbursements_amount: disbursements,
+          vat_rate: rules.vatRate,
+          status: 'draft',
+          fee_narrative: narrative,
+          next_reminder_date: format(addDays(invoiceDate, rules.reminderSchedule[0]), 'yyyy-MM-dd')
+        })
+        .select()
+        .single();
+      
+      if (invoiceError) throw invoiceError;
+      
+      // Mark time entries as billed
+      await supabase
+        .from('time_entries')
+        .update({ 
+          billed: true, 
+          invoice_id: invoice.id,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', timeEntries.map(e => e.id));
+      
+      // Update matter WIP value
+      await supabase
+        .from('matters')
+        .update({ 
+          wip_value: 0,
+          actual_fee: (matter.actual_fee || 0) + totalFees
+        })
+        .eq('id', matterId);
+      
+      toast.success('Invoice generated successfully');
+      return invoice;
+      
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate invoice');
+      throw error;
+    }
+  }
+  
+  // Generate professional fee narrative with AI assistance
+  static async generateFeeNarrative(
+    matter: Matter,
+    timeEntries: TimeEntry[],
+    disbursements: number
+  ): Promise<string> {
+    // Group time entries by type of work
+    const workSummary = this.summarizeWork(timeEntries);
+    
+    let narrative = `PROFESSIONAL SERVICES RENDERED\n\n`;
+    narrative += `Matter: ${matter.title}\n`;
+    narrative += `Reference: ${matter.reference_number}\n`;
+    narrative += `Period: ${this.getPeriodDescription(timeEntries)}\n\n`;
+    narrative += `SUMMARY OF SERVICES:\n`;
+    
+    // Add detailed work descriptions
+    workSummary.forEach(category => {
+      narrative += `\n${category.description}:\n`;
+      narrative += `${category.hours.toFixed(1)} hours @ R${category.averageRate.toFixed(2)}/hour\n`;
+      narrative += `Subtotal: R${category.total.toFixed(2)}\n`;
+    });
+    
+    // Add disbursements if any
+    if (disbursements > 0) {
+      narrative += `\nDISBURSEMENTS:\n`;
+      narrative += `Various expenses incurred: R${disbursements.toFixed(2)}\n`;
+    }
+    
+    // Add professional closing
+    narrative += `\n---\n`;
+    narrative += `Services rendered with care and diligence in accordance with `;
+    narrative += `the standards of the ${matter.bar} Society of Advocates.\n`;
+    
+    return narrative;
+  }
+  
+  // Send invoice to client
+  static async sendInvoice(invoiceId: string): Promise<void> {
+    try {
+      const { data: invoice, error } = await supabase
+        .from('invoices')
+        .update({ 
+          status: 'sent',
+          sent_at: new Date().toISOString()
+        })
+        .eq('id', invoiceId)
+        .select('*, matter:matters(*)')
+        .single();
+      
+      if (error || !invoice) throw new Error('Invoice not found');
+      
+      // Send via email (integrate with email service)
+      await this.emailInvoice(invoice);
+      
+      // Send WhatsApp notification if enabled
+      if (invoice.matter.client_phone) {
+        await this.sendWhatsAppNotification(invoice);
+      }
+      
+      // Schedule reminders
+      await this.scheduleReminders(invoice);
+      
+      toast.success('Invoice sent successfully');
+      
+    } catch (error) {
+      console.error('Error sending invoice:', error);
+      toast.error('Failed to send invoice');
+      throw error;
+    }
+  }
+  
+  // Process payment for invoice
+  static async recordPayment(
+    invoiceId: string,
+    amount: number,
+    paymentMethod: string,
+    reference?: string
+  ): Promise<void> {
+    try {
+      const { data: invoice } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', invoiceId)
+        .single();
+      
+      if (!invoice) throw new Error('Invoice not found');
+      
+      // Record payment
+      await supabase.from('payments').insert({
+        invoice_id: invoiceId,
+        advocate_id: invoice.advocate_id,
+        amount: amount,
+        payment_date: format(new Date(), 'yyyy-MM-dd'),
+        payment_method: paymentMethod,
+        reference: reference
+      });
+      
+      // Update invoice
+      const newAmountPaid = (invoice.amount_paid || 0) + amount;
+      const isPaid = newAmountPaid >= invoice.total_amount;
+      
+      await supabase
+        .from('invoices')
+        .update({
+          amount_paid: newAmountPaid,
+          status: isPaid ? 'paid' : invoice.status,
+          date_paid: isPaid ? format(new Date(), 'yyyy-MM-dd') : null,
+          payment_method: paymentMethod,
+          payment_reference: reference
+        })
+        .eq('id', invoiceId);
+      
+      toast.success(`Payment of R${amount.toFixed(2)} recorded successfully`);
+      
+    } catch (error) {
+      console.error('Error recording payment:', error);
+      toast.error('Failed to record payment');
+      throw error;
+    }
+  }
+  
+  // Automated reminder system
+  static async processReminders(): Promise<void> {
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      
+      // Find invoices due for reminders
+      const { data: invoices } = await supabase
+        .from('invoices')
+        .select('*, matter:matters(*)')
+        .eq('status', 'sent')
+        .lte('next_reminder_date', today)
+        .is('deleted_at', null);
+      
+      if (!invoices || invoices.length === 0) return;
+      
+      for (const invoice of invoices) {
+        await this.sendReminder(invoice);
+        
+        // Update reminder tracking
+        const rules = BAR_PAYMENT_RULES[invoice.bar as keyof typeof BAR_PAYMENT_RULES];
+        const reminderCount = invoice.reminders_sent + 1;
+        const nextReminderIndex = reminderCount;
+        
+        let nextReminderDate = null;
+        if (nextReminderIndex < rules.reminderSchedule.length) {
+          nextReminderDate = format(
+            addDays(new Date(invoice.invoice_date), rules.reminderSchedule[nextReminderIndex]),
+            'yyyy-MM-dd'
+          );
+        }
+        
+        await supabase
+          .from('invoices')
+          .update({
+            reminders_sent: reminderCount,
+            last_reminder_date: today,
+            next_reminder_date: nextReminderDate,
+            status: reminderCount >= 3 ? 'overdue' : 'sent'
+          })
+          .eq('id', invoice.id);
+      }
+      
+    } catch (error) {
+      console.error('Error processing reminders:', error);
+    }
+  }
+  
+  // Helper: Generate invoice number
+  private static async generateInvoiceNumber(bar: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+    
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .like('invoice_number', `INV-${year}${month}-%`)
+      .order('invoice_number', { ascending: false })
+      .limit(1);
+    
+    let nextNumber = 1;
+    if (data && data.length > 0) {
+      const lastNumber = parseInt(data[0].invoice_number.split('-').pop() || '0');
+      nextNumber = lastNumber + 1;
+    }
+    
+    return `INV-${year}${month}-${nextNumber.toString().padStart(4, '0')}`;
+  }
+  
+  // Helper: Summarize work for narrative
+  private static summarizeWork(timeEntries: TimeEntry[]) {
+    const categories = new Map<string, any>();
+    
+    timeEntries.forEach(entry => {
+      const category = this.categorizeWork(entry.description);
+      
+      if (!categories.has(category)) {
+        categories.set(category, {
+          description: category,
+          hours: 0,
+          total: 0,
+          rates: [],
+          entries: []
+        });
+      }
+      
+      const cat = categories.get(category);
+      const hours = entry.duration_minutes / 60;
+      cat.hours += hours;
+      cat.total += hours * entry.rate;
+      cat.rates.push(entry.rate);
+      cat.entries.push(entry);
+    });
+    
+    return Array.from(categories.values()).map(cat => ({
+      ...cat,
+      averageRate: cat.rates.reduce((a: number, b: number) => a + b, 0) / cat.rates.length
+    }));
+  }
+  
+  // Helper: Categorize work type
+  private static categorizeWork(description: string): string {
+    const lower = description.toLowerCase();
+    
+    if (lower.includes('draft') || lower.includes('review')) return 'Drafting & Review';
+    if (lower.includes('consult') || lower.includes('meeting')) return 'Consultations';
+    if (lower.includes('research')) return 'Legal Research';
+    if (lower.includes('court') || lower.includes('hearing')) return 'Court Appearances';
+    if (lower.includes('correspond') || lower.includes('email')) return 'Correspondence';
+    
+    return 'General Legal Services';
+  }
+  
+  // Helper: Get period description
+  private static getPeriodDescription(timeEntries: TimeEntry[]): string {
+    const dates = timeEntries.map(e => new Date(e.date));
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    
+    return `${format(minDate, 'dd MMMM yyyy')} to ${format(maxDate, 'dd MMMM yyyy')}`;
+  }
+}
+*/
+```
+
+---
+
+## Phase 4: Voice Intelligence & Natural Language Processing
+
+### Prompt 4.1: Voice Capture & Transcription System
+```typescript
+// AI_TASK: Implement voice-first time capture with natural language processing
+// CONTEXT: Advocates need to capture time while mobile, in court, or between meetings
+// REQUIREMENTS: Voice recording, transcription, intelligent parsing, automatic categorization
+
+// --- VOICE SERVICE ---
+// AI_TARGET_FILE: src/services/voice/voice-capture.service.ts
+// AI_EXPECTATIONS: Create voice capture system with NLP for time entries
+
+/*
+import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
+
+// Natural Language Patterns for Legal Work
+const LEGAL_WORK_PATTERNS = {
+  drafting: [
+    'drafted', 'prepared', 'wrote', 'composed', 'created', 'compiled',
+    'draft heads', 'draft plea', 'draft affidavit', 'draft opinion'
+  ],
+  research: [
+    'researched', 'investigated', 'studied', 'analyzed', 'reviewed case law',
+    'legal research', 'case research', 'precedent research'
+  ],
+  consultation: [
+    'met with', 'consulted', 'conference', 'consultation', 'discussed',
+    'client meeting', 'counsel meeting', 'telephonic consultation'
+  ],
+  court: [
+    'appeared', 'argued', 'hearing', 'trial', 'motion', 'application',
+    'court appearance', 'in court', 'before judge', 'before magistrate'
+  ],
+  correspondence: [
+    'emailed', 'wrote to', 'responded', 'corresponded', 'letter to',
+    'email to attorney', 'response to', 'follow up'
+  ],
+  review: [
+    'reviewed', 'perused', 'studied', 'examined', 'analyzed',
+    'review documents', 'review bundle', 'review pleadings'
+  ]
+};
+
+// Time extraction patterns
+const TIME_PATTERNS = {
+  duration: /(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/gi,
+  timeRange: /from\s+(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2}):?(\d{2})?\s*(am|pm)?/gi,
+  relative: /(spent|took|lasted)\s+(?:about\s+)?(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/gi,
+  today: /today|this morning|this afternoon|this evening/gi,
+  yesterday: /yesterday|yesterday morning|yesterday afternoon|yesterday evening/gi,
+  specific: /on\s+(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/gi
+};
+
+export class VoiceCaptureService {
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+  
+  // Start recording audio
+  async startRecording(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      this.mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      this.audioChunks = [];
+      
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+      
+      this.mediaRecorder.start();
+      toast.success('Recording started');
+      
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast.error('Failed to start recording. Please check microphone permissions.');
+      throw error;
+    }
+  }
+  
+  // Stop recording and process
+  async stopRecording(matterId?: string): Promise<void> {
+    if (!this.mediaRecorder) {
+      throw new Error('No recording in progress');
+    }
+    
+    return new Promise((resolve, reject) => {
+      this.mediaRecorder!.onstop = async () => {
+        try {
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          
+          // Upload audio to storage
+          const audioUrl = await this.uploadAudio(audioBlob);
+          
+          // Transcribe audio
+          const transcription = await this.transcribeAudio(audioBlob);
+          
+          // Parse transcription
+          const parsedEntry = await this.parseTranscription(transcription, matterId);
+          
+          // Create time entry
+          if (parsedEntry) {
+            await this.createTimeEntry(parsedEntry, transcription, audioUrl);
+            toast.success('Time entry created from voice recording');
+          } else {
+            toast.error('Could not parse time entry from recording');
+          }
+          
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      this.mediaRecorder!.stop();
+      
+      // Stop all tracks
+      this.mediaRecorder!.stream.getTracks().forEach(track => track.stop());
+    });
+  }
+  
+  // Transcribe audio using Web Speech API or external service
+  private async transcribeAudio(audioBlob: Blob): Promise<string> {
+    // For production, integrate with a service like:
+    // - OpenAI Whisper API
+    // - Google Speech-to-Text
+    // - Azure Speech Services
+    
+    // Mock implementation using Web Speech API
+    return new Promise((resolve, reject) => {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-ZA'; // South African English
+      
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        resolve(transcript);
+      };
+      
+      recognition.onerror = (event: any) => {
+        reject(new Error(`Speech recognition error: ${event.error}`));
+      };
+      
+      // Convert blob to audio for recognition
+      const audio = new Audio(URL.createObjectURL(audioBlob));
+      recognition.start();
+      
+      // Simulate transcription (in production, use proper API)
+      setTimeout(() => {
+        recognition.stop();
+        resolve("Spent 2.5 hours drafting heads of argument for the Smith matter. Reviewed case law and prepared comprehensive legal arguments regarding the contractual dispute.");
+      }, 2000);
+    });
+  }
+  
+  // Parse natural language transcription into structured data
+  private async parseTranscription(
+    transcription: string,
+    suggestedMatterId?: string
+  ): Promise<any> {
+    const parsed: any = {
+      description: transcription,
+      duration_minutes: 0,
+      date: new Date().toISOString().split('T')[0],
+      category: 'General Legal Services'
+    };
+    
+    // Extract duration
+    const duration = this.extractDuration(transcription);
+    if (duration) {
+      parsed.duration_minutes = duration;
+    } else {
+      // If no duration found, prompt user
+      return null;
+    }
+    
+    // Extract date
+    const date = this.extractDate(transcription);
+    if (date) {
+      parsed.date = date;
+    }
+    
+    // Categorize work type
+    parsed.category = this.categorizeWork(transcription);
+    
+    // Extract matter reference if mentioned
+    if (!suggestedMatterId) {
+      const matterRef = await this.extractMatterReference(transcription);
+      if (matterRef) {
+        parsed.matter_id = matterRef;
+      }
+    } else {
+      parsed.matter_id = suggestedMatterId;
+    }
+    
+    // Clean up description
+    parsed.description = this.cleanDescription(transcription);
+    
+    return parsed;
+  }
+  
+  // Extract duration from natural language
+  private extractDuration(text: string): number | null {
+    let totalMinutes = 0;
+    
+    // Check for duration patterns
+    const matches = text.matchAll(TIME_PATTERNS.duration);
+    for (const match of matches) {
+      const value = parseFloat(match[1]);
+      const unit = match[2].toLowerCase();
+      
+      if (unit.startsWith('hour')) {
+        totalMinutes += value * 60;
+      } else if (unit.startsWith('min')) {
+        totalMinutes += value;
+      }
+    }
+    
+    // Check for time ranges
+    const rangeMatch = TIME_PATTERNS.timeRange.exec(text);
+    if (rangeMatch) {
+      const startHour = parseInt(rangeMatch[1]);
+      const startMin = parseInt(rangeMatch[2] || '0');
+      const endHour = parseInt(rangeMatch[4]);
+      const endMin = parseInt(rangeMatch[5] || '0');
+      
+      // Calculate duration (simplified - doesn't handle AM/PM fully)
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+      totalMinutes = Math.abs(endMinutes - startMinutes);
+    }
+    
+    return totalMinutes > 0 ? totalMinutes : null;
+  }
+  
+  // Extract date from natural language
+  private extractDate(text: string): string {
+    const today = new Date();
+    
+    if (TIME_PATTERNS.today.test(text)) {
+      return today.toISOString().split('T')[0];
+    }
+    
+    if (TIME_PATTERNS.yesterday.test(text)) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return yesterday.toISOString().split('T')[0];
+    }
+    
+    // Check for specific date
+    const specificMatch = TIME_PATTERNS.specific.exec(text);
+    if (specificMatch) {
+      const day = parseInt(specificMatch[1]);
+      const month = parseInt(specificMatch[2]) - 1; // JS months are 0-indexed
+      let year = parseInt(specificMatch[3]);
+      
+      // Handle 2-digit years
+      if (year < 100) {
+        year += 2000;
+      }
+      
+      const date = new Date(year, month, day);
+      return date.toISOString().split('T')[0];
+    }
+    
+    return today.toISOString().split('T')[0];
+  }
+  
+  // Categorize work based on keywords
+  private categorizeWork(text: string): string {
+    const lower = text.toLowerCase();
+    
+    for (const [category, patterns] of Object.entries(LEGAL_WORK_PATTERNS)) {
+      if (patterns.some(pattern => lower.includes(pattern))) {
+        return category.charAt(0).toUpperCase() + category.slice(1);
+      }
+    }
+    
+    return 'General Legal Services';
+  }
+  
+  // Extract matter reference from text
+  private async extractMatterReference(text: string): Promise<string | null> {
+    // Look for patterns like "Smith matter", "matter of Jones v State", etc.
+    const patterns = [
+      /(?:the\s+)?(\w+)\s+matter/gi,
+      /matter\s+of\s+([\w\s]+?)(?:\s+v\s+[\w\s]+)?/gi,
+      /case\s+(?:of\s+)?([\w\s]+?)(?:\s+v\s+[\w\s]+)?/gi
+    ];
+    
+    for (const pattern of patterns) {
+      const match = pattern.exec(text);
+      if (match) {
+        // Search for matter by partial match
+        const searchTerm = match[1].trim();
+        const { data } = await supabase
+          .from('matters')
+          .select('id, title')
+          .or(`title.ilike.%${searchTerm}%,client_name.ilike.%${searchTerm}%`)
+          .limit(1);
+        
+        if (data && data.length > 0) {
+          return data[0].id;
+        }
+      }
+    }
+    
+    return null;
+  }
+  
+  // Clean and format description
+  private cleanDescription(text: string): string {
+    // Remove duration mentions
+    let cleaned = text.replace(TIME_PATTERNS.duration, '');
+    cleaned = cleaned.replace(TIME_PATTERNS.relative, '');
+    
+    // Remove extra whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    // Capitalize first letter
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    
+    // Ensure it ends with a period
+    if (!cleaned.match(/[.!?]$/)) {
+      cleaned += '.';
+    }
+    
+    return cleaned;
+  }
+  
+  // Upload audio to storage
+  private async uploadAudio(audioBlob: Blob): Promise<string> {
+    const fileName = `voice-${Date.now()}.webm`;
+    
+    const { data, error } = await supabase.storage
+      .from('voice-recordings')
+      .upload(fileName, audioBlob);
+    
+    if (error) throw error;
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('voice-recordings')
+      .getPublicUrl(fileName);
+    
+    return publicUrl;
+  }
+  
+  // Create time entry from parsed data
+  private async createTimeEntry(
+    parsedData: any,
+    transcription: string,
+    audioUrl: string
+  ): Promise<void> {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+    
+    // Get advocate's hourly rate
+    const { data: advocate } = await supabase
+      .from('advocates')
+      .select('hourly_rate')
+      .eq('id', user.user!.id)
+      .single();
+    
+    await supabase.from('time_entries').insert({
+      matter_id: parsedData.matter_id,
+      advocate_id: user.user!.id,
+      date: parsedData.date,
+      duration_minutes: parsedData.duration_minutes,
+      description: parsedData.description,
+      rate: advocate?.hourly_rate || 0,
+      recording_method: 'voice',
+      voice_transcription: transcription,
+      voice_recording_url: audioUrl,
+      billable: true
+    });
+  }
+}
+*/
+```
+
+---
+
+## Phase 5: Practice Intelligence & Analytics
+
+### Prompt 5.1: Settlement Probability & Practice Metrics
+```typescript
+// AI_TASK: Build AI-driven practice analytics and predictive intelligence
+// CONTEXT: Help advocates make data-driven decisions about matters and practice health
+// REQUIREMENTS: Settlement prediction, cash flow forecasting, practice metrics
+
+// --- ANALYTICS SERVICE ---
+// AI_TARGET_FILE: src/services/analytics
+
+### Prompt 2.1: Database Schema & Migration
+```typescript
+// AI_TASK: Create complete Supabase schema for lexo with RLS policies and migrations
+// CONTEXT: South African advocate practice management with multi-Bar support
+// REQUIREMENTS: ACID compliance, row-level security, audit trails, soft deletes
+
+// --- SUPABASE SCHEMA CREATION ---
+// AI_TARGET_FILE: supabase/migrations/001_initial_schema.sql
+// AI_EXPECTATIONS: Create all tables with proper constraints, indexes, and RLS policies
+
+/*
+-- Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Custom types
+CREATE TYPE bar_association AS ENUM ('johannesburg', 'cape_town');
+CREATE TYPE matter_status AS ENUM ('active', 'pending', 'settled', 'closed', 'on_hold');
+CREATE TYPE invoice_status AS ENUM ('draft', 'sent', 'viewed', 'paid', 'overdue', 'disputed', 'written_off');
+CREATE TYPE payment_method AS ENUM ('eft', 'cheque', 'cash', 'card', 'debit_order');
+CREATE TYPE risk_level AS ENUM ('low', 'medium', 'high', 'critical');
+CREATE TYPE time_entry_method AS ENUM ('manual', 'voice', 'timer', 'ai_suggested');
+CREATE TYPE document_type AS ENUM ('brief', 'opinion', 'contract', 'correspondence', 'court_document', 'invoice', 'receipt', 'other');
+CREATE TYPE fee_type AS ENUM ('standard', 'contingency', 'success', 'retainer', 'pro_bono');
+
+-- Users table (advocates)
+CREATE TABLE advocates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  initials VARCHAR(10) NOT NULL,
+  practice_number VARCHAR(50) UNIQUE NOT NULL,
+  bar bar_association NOT NULL,
+  year_admitted INTEGER NOT NULL CHECK (year_admitted >= 1900 AND year_admitted <= EXTRACT(YEAR FROM CURRENT_DATE)),
+  specialisations TEXT[] DEFAULT '{}',
+  hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate > 0),
+  contingency_rate DECIMAL(3,2) CHECK (contingency_rate >= 0 AND contingency_rate <= 1),
+  success_fee_rate DECIMAL(3,2) CHECK (success_fee_rate >= 0 AND success_fee_rate <= 1),
+  
+  -- Contact details
+  phone_number VARCHAR(20),
+  chambers_address TEXT,
+  postal_address TEXT,
+  
+  -- Settings
+  notification_preferences JSONB DEFAULT '{"email": true, "whatsapp": false, "sms": false}',
+  invoice_settings JSONB DEFAULT '{"auto_remind": true, "reminder_days": [30, 45, 55]}',
+  
+  -- Metadata
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ,
+  is_active BOOLEAN DEFAULT true,
+  deleted_at TIMESTAMPTZ,
+  
+  -- Computed fields for quick access
+  total_outstanding DECIMAL(12,2) DEFAULT 0,
+  total_collected_ytd DECIMAL(12,2) DEFAULT 0,
+  matters_count INTEGER DEFAULT 0
+);
+
+-- Matters table with comprehensive tracking
+CREATE TABLE matters (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  advocate_id UUID NOT NULL REFERENCES advocates(id) ON DELETE CASCADE,
+  
+  -- Basic Information
+  reference_number VARCHAR(50) UNIQUE NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  description TEXT,
+  matter_type VARCHAR(100) NOT NULL,
+  court_case_number VARCHAR(100),
+  bar bar_association NOT NULL,
+  
+  -- Client Information
+  client_name VARCHAR(255) NOT NULL,
+  client_email VARCHAR(255),
+  client_phone VARCHAR(20),
+  client_address TEXT,
+  client_type VARCHAR(50) CHECK (client_type IN ('individual', 'company', 'trust', 'government', 'ngo')),
+  
+  -- Instructing Attorney Information
+  instructing_attorney VARCHAR(255) NOT NULL,
+  instructing_attorney_email VARCHAR(255),
+  instructing_attorney_phone VARCHAR(20),
+  instructing_firm VARCHAR(255),
+  instructing_firm_ref VARCHAR(100),
+  
+  -- Financial Information
+  fee_type fee_type DEFAULT 'standard',
+  estimated_fee DECIMAL(12,2),
+  fee_cap DECIMAL(12,2),
+  actual_fee DECIMAL(12,2),
+  wip_value DECIMAL(12,2) DEFAULT 0,
+  trust_balance DECIMAL(12,2) DEFAULT 0,
+  disbursements DECIMAL(12,2) DEFAULT 0,
+  vat_exempt BOOLEAN DEFAULT false,
+  
+  -- Status and Risk
+  status matter_status DEFAULT 'pending',
+  risk_level risk_level DEFAULT 'low',
+  settlement_probability DECIMAL(3,2) CHECK (settlement_probability >= 0 AND settlement_probability <= 1),
+  expected_completion_date DATE,
+  
+  -- Conflict Check
+  conflict_check_completed BOOLEAN DEFAULT false,
+  conflict_check_date TIMESTAMPTZ,
+  conflict_check_cleared BOOLEAN,
+  conflict_notes TEXT,
+  
+  -- Important Dates
+  date_instructed DATE NOT NULL DEFAULT CURRENT_DATE,
+  date_accepted DATE,
+  date_commenced DATE,
+  date_settled DATE,
+  date_closed DATE,
+  next_court_date DATE,
+  prescription_date DATE,
+  
+  -- Metadata
+  tags TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ,
+  
+  -- Computed fields
+  days_active INTEGER GENERATED ALWAYS AS (
+    CASE 
+      WHEN date_closed IS NOT NULL THEN EXTRACT(DAY FROM (date_closed - date_instructed))
+      ELSE EXTRACT(DAY FROM (NOW() - date_instructed))
+    END
+  ) STORED,
+  
+  is_overdue BOOLEAN GENERATED ALWAYS AS (
+    CASE 
+      WHEN expected_completion_date IS NOT NULL AND status IN ('active', 'pending') 
+      THEN expected_completion_date < CURRENT_DATE
+      ELSE false
+    END
+  ) STORED
+);
+
+-- Invoices table with Bar-specific rules
+CREATE TABLE invoices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  matter_id UUID NOT NULL REFERENCES matters(id) ON DELETE CASCADE,
+  advocate_id UUID NOT NULL REFERENCES advocates(id) ON DELETE CASCADE,
+  
+  -- Invoice Details
+  invoice_number VARCHAR(50) UNIQUE NOT NULL,
+  invoice_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  due_date DATE NOT NULL,
+  bar bar_association NOT NULL,
+  
+  -- Financial Details
+  fees_amount DECIMAL(12,2) NOT NULL CHECK (fees_amount >= 0),
+  disbursements_amount DECIMAL(12,2) DEFAULT 0 CHECK (disbursements_amount >= 0),
+  subtotal DECIMAL(12,2) GENERATED ALWAYS AS (fees_amount + disbursements_amount) STORED,
+  vat_rate DECIMAL(3,2) DEFAULT 0.15,
+  vat_amount DECIMAL(12,2) GENERATED ALWAYS AS ((fees_amount + disbursements_amount) * vat_rate) STORED,
+  total_amount DECIMAL(12,2) GENERATED ALWAYS AS ((fees_amount + disbursements_amount) * (1 + vat_rate)) STORED,
+  
+  -- Payment Tracking
+  status invoice_status DEFAULT 'draft',
+  amount_paid DECIMAL(12,2) DEFAULT 0 CHECK (amount_paid >= 0),
+  balance_due DECIMAL(12,2) GENERATED ALWAYS AS (
+    ((fees_amount + disbursements_amount) * (1 + vat_rate)) - amount_paid
+  ) STORED,
+  date_paid DATE,
+  payment_method payment_method,
+  payment_reference VARCHAR(100),
+  
+  -- Fee Narrative
+  fee_narrative TEXT NOT NULL,
+  internal_notes TEXT,
+  
+  -- Reminder Tracking
+  reminders_sent INTEGER DEFAULT 0,
+  last_reminder_date DATE,
+  next_reminder_date DATE,
+  reminder_history JSONB DEFAULT '[]',
+  
+  -- Metadata
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  sent_at TIMESTAMPTZ,
+  viewed_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
+  
+  -- Computed fields
+  days_outstanding INTEGER GENERATED ALWAYS AS (
+    CASE 
+      WHEN date_paid IS NOT NULL THEN EXTRACT(DAY FROM (date_paid - invoice_date))
+      WHEN status IN ('sent', 'viewed', 'overdue') THEN EXTRACT(DAY FROM (NOW() - invoice_date))
+      ELSE NULL
+    END
+  ) STORED,
+  
+  is_overdue BOOLEAN GENERATED ALWAYS AS (
+    CASE 
+      WHEN status NOT IN ('paid', 'written_off') AND due_date < CURRENT_DATE 
+      THEN true 
+      ELSE false 
+    END
+  ) STORED
+);
+
+-- Time entries with voice transcription support
+CREATE TABLE time_entries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  matter_id UUID NOT NULL REFERENCES matters(id) ON DELETE CASCADE,
+  advocate_id UUID NOT NULL REFERENCES advocates(id) ON DELETE CASCADE,
+  invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+  
+  -- Time Details
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  start_time TIME,
+  end_time TIME,
+  duration_minutes INTEGER NOT NULL CHECK (duration_minutes > 0),
+  
+  -- Billing Details
+  description TEXT NOT NULL,
+  billable BOOLEAN DEFAULT true,
+  rate DECIMAL(10,2) NOT NULL,
+  amount DECIMAL(12,2) GENERATED ALWAYS AS ((duration_minutes / 60.0) * rate) STORED,
+  
+  -- Recording Method
+  recording_method time_entry_method DEFAULT 'manual',
+  voice_transcription TEXT,
+  voice_recording_url TEXT,
+  
+  -- Status
+  billed BOOLEAN DEFAULT false,
+  write_off BOOLEAN DEFAULT false,
+  write_off_reason TEXT,
+  
+  -- Metadata
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+
+-- Documents table
+CREATE TABLE documents (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  matter_id UUID NOT NULL REFERENCES matters(id) ON DELETE CASCADE,
+  advocate_id UUID NOT NULL REFERENCES advocates(id) ON DELETE CASCADE,
+  
+  -- Document Details
+  filename VARCHAR(255) NOT NULL,
+  original_filename VARCHAR(255) NOT NULL,
+  document_type document_type NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  storage_path TEXT NOT NULL,
+  
+  -- Version Control
+  version INTEGER DEFAULT 1,
+  parent_document_id UUID REFERENCES documents(id) ON DELETE SET NULL,
+  
+  -- Metadata
+  description TEXT,
+  tags TEXT[] DEFAULT '{}',
+  uploaded_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ,
+  
+  -- Full-text search
+  content_text TEXT,
+  content_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(content_text, ''))) STORED
+);
+
+-- Notes/Comments table
+CREATE TABLE notes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  matter_id UUID NOT NULL REFERENCES matters(id) ON DELETE CASCADE,
+  advocate_id UUID NOT NULL REFERENCES advocates(id) ON DELETE CASCADE,
+  
+  content TEXT NOT NULL,
+  is_internal BOOLEAN DEFAULT true,
+  is_important BOOLEAN DEFAULT false,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+
+-- Referrals tracking table
+CREATE TABLE referrals (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  matter_id UUID NOT NULL REFERENCES matters(id) ON DELETE CASCADE,
+  
+  -- Referral parties
+  referring_advocate_id UUID REFERENCES advocates(id) ON DELETE SET NULL,
+  referred_to_advocate_id UUID REFERENCES advocates(id) ON DELETE SET NULL,
+  referring_firm VARCHAR(255),
+  
+  -- Referral details
+  referral_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  referral_fee_percentage DECIMAL(3,2) CHECK (referral_fee_percentage >= 0 AND referral_fee_percentage <= 1),
+  referral_fee_amount DECIMAL(12,2),
+  referral_fee_paid BOOLEAN DEFAULT false,
+  referral_fee_paid_date DATE,
+  
+  -- Reciprocal tracking
+  reciprocal_expected BOOLEAN DEFAULT false,
+  reciprocal_completed BOOLEAN DEFAULT false,
+  
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Payments table for tracking all financial transactions
+CREATE TABLE payments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+  advocate_id UUID NOT NULL REFERENCES advocates(id) ON DELETE CASCADE,
+  
+  -- Payment details
+  amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+  payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  payment_method payment_method NOT NULL,
+  reference VARCHAR(100),
+  
+  -- Bank reconciliation
+  bank_reference VARCHAR(100),
+  reconciled BOOLEAN DEFAULT false,
+  reconciled_date DATE,
+  
+  -- Trust accounting
+  is_trust_deposit BOOLEAN DEFAULT false,
+  trust_transfer_date DATE,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Audit log table
+CREATE TABLE audit_log (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  advocate_id UUID REFERENCES advocates(id) ON DELETE SET NULL,
+  
+  table_name VARCHAR(50) NOT NULL,
+  record_id UUID NOT NULL,
+  action VARCHAR(20) NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE', 'VIEW')),
+  
+  old_values JSONB,
+  new_values JSONB,
+  
+  ip_address INET,
+  user_agent TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes for performance
+CREATE INDEX idx_matters_advocate ON matters(advocate_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_matters_status ON matters(status) WHERE deleted_at IS NULL;
+CREATE INDEX idx_matters_dates ON matters(date_instructed, date_closed) WHERE deleted_at IS NULL;
+CREATE INDEX idx_invoices_matter ON invoices(matter_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_invoices_status ON invoices(status) WHERE deleted_at IS NULL;
+CREATE INDEX idx_invoices_due_date ON invoices(due_date) WHERE deleted_at IS NULL AND status NOT IN ('paid', 'written_off');
+CREATE INDEX idx_time_entries_matter ON time_entries(matter_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_time_entries_unbilled ON time_entries(matter_id) WHERE billed = false AND deleted_at IS NULL;
+CREATE INDEX idx_documents_matter ON documents(matter_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_documents_search ON documents USING GIN(content_vector);
+CREATE INDEX idx_payments_invoice ON payments(invoice_id);
+CREATE INDEX idx_audit_log_advocate ON audit_log(advocate_id, created_at DESC);
+
+-- Create views for common queries
+CREATE VIEW active_matters AS
+SELECT * FROM matters 
+WHERE status IN ('active', 'pending') 
+AND deleted_at IS NULL;
+
+CREATE VIEW overdue_invoices AS
+SELECT * FROM invoices 
+WHERE is_overdue = true 
+AND status NOT IN ('paid', 'written_off')
+AND deleted_at IS NULL;
+
+CREATE VIEW unbilled_time AS
+SELECT 
+  te.*,
+  m.title as matter_title,
+  m.client_name
+FROM time_entries te
+JOIN matters m ON te.matter_id = m.id
+WHERE te.billed = false 
+AND te.deleted_at IS NULL
+AND m.deleted_at IS NULL;
+
+-- Row Level Security Policies
+ALTER TABLE advocates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies (advocates can only see their own data)
+CREATE POLICY advocate_policy ON advocates
+  FOR ALL USING (auth.uid()::text = id::text);
+
+CREATE POLICY matters_policy ON matters
+  FOR ALL USING (auth.uid()::text = advocate_id::text);
+
+CREATE POLICY invoices_policy ON invoices
+  FOR ALL USING (auth.uid()::text = advocate_id::text);
+
+CREATE POLICY time_entries_policy ON time_entries
+  FOR ALL USING (auth.uid()::text = advocate_id::text);
+
+CREATE POLICY documents_policy ON documents
+  FOR ALL USING (auth.uid()::text = advocate_id::text);
+
+CREATE POLICY notes_policy ON notes
+  FOR ALL USING (auth.uid()::text = advocate_id::text);
+
+CREATE POLICY payments_policy ON payments
+  FOR ALL USING (auth.uid()::text = advocate_id::text);
+
+-- Functions for business logic
+CREATE OR REPLACE FUNCTION calculate_due_date(invoice_date DATE, bar bar_association)
+RETURNS DATE AS $$
+BEGIN
+  CASE bar
+    WHEN 'johannesburg' THEN
+      RETURN invoice_date + INTERVAL '60 days';
+    WHEN 'cape_town' THEN
+      RETURN invoice_date + INTERVAL '90 days';
+    ELSE
+      RETURN invoice_date + INTERVAL '60 days';
+  END CASE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply update trigger to all relevant tables
+CREATE TRIGGER update_advocates_updated_at BEFORE UPDATE ON advocates
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  
+CREATE TRIGGER update_matters_updated_at BEFORE UPDATE ON matters
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  
+CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Function to check for conflicts
+CREATE OR REPLACE FUNCTION check_conflict(
+  p_advocate_id UUID,
+  p_client_name VARCHAR,
+  p_opposing_party VARCHAR
+)
+RETURNS TABLE(
+  has_conflict BOOLEAN,
+  conflicting_matters UUID[],
+  conflict_reason TEXT
+) AS $$
+DECLARE
+  v_conflicts UUID[];
+BEGIN
+  -- Check if advocate has represented opposing party before
+  SELECT ARRAY_AGG(id) INTO v_conflicts
+  FROM matters
+  WHERE advocate_id = p_advocate_id
+  AND deleted_at IS NULL
+  AND (
+    LOWER(client_name) = LOWER(p_opposing_party)
+    OR LOWER(client_name) LIKE '%' || LOWER(p_opposing_party) || '%'
+  );
+  
+  IF v_conflicts IS NOT NULL THEN
+    RETURN QUERY 
+    SELECT 
+      true,
+      v_conflicts,
+      'Previously represented the opposing party';
+    RETURN;
+  END IF;
+  
+  -- Check if advocate has matters against this client
+  SELECT ARRAY_AGG(id) INTO v_conflicts
+  FROM matters
+  WHERE advocate_id = p_advocate_id
+  AND deleted_at IS NULL
+  AND description ILIKE '%' || p_client_name || '%';
+  
+  IF v_conflicts IS NOT NULL THEN
+    RETURN QUERY 
+    SELECT 
+      true,
+      v_conflicts,
+      'Potential conflict with existing matter';
+    RETURN;
+  END IF;
+  
+  -- No conflicts found
+  RETURN QUERY 
+  SELECT 
+    false,
+    NULL::UUID[],
+    'No conflicts detected';
+END;
+$$ LANGUAGE plpgsql;
+*/
+```
+
+### Prompt 2.2: Supabase Service Layer
+```typescript
+// AI_TASK: Create comprehensive Supabase service layer with type-safe operations
+// REQUIREMENTS: Error handling, retry logic, optimistic updates, offline support
+
+// --- SUPABASE CLIENT & CONFIGURATION ---
+// AI_TARGET_FILE: src/lib/supabase.ts
+// AI_EXPECTATIONS: Configure Supabase client with proper typing and error handling
+
+/*
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from './database.types';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  global: {
+    headers: { 'x-application-name': 'lexo' },
+  },
+});
+
+// Generate TypeScript types from database
+export type Tables<T extends keyof Database['public']['Tables']> = 
+  Database['public']['Tables'][T]['Row'];
+  
+export type Inserts<T extends keyof Database['public']['Tables']> = 
+  Database['public']['Tables'][T]['Insert'];
+  
+export type Updates<T extends keyof Database['public']['Tables']> = 
+  Database['public']['Tables'][T]['Update'];
+*/
+
+// --- API SERVICE LAYER ---
+// AI_TARGET_FILE: src/services/api/matters.service.ts
+// AI_EXPECTATIONS: Create comprehensive matter management service with business logic
+
+/*
+import { supabase } from '@/lib/supabase';
+import type { Matter, NewMatterForm, MatterStatus } from '@/types';
+import { z } from 'zod';
+import { toast } from 'react-hot-toast';
+
+// Validation schemas
+const MatterValidation = z.object({
+  title: z.string().min(3).max(500),
+  clientName: z.string().min(2).max(255),
+  clientEmail: z.string().email().optional().or(z.literal('')),
+  clientPhone: z.string().regex(/^[0-9+\-\s()]+$/).optional().or(z.literal('')),
+  instructingAttorney: z.string().min(2).max(255),
+  instructingAttorneyEmail: z.string().email().optional().or(z.literal('')),
+  bar: z.enum(['johannesburg', 'cape_town']),
+  briefType: z.string().min(2).max(100),
+  estimatedFee: z.number().positive().optional(),
+  riskLevel: z.enum(['low', 'medium', 'high'])
+});
+
+export class MatterService {
+  // Create a new matter with conflict checking
+  static async createMatter(data: NewMatterForm): Promise<Matter> {
+    try {
+      // Validate input
+      const validated = MatterValidation.parse(data);
+      
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('User not authenticated');
+      
+      // Perform conflict check
+      const { data: conflictCheck, error: conflictError } = await supabase
+        .rpc('check_conflict', {
+          p_advocate_id: user.id,
+          p_client_name: validated.clientName,
+          p_opposing_party: '' // Would be extracted from description in full implementation
+        });
+        
+      if (conflictError) throw conflictError;
+      
+      if (conflictCheck?.has_conflict) {
+        const proceed = await this.confirmConflictOverride(conflictCheck.conflict_reason);
+        if (!proceed) throw new Error('Matter creation cancelled due to conflict');
+      }
+      
+      // Generate reference number
+      const referenceNumber = await this.generateReferenceNumber(validated.bar);
+      
+      // Create the matter
+      const { data: matter, error } = await supabase
+        .from('matters')
+        .insert({
+          advocate_id: user.id,
+          reference_number: referenceNumber,
+          title: validated.title,
+          client_name: validated.clientName,
+          client_email: validated.clientEmail || null,
+          client_phone: validated.clientPhone || null,
+          instructing_attorney: validated.instructingAttorney,
+          instructing_attorney_email: validated.instructingAttorneyEmail || null,
+          instructing_firm: validated.instructingFirm || null,
+          bar: validated.bar,
+          matter_type: validated.briefType,
+          estimated_fee: validated.estimatedFee || null,
+          risk_level: validated.riskLevel,
+          status: 'pending',
+          conflict_check_completed: !conflictCheck?.has_conflict,
+          conflict_check_date: new Date().toISOString(),
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // Log the action
+      await this.auditLog('matters', matter.id, 'INSERT', null, matter);
+      
+      toast.success('Matter created successfully');
+      return matter;
+      
+    } catch (error) {
+      console.error('Error creating matter:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create matter');
+      throw error;
+    }
+  }
+  
+  // Update matter status with validation
+  static async updateMatterStatus(
+    matterId: string, 
+    newStatus: MatterStatus, 
+    reason?: string
+  ): Promise<Matter> {
+    try {
+      const { data: currentMatter } = await supabase
+        .from('matters')
+        .select('*')
+        .eq('id', matterId)
+        .single();
+        
+      if (!currentMatter) throw new Error('Matter not found');
+      
+      // Validate status transition
+      if (!this.isValidStatusTransition(currentMatter.status, newStatus)) {
+        throw new Error(`Invalid status transition from ${currentMatter.status} to ${newStatus}`);
+      }
+      
+      // Prepare update data
+      const updateData: any = {
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add status-specific fields
+      if (newStatus === 'closed') {
+        updateData.date_closed = new Date().toISOString();
+      } else if (newStatus === 'settled') {
+        updateData.date_settled = new Date().toISOString();
+      } else if (newStatus === 'active') {
+        updateData.date_commenced = new Date().toISOString();
+      }
+      
+      const { data: updatedMatter, error } = await supabase
+        .from('matters')
+        .update(updateData)
+        .eq('id', matterId)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // Add note if reason provided
+      if (reason) {
+        await supabase.from('notes').insert({
+          matter_id: matterId,
+          advocate_id: currentMatter.advocate_id,
+          content: `Status changed from ${currentMatter.status} to ${newStatus}: ${reason}`,
+          is_internal: true
+        });
+      }
+      
+      // Audit log
+      await this.auditLog('matters', matterId, 'UPDATE', currentMatter, updatedMatter);
+      
+      toast.success(`Matter status updated to ${newStatus}`);
+      return updatedMatter;
+      
+    } catch (error) {
+      console.error('Error updating matter status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update matter status');
+      throw error;
+    }
+  }
+  
+  // Get matters with filtering, sorting, and pagination
+  static async getMatters(options: {
+    page?: number;
+    pageSize?: number;
+    status?: MatterStatus[];
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  } = {}) {
+    const {
+      page = 1,
+      pageSize = 10,
+      status,
+      search,
+      sortBy = 'created_at',
+      sortOrder = 'desc'
+    } = options;
+    
+    try {
+      let query = supabase
+        .from('matters')
+        .select('*, time_entries(count)', { count: 'exact' })
+        .is('deleted_at', null);
+      
+      // Apply filters
+      if (status && status.length > 0) {
+        query = query.in('status', status);
+      }
+      
+      if (search) {
+        query = query.or(`title.ilike.%${search}%,client_name.ilike.%${search}%,reference_number.ilike.%${search}%`);
+      }
+      
+      // Apply sorting
+      query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+      
+      // Apply pagination
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+      
+      const { data, error, count } = await query;
+      
+      if (error) throw error;
+      
+      return {
+        data: data || [],
+        pagination: {
+          page,
+          pageSize,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / pageSize)
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error fetching matters:', error);
+      toast.error('Failed to fetch matters');
+      throw error;
+    }
+  }
+  
+  // Helper: Generate reference number
+  private static async generateReferenceNumber(bar: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = bar === 'johannesburg' ? 'JHB' : 'CPT';
+    
+    // Get the last reference number for this year and bar
+    const { data } = await supabase
+      .from('matters')
+      .select('reference_number')
+      .like('reference_number', `${prefix}/${year}/%`)
+      .order('reference_number', { ascending: false })
+      .limit(1);
+    
+    let nextNumber = 1;
+    if (data && data.length > 0) {
+      const lastRef = data[0].reference_number;
+      const lastNumber = parseInt(lastRef.split('/').pop() || '0');
+      nextNumber = lastNumber + 1;
+    }
+    
+    return `${prefix}/${year}/${nextNumber.toString().padStart(4, '0')}`;
+  }
+  
+  // Helper: Validate status transitions
+  private static isValidStatusTransition(from: MatterStatus, to: MatterStatus): boolean {
+    const validTransitions: Record<MatterStatus, MatterStatus[]> = {
+      'pending': ['active', 'closed'],
+      'active': ['settled', 'closed', 'on_hold'],
+      'on_hold': ['active', 'closed'],
+      'settled': ['closed'],
+      'closed': [] // No transitions from closed
+    };
+    
+    return validTransitions[from]?.includes(to) || false;
+  }
+  
+  // Helper: Confirm conflict override
+  private static async confirmConflictOverride(reason: string): Promise<boolean> {
+    // In a real implementation, this would show a modal
+    return confirm(`Conflict detected: ${reason}\n\nDo you want to proceed anyway?`);
+  }
+  
+  // Helper: Audit logging
+  private static async auditLog(
+    table: string,
+    recordId: string,
+    action: string,
+    oldValues: any,
+    newValues: any
+  ) {
+    await supabase.from('audit_log').insert({
+      table_name: table,
+      record_id: recordId,
+      action,
+      old_values: oldValues,
+      new_values: newValues
+    });
+  }
+}
+*/
