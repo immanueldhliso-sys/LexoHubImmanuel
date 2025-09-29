@@ -43,7 +43,9 @@ export enum InvoiceStatus {
   PAID = 'paid',
   OVERDUE = 'overdue',
   DISPUTED = 'disputed',
-  WRITTEN_OFF = 'written_off'
+  WRITTEN_OFF = 'written_off',
+  PRO_FORMA = 'pro_forma',
+  CONVERTED = 'converted'
 }
 
 export enum PaymentMethod {
@@ -380,6 +382,23 @@ export interface InvoiceFilters {
   maxAmount?: number;
   isOverdue?: boolean;
   paymentMethod?: PaymentMethod[];
+}
+
+export interface ProFormaFilters {
+  search: string;
+  status: 'all' | 'active' | 'converted' | 'expired';
+  dateRange: {
+    start: string;
+    end: string;
+  } | null;
+}
+
+export interface ProFormaSummaryStats {
+  totalCount: number;
+  estimatedValue: number;
+  currentMonthCount: number;
+  conversionRate: number;
+  averageValue: number;
 }
 
 export interface SortConfig<T> {

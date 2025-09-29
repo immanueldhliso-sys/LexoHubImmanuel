@@ -4,8 +4,12 @@ import {
   Invoice, 
   InvoiceStatus, 
   TimeEntry, 
-  Matter
+  Matter,
+  BarPaymentRules,
+  InvoiceGenerationRequest
 } from '../../types';
+import { toast } from 'react-hot-toast';
+import { format, addDays } from 'date-fns';
 
 // South African Bar Payment Rules
 const BAR_PAYMENT_RULES: Record<string, BarPaymentRules> = {
@@ -458,6 +462,278 @@ export class InvoiceService {
     } catch (error) {
       console.error('Error recording payment:', error);
       const message = error instanceof Error ? error.message : 'Failed to record payment';
+      toast.error(message);
+      throw error;
+    }
+  }
+
+  // Convert pro forma to final invoice
+  static async convertProFormaToFinal(proFormaId: string): Promise<Invoice> {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get the pro forma invoice
+      const { data: proForma, error: proFormaError } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', proFormaId)
+        .eq('advocate_id', user.id)
+        .eq('status', 'pro_forma')
+        .single();
+
+      if (proFormaError || !proForma) {
+        throw new Error('Pro forma invoice not found or unauthorized');
+      }
+
+      // Get the matter details
+      const { data: matter, error: matterError } = await supabase
+        .from('matters')
+        .select('*')
+        .eq('id', proForma.matter_id)
+        .single();
+
+      if (matterError || !matter) {
+        throw new Error('Associated matter not found');
+      }
+
+      // Get the time entries associated with this pro forma
+      const { data: timeEntries, error: timeEntriesError } = await supabase
+        .from('time_entries')
+        .select('*')
+        .eq('matter_id', proForma.matter_id)
+        .eq('billed', false)
+        .is('deleted_at', null);
+
+      if (timeEntriesError) {
+        throw timeEntriesError;
+      }
+
+      // Generate new invoice number for final invoice
+      const finalInvoiceNumber = await this.generateInvoiceNumber(matter.bar);
+
+      // Create the final invoice based on pro forma data
+      const { data: finalInvoice, error: finalInvoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          matter_id: proForma.matter_id,
+          advocate_id: user.id,
+          invoice_number: finalInvoiceNumber,
+          invoice_date: new Date().toISOString().split('T')[0],
+          due_date: proForma.due_date,
+          bar: proForma.bar,
+          fees_amount: proForma.fees_amount,
+          disbursements_amount: proForma.disbursements_amount,
+          subtotal: proForma.subtotal,
+          vat_rate: proForma.vat_rate,
+          vat_amount: proForma.vat_amount,
+          total_amount: proForma.total_amount,
+          status: 'draft',
+          fee_narrative: proForma.fee_narrative,
+          internal_notes: `Converted from pro forma ${proForma.invoice_number}`,
+          reminders_sent: 0,
+          reminder_history: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (finalInvoiceError) {
+        throw new Error(`Failed to create final invoice: ${finalInvoiceError.message}`);
+      }
+
+      // Update the pro forma status to indicate conversion
+      await supabase
+        .from('invoices')
+        .update({
+          status: 'converted',
+          internal_notes: `Converted to final invoice ${finalInvoiceNumber}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', proFormaId);
+
+      // Mark time entries as billed and associate with final invoice
+      if (timeEntries && timeEntries.length > 0) {
+        await supabase
+          .from('time_entries')
+          .update({
+            billed: true,
+            invoice_id: finalInvoice.id,
+            updated_at: new Date().toISOString()
+          })
+          .in('id', timeEntries.map(e => e.id));
+      }
+
+      // Update matter WIP value
+      await supabase
+        .from('matters')
+        .update({
+          wip_value: Math.max(0, (matter.wip_value || 0) - proForma.fees_amount),
+          actual_fee: (matter.actual_fee || 0) + proForma.fees_amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', matter.id);
+
+      toast.success('Pro forma converted to final invoice successfully');
+      return this.mapDatabaseToInvoice(finalInvoice);
+
+    } catch (error) {
+      console.error('Error converting pro forma to final invoice:', error);
+      const message = error instanceof Error ? error.message : 'Failed to convert pro forma';
+      toast.error(message);
+      throw error;
+    }
+  }
+
+  // Send invoice to client
+  static async sendInvoice(invoiceId: string): Promise<void> {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: invoice, error } = await supabase
+        .from('invoices')
+        .update({ 
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', invoiceId)
+        .eq('advocate_id', user.id)
+        .select()
+        .single();
+      
+      if (error || !invoice) {
+        throw new Error('Invoice not found or unauthorized');
+      }
+      
+      toast.success('Invoice sent successfully');
+      
+    } catch (error) {
+      console.error('Error sending invoice:', error);
+      const message = error instanceof Error ? error.message : 'Failed to send invoice';
+      toast.error(message);
+      throw error;
+    }
+  }
+
+  // Download invoice PDF
+  static async downloadInvoicePDF(invoiceId: string): Promise<void> {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get invoice details
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', invoiceId)
+        .eq('advocate_id', user.id)
+        .single();
+
+      if (invoiceError || !invoice) {
+        throw new Error('Invoice not found or unauthorized');
+      }
+
+      // For now, we'll create a simple text-based download
+      // In production, this would generate a proper PDF
+      const invoiceContent = `
+INVOICE ${invoice.invoice_number}
+
+Date: ${new Date(invoice.invoice_date).toLocaleDateString()}
+Due Date: ${new Date(invoice.due_date).toLocaleDateString()}
+
+Professional Fees: R${invoice.fees_amount.toFixed(2)}
+Disbursements: R${invoice.disbursements_amount.toFixed(2)}
+VAT: R${invoice.vat_amount.toFixed(2)}
+Total: R${invoice.total_amount.toFixed(2)}
+
+Fee Narrative:
+${invoice.fee_narrative || 'No narrative provided'}
+      `;
+
+      const blob = new Blob([invoiceContent], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${invoice.invoice_number}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      const message = error instanceof Error ? error.message : 'Failed to download invoice';
+      toast.error(message);
+      throw error;
+    }
+  }
+
+  // Update invoice
+  static async updateInvoice(invoiceId: string, updates: Partial<Invoice>): Promise<Invoice> {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: invoice, error } = await supabase
+        .from('invoices')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', invoiceId)
+        .eq('advocate_id', user.id)
+        .select()
+        .single();
+        
+      if (error || !invoice) {
+        throw new Error('Invoice not found or unauthorized');
+      }
+      
+      return this.mapDatabaseToInvoice(invoice);
+      
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      const message = error instanceof Error ? error.message : 'Failed to update invoice';
+      toast.error(message);
+      throw error;
+    }
+  }
+
+  // Delete invoice
+  static async deleteInvoice(invoiceId: string): Promise<void> {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          deleted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', invoiceId)
+        .eq('advocate_id', user.id);
+        
+      if (error) {
+        throw new Error(`Failed to delete invoice: ${error.message}`);
+      }
+      
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      const message = error instanceof Error ? error.message : 'Failed to delete invoice';
       toast.error(message);
       throw error;
     }

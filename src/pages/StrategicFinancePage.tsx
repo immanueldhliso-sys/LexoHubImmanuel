@@ -19,11 +19,15 @@ import {
   type PracticeFinancialHealth,
   type FactoringOffer
 } from '../services/api/strategic-finance.service';
+import { InvoiceService } from '../services/api/invoices.service';
 import { CashFlowChart } from '@/components/strategic-finance/CashFlowChart';
 import { FinancialHealthCard } from '@/components/strategic-finance/FinancialHealthCard';
 import { FactoringMarketplace } from '@/components/strategic-finance/FactoringMarketplace';
 import { SuccessFeeCalculator } from '@/components/strategic-finance/SuccessFeeCalculator';
 import { FeeOptimizationCard } from '@/components/strategic-finance/FeeOptimizationCard';
+import { Button, Card, CardHeader, CardContent } from '../design-system/components';
+import { toast } from 'react-hot-toast';
+import type { Invoice, InvoiceStatus } from '../types';
 // import { AdvancedCashFlowChart } from '../components/strategic-finance/AdvancedCashFlowChart';
 
 export const StrategicFinancePage: React.FC = () => {
@@ -34,6 +38,19 @@ export const StrategicFinancePage: React.FC = () => {
   const [factoringOffers, setFactoringOffers] = useState<FactoringOffer[]>([]);
   const [showSuccessFeeCalculator, setShowSuccessFeeCalculator] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<{
+    totalOutstanding: number;
+    overdueAmount: number;
+    averagePaymentDays: number;
+    recentInvoices: Invoice[];
+    agingAnalysis: { range: string; amount: number; count: number }[];
+  }>({
+    totalOutstanding: 0,
+    overdueAmount: 0,
+    averagePaymentDays: 0,
+    recentInvoices: [],
+    agingAnalysis: []
+  });
 
   useEffect(() => {
     void loadData();
@@ -43,8 +60,12 @@ export const StrategicFinancePage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Always load financial health
-      const health = await StrategicFinanceService.getPracticeFinancialHealth();
+      // Always load financial health and invoice data
+      const [health, invoices] = await Promise.all([
+        StrategicFinanceService.getPracticeFinancialHealth(),
+        loadInvoiceData()
+      ]);
+      
       setFinancialHealth(health);
 
       // Load tab-specific data
@@ -57,8 +78,82 @@ export const StrategicFinancePage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading data:', error);
+      toast.error('Failed to load financial data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadInvoiceData = async () => {
+    try {
+      const response = await InvoiceService.getInvoices({ 
+        page: 1, 
+        pageSize: 100,
+        sortBy: 'created_at',
+        sortOrder: 'desc'
+      });
+      
+      const invoices = response.data;
+      const now = new Date();
+      
+      // Calculate outstanding amounts
+      const outstandingInvoices = invoices.filter(inv => 
+        inv.status !== InvoiceStatus.PAID && inv.status !== InvoiceStatus.WRITTEN_OFF
+      );
+      
+      const totalOutstanding = outstandingInvoices.reduce((sum, inv) => 
+        sum + (inv.total_amount - (inv.amount_paid || 0)), 0
+      );
+      
+      const overdueInvoices = invoices.filter(inv => 
+        inv.status === InvoiceStatus.OVERDUE
+      );
+      
+      const overdueAmount = overdueInvoices.reduce((sum, inv) => 
+        sum + (inv.total_amount - (inv.amount_paid || 0)), 0
+      );
+      
+      // Calculate aging analysis
+      const agingRanges = [
+        { range: '0-30 days', min: 0, max: 30 },
+        { range: '31-60 days', min: 31, max: 60 },
+        { range: '61-90 days', min: 61, max: 90 },
+        { range: '90+ days', min: 91, max: Infinity }
+      ];
+      
+      const agingAnalysis = agingRanges.map(range => {
+        const rangeInvoices = outstandingInvoices.filter(inv => {
+          const daysPastDue = Math.floor((now.getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24));
+          return daysPastDue >= range.min && daysPastDue <= range.max;
+        });
+        
+        return {
+          range: range.range,
+          amount: rangeInvoices.reduce((sum, inv) => sum + (inv.total_amount - (inv.amount_paid || 0)), 0),
+          count: rangeInvoices.length
+        };
+      });
+      
+      // Calculate average payment days (simplified calculation)
+      const paidInvoices = invoices.filter(inv => inv.status === InvoiceStatus.PAID && inv.date_paid);
+      const averagePaymentDays = paidInvoices.length > 0 
+        ? paidInvoices.reduce((sum, inv) => {
+            const daysToPay = Math.floor((new Date(inv.date_paid!).getTime() - new Date(inv.invoice_date).getTime()) / (1000 * 60 * 60 * 24));
+            return sum + daysToPay;
+          }, 0) / paidInvoices.length
+        : 0;
+      
+      setInvoiceData({
+        totalOutstanding,
+        overdueAmount,
+        averagePaymentDays,
+        recentInvoices: invoices.slice(0, 10),
+        agingAnalysis
+      });
+      
+    } catch (error) {
+      console.error('Error loading invoice data:', error);
+      toast.error('Failed to load invoice data');
     }
   };
 
@@ -67,10 +162,52 @@ export const StrategicFinancePage: React.FC = () => {
     try {
       await StrategicFinanceService.calculatePracticeMetrics();
       await loadData();
+      toast.success('Financial metrics refreshed successfully');
     } catch (error) {
       console.error('Error refreshing metrics:', error);
+      toast.error('Failed to refresh metrics');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleOptimizeCashFlow = async () => {
+    try {
+      // Generate cash flow optimization recommendations
+      const recommendations = await StrategicFinanceService.generateCashFlowOptimization();
+      toast.success('Cash flow optimization recommendations generated');
+      // This would open a modal or navigate to detailed recommendations
+    } catch (error) {
+      console.error('Error generating cash flow optimization:', error);
+      toast.error('Failed to generate optimization recommendations');
+    }
+  };
+
+  const handleInvoiceAging = () => {
+    // Navigate to detailed invoice aging report
+    toast.info('Opening detailed invoice aging analysis...');
+    // This would open a modal or navigate to a detailed aging report
+  };
+
+  const handleFactorInvoices = async (selectedInvoices: string[]) => {
+    try {
+      const result = await StrategicFinanceService.submitFactoringRequest(selectedInvoices);
+      toast.success(`Factoring request submitted for ${selectedInvoices.length} invoices`);
+      await loadData(); // Refresh data
+    } catch (error) {
+      console.error('Error submitting factoring request:', error);
+      toast.error('Failed to submit factoring request');
+    }
+  };
+
+  const handleFeeOptimization = async (matterId?: string) => {
+    try {
+      const recommendations = await StrategicFinanceService.generateFeeOptimizationRecommendations(matterId);
+      toast.success('Fee optimization recommendations generated');
+      // This would open a modal with recommendations
+    } catch (error) {
+      console.error('Error generating fee optimization:', error);
+      toast.error('Failed to generate fee optimization recommendations');
     }
   };
 
@@ -108,21 +245,29 @@ export const StrategicFinancePage: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <button
+              <Button
+                variant="primary"
                 onClick={() => setShowSuccessFeeCalculator(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-mpondo-gold-600 text-white rounded-lg hover:bg-mpondo-gold-700 transition-colors"
+                className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
               >
-                <Calculator className="w-4 h-4" />
+                <Calculator className="w-4 h-4 mr-2" />
                 Success Fee Calculator
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleOptimizeCashFlow}
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Optimize Cash Flow
+              </Button>
+              <Button
+                variant="outline"
                 onClick={refreshMetrics}
                 disabled={refreshing}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -274,6 +419,58 @@ export const StrategicFinancePage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Invoice Aging Analysis */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <h3 className="text-lg font-semibold text-neutral-900">Invoice Aging Analysis</h3>
+                    <Button variant="outline" size="sm" onClick={handleInvoiceAging}>
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      View Details
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {invoiceData.agingAnalysis.map((range, index) => (
+                        <div key={range.range} className="text-center">
+                          <div className={`p-4 rounded-lg ${
+                            index === 0 ? 'bg-status-success-50' :
+                            index === 1 ? 'bg-status-warning-50' :
+                            index === 2 ? 'bg-status-error-50' :
+                            'bg-status-error-100'
+                          }`}>
+                            <p className="text-sm font-medium text-neutral-600">{range.range}</p>
+                            <p className="text-xl font-bold text-neutral-900">
+                              R{range.amount.toLocaleString('en-ZA')}
+                            </p>
+                            <p className="text-xs text-neutral-500">{range.count} invoices</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center p-4 bg-neutral-50 rounded-lg">
+                        <p className="text-sm text-neutral-600">Total Outstanding</p>
+                        <p className="text-2xl font-bold text-neutral-900">
+                          R{invoiceData.totalOutstanding.toLocaleString('en-ZA')}
+                        </p>
+                      </div>
+                      <div className="text-center p-4 bg-status-error-50 rounded-lg">
+                        <p className="text-sm text-neutral-600">Overdue Amount</p>
+                        <p className="text-2xl font-bold text-status-error-600">
+                          R{invoiceData.overdueAmount.toLocaleString('en-ZA')}
+                        </p>
+                      </div>
+                      <div className="text-center p-4 bg-judicial-blue-50 rounded-lg">
+                        <p className="text-sm text-neutral-600">Avg Payment Days</p>
+                        <p className="text-2xl font-bold text-judicial-blue-600">
+                          {invoiceData.averagePaymentDays.toFixed(0)} days
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Alerts and Opportunities */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {financialHealth?.riskAlerts && financialHealth.riskAlerts.length > 0 && (
@@ -356,38 +553,245 @@ export const StrategicFinancePage: React.FC = () => {
                 {/* Cash Flow Chart */}
                 <CashFlowChart predictions={cashFlowPredictions} />
 
-                {/* Seasonal Insights */}
-                <div className="bg-white rounded-lg border border-neutral-200 p-6">
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Seasonal Insights</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {cashFlowPredictions.filter(p => p.seasonalAdjustment && p.seasonalAdjustment !== 0).map(prediction => (
-                      <div key={prediction.id} className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-neutral-900">
-                            {format(new Date(prediction.periodStart), 'MMMM')}
-                          </p>
-                          <p className="text-sm text-neutral-600">
-                            Historical adjustment: {prediction.seasonalAdjustment! > 0 ? '+' : ''}{prediction.seasonalAdjustment!.toFixed(0)}%
-                          </p>
+                {/* Cash Flow Actions */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <h3 className="text-lg font-semibold text-neutral-900">Cash Flow Actions</h3>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={handleOptimizeCashFlow}>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Optimize
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => toast.info('Exporting cash flow forecast...')}>
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Export Forecast
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-medium text-neutral-900 mb-3">Immediate Actions</h4>
+                        <div className="space-y-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-start"
+                            onClick={() => toast.info('Sending payment reminders...')}
+                          >
+                            Send Payment Reminders ({invoiceData.agingAnalysis.find(a => a.range === '31-60 days')?.count || 0})
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-start"
+                            onClick={() => toast.info('Reviewing overdue accounts...')}
+                          >
+                            Review Overdue Accounts ({invoiceData.agingAnalysis.find(a => a.range === '90+ days')?.count || 0})
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-start"
+                            onClick={() => {
+                              const eligibleInvoices = invoiceData.recentInvoices
+                                .filter(inv => inv.status !== InvoiceStatus.PAID)
+                                .map(inv => inv.id);
+                              handleFactorInvoices(eligibleInvoices);
+                            }}
+                          >
+                            Consider Invoice Factoring
+                          </Button>
                         </div>
-                        {prediction.seasonalAdjustment! > 0 ? (
-                          <ArrowUpRight className="w-5 h-5 text-success-600" />
-                        ) : (
-                          <ArrowDownRight className="w-5 h-5 text-error-600" />
-                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-neutral-900 mb-3">Strategic Actions</h4>
+                        <div className="space-y-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-start"
+                            onClick={() => handleFeeOptimization()}
+                          >
+                            Optimize Fee Structure
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-start"
+                            onClick={() => toast.info('Reviewing payment terms...')}
+                          >
+                            Review Payment Terms
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-start"
+                            onClick={() => setShowSuccessFeeCalculator(true)}
+                          >
+                            Explore Success Fees
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Seasonal Insights */}
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-lg font-semibold text-neutral-900">Seasonal Insights</h3>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {cashFlowPredictions.filter(p => p.seasonalAdjustment && p.seasonalAdjustment !== 0).map(prediction => (
+                        <div key={prediction.id} className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
+                          <div>
+                            <p className="font-medium text-neutral-900">
+                              {format(new Date(prediction.periodStart), 'MMMM')}
+                            </p>
+                            <p className="text-sm text-neutral-600">
+                              Historical adjustment: {prediction.seasonalAdjustment! > 0 ? '+' : ''}{prediction.seasonalAdjustment!.toFixed(0)}%
+                            </p>
+                          </div>
+                          {prediction.seasonalAdjustment! > 0 ? (
+                            <ArrowUpRight className="w-5 h-5 text-success-600" />
+                          ) : (
+                            <ArrowDownRight className="w-5 h-5 text-error-600" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
 
             {activeTab === 'factoring' && (
-              <FactoringMarketplace offers={factoringOffers} />
+              <div className="space-y-6">
+                {/* Factoring Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <div className="text-mpondo-gold-500 mb-2">
+                        <DollarSign className="w-8 h-8 mx-auto" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-neutral-900">
+                        R{invoiceData.totalOutstanding.toLocaleString('en-ZA')}
+                      </h3>
+                      <p className="text-sm text-neutral-600">Available for Factoring</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <div className="text-judicial-blue-500 mb-2">
+                        <Calendar className="w-8 h-8 mx-auto" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-neutral-900">
+                        {invoiceData.recentInvoices.filter(inv => inv.status !== InvoiceStatus.PAID).length}
+                      </h3>
+                      <p className="text-sm text-neutral-600">Eligible Invoices</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <div className="text-status-success-500 mb-2">
+                        <TrendingUp className="w-8 h-8 mx-auto" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-neutral-900">
+                        85-95%
+                      </h3>
+                      <p className="text-sm text-neutral-600">Typical Advance Rate</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Quick Factor Button */}
+                <div className="flex justify-center">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={() => {
+                      const eligibleInvoices = invoiceData.recentInvoices
+                        .filter(inv => inv.status !== InvoiceStatus.PAID)
+                        .map(inv => inv.id);
+                      handleFactorInvoices(eligibleInvoices);
+                    }}
+                    disabled={invoiceData.recentInvoices.filter(inv => inv.status !== InvoiceStatus.PAID).length === 0}
+                    className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
+                  >
+                    <DollarSign className="w-5 h-5 mr-2" />
+                    Factor Outstanding Invoices
+                  </Button>
+                </div>
+
+                {/* Factoring Marketplace */}
+                <FactoringMarketplace offers={factoringOffers} />
+              </div>
             )}
 
             {activeTab === 'optimization' && (
-              <FeeOptimizationCard />
+              <div className="space-y-6">
+                {/* Optimization Actions */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Card hoverable className="cursor-pointer" onClick={() => handleFeeOptimization()}>
+                    <CardContent className="p-6 text-center">
+                      <div className="text-mpondo-gold-500 mb-4">
+                        <Zap className="w-12 h-12 mx-auto" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                        Optimize Fee Structure
+                      </h3>
+                      <p className="text-sm text-neutral-600 mb-4">
+                        Get AI-powered recommendations to optimize your fee structure based on market data and performance.
+                      </p>
+                      <Button variant="outline" size="sm">
+                        Generate Recommendations
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card hoverable className="cursor-pointer" onClick={handleOptimizeCashFlow}>
+                    <CardContent className="p-6 text-center">
+                      <div className="text-judicial-blue-500 mb-4">
+                        <TrendingUp className="w-12 h-12 mx-auto" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                        Cash Flow Optimization
+                      </h3>
+                      <p className="text-sm text-neutral-600 mb-4">
+                        Optimize payment terms and collection strategies to improve cash flow.
+                      </p>
+                      <Button variant="outline" size="sm">
+                        Optimize Cash Flow
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card hoverable className="cursor-pointer" onClick={() => setShowSuccessFeeCalculator(true)}>
+                    <CardContent className="p-6 text-center">
+                      <div className="text-status-success-500 mb-4">
+                        <Calculator className="w-12 h-12 mx-auto" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                        Success Fee Analysis
+                      </h3>
+                      <p className="text-sm text-neutral-600 mb-4">
+                        Calculate optimal success fee structures for performance-based pricing.
+                      </p>
+                      <Button variant="outline" size="sm">
+                        Calculate Fees
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Fee Optimization Component */}
+                <FeeOptimizationCard />
+              </div>
             )}
           </>
         )}

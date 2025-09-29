@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, FileText, AlertCircle, TrendingUp } from 'lucide-react';
+import { Plus, FileText, AlertCircle, TrendingUp, RefreshCw } from 'lucide-react';
 import { InvoiceCard } from './InvoiceCard';
 import { InvoiceFilters } from './InvoiceFilters';
 import { InvoiceGenerationModal } from './InvoiceGenerationModal';
 import { PaymentModal } from './PaymentModal';
+import { InvoiceDetailsModal } from './InvoiceDetailsModal';
 import { InvoiceService } from '@/services/api/invoices.service';
 import { formatRand } from '../../lib/currency';
+import { toast } from 'react-hot-toast';
 import type { Invoice, InvoiceStatus, Bar } from '@/types';
 
 interface InvoiceListProps {
@@ -26,6 +28,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ className = '' }) => {
   const [error, setError] = useState<string | null>(null);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   
   const [filters, setFilters] = useState<InvoiceFilters>({
@@ -117,11 +120,55 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ className = '' }) => {
 
   const handleSendInvoice = async (invoice: Invoice) => {
     try {
-      await invoiceService.sendInvoice(invoice.id);
+      await InvoiceService.sendInvoice(invoice.id);
       loadInvoices(); // Refresh to show updated status
+      toast.success('Invoice sent successfully');
     } catch (err) {
       console.error('Error sending invoice:', err);
-      // You might want to show a toast notification here
+      toast.error('Failed to send invoice. Please try again.');
+    }
+  };
+
+  const handleViewInvoice = (invoice: Invoice) => {
+    // Open invoice details modal or navigate to details page
+    setSelectedInvoice(invoice);
+    setShowDetailsModal(true);
+  };
+
+  const handleDownloadInvoice = async (invoice: Invoice) => {
+    try {
+      // Generate and download PDF
+      await InvoiceService.downloadInvoicePDF(invoice.id);
+      toast.success('Invoice downloaded successfully');
+    } catch (err) {
+      console.error('Error downloading invoice:', err);
+      toast.error('Failed to download invoice. Please try again.');
+    }
+  };
+
+  const handleUpdateInvoiceStatus = async (invoiceId: string, newStatus: InvoiceStatus) => {
+    try {
+      await InvoiceService.updateInvoiceStatus(invoiceId, newStatus);
+      loadInvoices(); // Refresh to show updated status
+      toast.success(`Invoice status updated to ${newStatus}`);
+    } catch (err) {
+      console.error('Error updating invoice status:', err);
+      toast.error('Failed to update invoice status. Please try again.');
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    if (!confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      await InvoiceService.deleteInvoice(invoiceId);
+      loadInvoices(); // Refresh the list
+      toast.success('Invoice deleted successfully');
+    } catch (err) {
+      console.error('Error deleting invoice:', err);
+      toast.error('Failed to delete invoice. Please try again.');
     }
   };
 
@@ -265,8 +312,12 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ className = '' }) => {
               <InvoiceCard
                 key={invoice.id}
                 invoice={invoice}
+                onView={() => handleViewInvoice(invoice)}
+                onSend={() => handleSendInvoice(invoice)}
+                onDownload={() => handleDownloadInvoice(invoice)}
                 onRecordPayment={() => handleRecordPayment(invoice)}
-                onSendInvoice={() => handleSendInvoice(invoice)}
+                onUpdateStatus={(status) => handleUpdateInvoiceStatus(invoice.id, status)}
+                onDelete={() => handleDeleteInvoice(invoice.id)}
               />
             ))}
           </div>
@@ -290,6 +341,17 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ className = '' }) => {
             setSelectedInvoice(null);
           }}
           onPaymentRecorded={handlePaymentRecorded}
+        />
+      )}
+
+      {showDetailsModal && selectedInvoice && (
+        <InvoiceDetailsModal
+          invoice={selectedInvoice}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedInvoice(null);
+          }}
+          onInvoiceUpdated={loadInvoices}
         />
       )}
     </div>

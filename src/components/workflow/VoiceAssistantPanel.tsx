@@ -9,9 +9,12 @@ import {
   Globe,
   MessageCircle,
   Sparkles,
-  Clock
+  Clock,
+  Settings,
+  Loader
 } from 'lucide-react';
 import { Button, Card, CardHeader, CardContent } from '../../design-system/components';
+import { getEnhancedSpeechService, type SpeechRequest } from '../../services/enhanced-speech.service';
 import type { VoiceQuery } from '../../types';
 import { format } from 'date-fns';
 
@@ -35,11 +38,14 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({
   const [audioLevel, setAudioLevel] = useState(0);
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [lastResponse, setLastResponse] = useState<string>('');
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number>();
+  const enhancedSpeechRef = useRef(getEnhancedSpeechService());
 
   const languages = [
     { code: 'en', name: 'English', nativeName: 'English' },
@@ -148,12 +154,55 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({
 
     setIsProcessing(true);
     try {
-      await onProcessQuery(queryText, selectedLanguage);
+      const response = await onProcessQuery(queryText, selectedLanguage);
       setTextQuery('');
       setTranscript('');
+      
+      // Store response for potential speech synthesis
+      if (response && typeof response === 'string') {
+        setLastResponse(response);
+        // Automatically speak the response
+        await speakResponse(response);
+      }
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const speakResponse = async (text: string) => {
+    if (!text.trim() || isSpeaking) return;
+
+    setIsSpeaking(true);
+    try {
+      const speechRequest: SpeechRequest = {
+        text,
+        language: selectedLanguage,
+        useCase: 'notification',
+        priority: 'normal'
+      };
+
+      const result = await enhancedSpeechRef.current.speak(speechRequest);
+      
+      if (result.success && result.audioElement) {
+        result.audioElement.onended = () => {
+          setIsSpeaking(false);
+        };
+        
+        result.audioElement.onerror = () => {
+          setIsSpeaking(false);
+        };
+      } else {
+        setIsSpeaking(false);
+      }
+    } catch (error) {
+      console.error('Speech synthesis failed:', error);
+      setIsSpeaking(false);
+    }
+  };
+
+  const stopSpeaking = () => {
+    enhancedSpeechRef.current.stopSpeech();
+    setIsSpeaking(false);
   };
 
   const handleTextSubmit = (e: React.FormEvent) => {
@@ -213,7 +262,8 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({
         <CardContent>
           <div className="space-y-4">
             {/* Voice Controls */}
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center gap-4">
+              {/* Main Microphone Button */}
               <div className="relative">
                 <button
                   onClick={isListening ? stopListening : startListening}
@@ -244,6 +294,26 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Speaker Control Button */}
+              {lastResponse && (
+                <button
+                  onClick={isSpeaking ? stopSpeaking : () => speakResponse(lastResponse)}
+                  disabled={isProcessing}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                    isSpeaking
+                      ? 'bg-blue-500 hover:bg-blue-600 shadow-lg scale-105'
+                      : 'bg-neutral-500 hover:bg-neutral-600 shadow-md'
+                  } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={isSpeaking ? 'Stop speaking' : 'Repeat last response'}
+                >
+                  {isSpeaking ? (
+                    <VolumeX className="w-5 h-5 text-white" />
+                  ) : (
+                    <Volume2 className="w-5 h-5 text-white" />
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="text-center">

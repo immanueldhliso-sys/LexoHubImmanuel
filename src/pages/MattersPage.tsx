@@ -1,9 +1,23 @@
 import React, { useState, useMemo } from 'react';
-import { Briefcase } from 'lucide-react';
-import { Card, CardContent, Button } from '../design-system/components';
+import { 
+  Briefcase, 
+  FileText, 
+  Plus, 
+  DollarSign, 
+  Clock, 
+  AlertTriangle,
+  TrendingUp,
+  Eye,
+  Send,
+  Calculator
+} from 'lucide-react';
+import { Card, CardContent, Button, CardHeader } from '../design-system/components';
 import { VoiceRecordingModal, VoiceNotesList, VoiceTimeEntryForm } from '../components/voice';
+import { InvoiceGenerationModal } from '../components/invoices/InvoiceGenerationModal';
 import { voiceManagementService } from '../services/voice-management.service';
-import type { Matter, VoiceRecording, TimeEntry } from '../types';
+import { InvoiceService } from '../services/api/invoices.service';
+import { toast } from 'react-hot-toast';
+import type { Matter, VoiceRecording, TimeEntry, Invoice } from '../types';
 import { MatterStatus, BarAssociation, FeeType, RiskLevel } from '../types';
 
 const MattersPage: React.FC = () => {
@@ -13,9 +27,12 @@ const MattersPage: React.FC = () => {
   const [showNewMatterModal, setShowNewMatterModal] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showVoiceTimeEntryForm, setShowVoiceTimeEntryForm] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedMatter, setSelectedMatter] = useState<Matter | null>(null);
   const [selectedVoiceRecording, setSelectedVoiceRecording] = useState<VoiceRecording | null>(null);
   const [voiceRecordings, setVoiceRecordings] = useState<VoiceRecording[]>([]);
   const [playingRecordingId, setPlayingRecordingId] = useState<string | undefined>(undefined);
+  const [matterInvoices, setMatterInvoices] = useState<Record<string, Invoice[]>>({});
 
   // Mock data - in real app this would come from API
   const mockMatters: Matter[] = useMemo(() => [
@@ -70,10 +87,31 @@ const MattersPage: React.FC = () => {
     }
   ], []);
 
-  // Load existing voice recordings on component mount
+  // Load existing voice recordings and matter invoices on component mount
   React.useEffect(() => {
     setVoiceRecordings(voiceManagementService.getVoiceRecordings());
+    loadMatterInvoices();
   }, []);
+
+  const loadMatterInvoices = async () => {
+    try {
+      // Load invoices for all matters
+      const invoicePromises = mockMatters.map(async (matter) => {
+        const response = await InvoiceService.getInvoices({ matterId: matter.id });
+        return { matterId: matter.id, invoices: response.data };
+      });
+      
+      const results = await Promise.all(invoicePromises);
+      const invoiceMap: Record<string, Invoice[]> = {};
+      results.forEach(({ matterId, invoices }) => {
+        invoiceMap[matterId] = invoices;
+      });
+      
+      setMatterInvoices(invoiceMap);
+    } catch (error) {
+      console.error('Error loading matter invoices:', error);
+    }
+  };
 
   // Voice Recording Event Handlers
   const voiceHandlers = React.useMemo(() => {
@@ -139,6 +177,40 @@ const MattersPage: React.FC = () => {
       handleTimeEntrySave
     };
   }, [playingRecordingId, mockMatters]);
+
+  // Invoice Generation Handlers
+  const handleGenerateInvoice = (matter: Matter, isProForma: boolean = false) => {
+    setSelectedMatter(matter);
+    setShowInvoiceModal(true);
+  };
+
+  const handleInvoiceGenerated = async () => {
+    setShowInvoiceModal(false);
+    setSelectedMatter(null);
+    await loadMatterInvoices(); // Refresh invoice data
+    toast.success('Invoice generated successfully');
+  };
+
+  const handleViewMatterInvoices = (matter: Matter) => {
+    // Navigate to invoices page with matter filter
+    // This would be implemented with proper navigation
+    toast.info(`Viewing invoices for ${matter.title}`);
+  };
+
+  const getMatterFinancialSummary = (matter: Matter) => {
+    const invoices = matterInvoices[matter.id] || [];
+    const totalBilled = invoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+    const totalPaid = invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0);
+    const unbilledWip = matter.wip_value - totalBilled;
+    
+    return {
+      totalBilled,
+      totalPaid,
+      unbilledWip,
+      invoiceCount: invoices.length,
+      hasOverdue: invoices.some(inv => inv.status === 'overdue')
+    };
+  };
 
   const filteredMatters = useMemo(() => {
     return mockMatters.filter(matter => {
@@ -212,32 +284,133 @@ const MattersPage: React.FC = () => {
               </CardContent>
             </Card>
           ) : (
-            filteredMatters.map((matter) => (
-              <Card key={matter.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-neutral-900">{matter.title}</h3>
-                      <p className="text-sm text-neutral-600">
-                        Client: {matter.client_name} • Attorney: {matter.instructing_attorney}
-                      </p>
-                      <p className="text-sm text-neutral-500 mt-1">
-                        WIP: R{matter.wip_value.toLocaleString()} • Risk: {matter.risk_level}
-                      </p>
+            filteredMatters.map((matter) => {
+              const financialSummary = getMatterFinancialSummary(matter);
+              
+              return (
+                <Card key={matter.id} variant="default" hoverable>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-neutral-900">{matter.title}</h3>
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            matter.status === MatterStatus.ACTIVE 
+                              ? 'bg-status-success-100 text-status-success-800' 
+                              : 'bg-neutral-100 text-neutral-800'
+                          }`}>
+                            {matter.status}
+                          </span>
+                          {financialSummary.hasOverdue && (
+                            <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-status-error-100 text-status-error-800">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Overdue
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-neutral-600">
+                          Client: {matter.client_name} • Attorney: {matter.instructing_attorney}
+                        </p>
+                        <p className="text-sm text-neutral-500 mt-1">
+                          {matter.instructing_firm} • Risk: {matter.risk_level}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        matter.status === MatterStatus.ACTIVE 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {matter.status}
-                      </span>
+                  </CardHeader>
+
+                  <CardContent className="pt-0">
+                    {/* Financial Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-neutral-50 rounded-lg">
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Clock className="w-4 h-4 text-neutral-400" />
+                          <span className="text-xs text-neutral-500">Unbilled WIP</span>
+                        </div>
+                        <p className="font-semibold text-neutral-900">
+                          R{financialSummary.unbilledWip.toLocaleString()}
+                        </p>
+                      </div>
+                      
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <FileText className="w-4 h-4 text-neutral-400" />
+                          <span className="text-xs text-neutral-500">Total Billed</span>
+                        </div>
+                        <p className="font-semibold text-neutral-900">
+                          R{financialSummary.totalBilled.toLocaleString()}
+                        </p>
+                      </div>
+                      
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <DollarSign className="w-4 h-4 text-neutral-400" />
+                          <span className="text-xs text-neutral-500">Collected</span>
+                        </div>
+                        <p className="font-semibold text-status-success-600">
+                          R{financialSummary.totalPaid.toLocaleString()}
+                        </p>
+                      </div>
+                      
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <TrendingUp className="w-4 h-4 text-neutral-400" />
+                          <span className="text-xs text-neutral-500">Settlement %</span>
+                        </div>
+                        <p className="font-semibold text-neutral-900">
+                          {matter.settlement_probability || 0}%
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleGenerateInvoice(matter, false)}
+                        disabled={financialSummary.unbilledWip <= 0}
+                        className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Generate Invoice
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleGenerateInvoice(matter, true)}
+                        disabled={financialSummary.unbilledWip <= 0}
+                      >
+                        <Calculator className="w-4 h-4 mr-2" />
+                        Pro Forma
+                      </Button>
+                      
+                      {financialSummary.invoiceCount > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewMatterInvoices(matter)}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Invoices ({financialSummary.invoiceCount})
+                        </Button>
+                      )}
+                      
+                      <div className="flex-1"></div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowVoiceModal(true)}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Time
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       )}
@@ -264,6 +437,20 @@ const MattersPage: React.FC = () => {
             setShowVoiceTimeEntryForm(false);
             setSelectedVoiceRecording(null);
           }}
+        />
+      )}
+
+      {/* Invoice Generation Modal */}
+      {showInvoiceModal && selectedMatter && (
+        <InvoiceGenerationModal
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            setSelectedMatter(null);
+          }}
+          matter={selectedMatter}
+          onInvoiceGenerated={handleInvoiceGenerated}
+          defaultToProForma={false}
         />
       )}
 

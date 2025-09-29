@@ -24,6 +24,7 @@ import { Card, CardHeader, CardContent, Button } from '../../design-system/compo
 import { toast } from 'react-hot-toast';
 import { AdvancedNLPService, type VoiceCommandResult, type NLPIntent } from '../../services/ai/nlp-processor.service';
 import { PredictiveAnalyticsService } from '../../services/ai/predictive-analytics.service';
+import { getEnhancedSpeechService, type SpeechRequest } from '../../services/enhanced-speech.service';
 
 interface AdvancedVoiceAssistantProps {
   onCommandExecuted?: (command: VoiceCommandResult) => void;
@@ -67,6 +68,7 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
   const [showInsights, setShowInsights] = useState(false);
   
   // Settings state
+  const [showSettings, setShowSettings] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState({
     language: 'en-ZA',
     autoExecute: true,
@@ -79,7 +81,7 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const enhancedSpeechRef = useRef(getEnhancedSpeechService());
 
   // Initialize speech recognition and synthesis
   useEffect(() => {
@@ -106,10 +108,7 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
       recognitionRef.current.onend = handleSpeechEnd;
     }
 
-    // Initialize Speech Synthesis
-    if ('speechSynthesis' in window) {
-      synthRef.current = window.speechSynthesis;
-    }
+    // Enhanced speech service is already initialized via ref
   };
 
   const cleanup = () => {
@@ -119,8 +118,8 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
     }
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (enhancedSpeechRef.current) {
+      enhancedSpeechRef.current.stopSpeech();
     }
   };
 
@@ -202,7 +201,7 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
       // Check confidence threshold
       if (result.intent.confidence < voiceSettings.confidenceThreshold) {
         session.response = `I'm not sure I understood that correctly. Could you please rephrase? (Confidence: ${Math.round(result.intent.confidence * 100)}%)`;
-        speakResponse(session.response);
+        await speakResponse(session.response);
         setVoiceSessions(prev => [session, ...prev]);
         return;
       }
@@ -215,7 +214,7 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
 
       // Speak response if enabled
       if (voiceSettings.voiceResponseEnabled) {
-        speakResponse(result.response);
+        await speakResponse(result.response);
       }
 
       // Add to session history
@@ -234,7 +233,7 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
     } catch (error) {
       console.error('Error processing voice command:', error);
       const errorMessage = 'Sorry, I encountered an error processing your request.';
-      speakResponse(errorMessage);
+      await speakResponse(errorMessage);
       toast.error('Voice command processing failed');
     } finally {
       setIsProcessing(false);
@@ -281,23 +280,35 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
     }
   };
 
-  const speakResponse = (text: string) => {
-    if (!synthRef.current || !voiceSettings.voiceResponseEnabled) return;
+  const speakResponse = async (text: string) => {
+    if (!enhancedSpeechRef.current || !voiceSettings.voiceResponseEnabled) return;
 
-    // Cancel any current speech
-    synthRef.current.cancel();
+    try {
+      const speechRequest: SpeechRequest = {
+        text,
+        language: voiceSettings.language,
+        useCase: 'assistant',
+        priority: 'high'
+      };
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = voiceSettings.language;
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 0.8;
-
-    utterance.onstart = () => setIsPlaying(true);
-    utterance.onend = () => setIsPlaying(false);
-    utterance.onerror = () => setIsPlaying(false);
-
-    synthRef.current.speak(utterance);
+      const result = await enhancedSpeechRef.current.speak(speechRequest);
+      
+      if (result.success) {
+        setIsPlaying(true);
+        
+        // Handle audio end event
+        if (result.audioElement) {
+          result.audioElement.onended = () => setIsPlaying(false);
+          result.audioElement.onerror = () => setIsPlaying(false);
+        } else {
+          // For browser speech synthesis, we need to handle differently
+          setTimeout(() => setIsPlaying(false), text.length * 50); // Rough estimate
+        }
+      }
+    } catch (error) {
+      console.error('Speech synthesis failed:', error);
+      setIsPlaying(false);
+    }
   };
 
   const generateContextualInsights = async (result: VoiceCommandResult) => {
@@ -429,7 +440,12 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
               >
                 <Sparkles className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowSettings(!showSettings)}
+                className={showSettings ? 'bg-mpondo-gold-100' : ''}
+              >
                 <Settings className="w-4 h-4" />
               </Button>
             </div>
@@ -507,6 +523,115 @@ export const AdvancedVoiceAssistant: React.FC<AdvancedVoiceAssistantProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Voice Settings Panel */}
+      {showSettings && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-mpondo-gold-500" />
+                <h3 className="text-lg font-semibold text-neutral-900">Voice Settings</h3>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Language Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-700">Language</label>
+              <select
+                value={voiceSettings.language}
+                onChange={(e) => setVoiceSettings(prev => ({ ...prev, language: e.target.value }))}
+                className="w-full p-2 border border-neutral-300 rounded-md focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
+              >
+                <option value="en-ZA">English (South Africa)</option>
+                <option value="en-US">English (US)</option>
+                <option value="en-GB">English (UK)</option>
+                <option value="af-ZA">Afrikaans</option>
+                <option value="zu-ZA">Zulu</option>
+                <option value="xh-ZA">Xhosa</option>
+              </select>
+            </div>
+
+            {/* Auto Execute Commands */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-neutral-700">Auto Execute Commands</label>
+                <p className="text-xs text-neutral-500">Automatically execute recognized commands</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={voiceSettings.autoExecute}
+                onChange={(e) => setVoiceSettings(prev => ({ ...prev, autoExecute: e.target.checked }))}
+                className="h-4 w-4 text-mpondo-gold-600 focus:ring-mpondo-gold-500 border-neutral-300 rounded"
+              />
+            </div>
+
+            {/* Confidence Threshold */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-700">
+                Confidence Threshold ({Math.round(voiceSettings.confidenceThreshold * 100)}%)
+              </label>
+              <input
+                type="range"
+                min="0.3"
+                max="1"
+                step="0.1"
+                value={voiceSettings.confidenceThreshold}
+                onChange={(e) => setVoiceSettings(prev => ({ ...prev, confidenceThreshold: parseFloat(e.target.value) }))}
+                className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer"
+              />
+              <p className="text-xs text-neutral-500">Minimum confidence required to execute commands</p>
+            </div>
+
+            {/* Voice Response */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-neutral-700">Voice Responses</label>
+                <p className="text-xs text-neutral-500">Enable spoken responses from the assistant</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={voiceSettings.voiceResponseEnabled}
+                onChange={(e) => setVoiceSettings(prev => ({ ...prev, voiceResponseEnabled: e.target.checked }))}
+                className="h-4 w-4 text-mpondo-gold-600 focus:ring-mpondo-gold-500 border-neutral-300 rounded"
+              />
+            </div>
+
+            {/* AI Insights */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-neutral-700">AI Insights</label>
+                <p className="text-xs text-neutral-500">Show predictive analytics and recommendations</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={voiceSettings.enableInsights}
+                onChange={(e) => setVoiceSettings(prev => ({ ...prev, enableInsights: e.target.checked }))}
+                className="h-4 w-4 text-mpondo-gold-600 focus:ring-mpondo-gold-500 border-neutral-300 rounded"
+              />
+            </div>
+
+            {/* Reset to Defaults */}
+            <div className="pt-4 border-t border-neutral-200">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVoiceSettings({
+                  language: 'en-ZA',
+                  autoExecute: true,
+                  confidenceThreshold: 0.7,
+                  enableInsights: true,
+                  voiceResponseEnabled: true
+                })}
+                className="w-full"
+              >
+                Reset to Defaults
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* AI Insights Panel */}
       {showInsights && aiInsights.length > 0 && (

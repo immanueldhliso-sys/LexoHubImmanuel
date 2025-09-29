@@ -8,12 +8,17 @@ import {
   TrendingUp, 
   Calendar,
   AlertTriangle,
-  Clock
+  Clock,
+  DollarSign,
+  Send,
+  Calculator,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { InvoiceService } from '../services/api/invoices.service';
 import { toast } from 'react-hot-toast';
-import type { Matter, Page } from '../types';
-import { MatterStatus, BarAssociation, FeeType, RiskLevel } from '../types';
+import type { Matter, Page, Invoice } from '../types';
+import { MatterStatus, BarAssociation, FeeType, RiskLevel, InvoiceStatus } from '../types';
 
 interface DashboardPageProps {
   onNavigate?: (page: Page) => void;
@@ -35,6 +40,19 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     isLoading: false
   });
 
+  const [invoiceMetrics, setInvoiceMetrics] = useState({
+    totalInvoices: 0,
+    totalProFormas: 0,
+    outstandingAmount: 0,
+    paidThisMonth: 0,
+    overdueCount: 0,
+    averagePaymentDays: 0,
+    conversionRate: 0,
+    isLoading: false
+  });
+
+  const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+
   const [recentMatters, setRecentMatters] = useState<Matter[]>([]);
   const [quickActions, setQuickActions] = useState({
     newMatterModal: false,
@@ -52,7 +70,66 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     loadDashboardData();
+    loadInvoiceMetrics();
   }, []);
+
+  const loadInvoiceMetrics = async () => {
+    setInvoiceMetrics(prev => ({ ...prev, isLoading: true }));
+    try {
+      // Load recent invoices
+      const invoicesResponse = await InvoiceService.getInvoices({ 
+        page: 1, 
+        pageSize: 10,
+        sortBy: 'created_at',
+        sortOrder: 'desc'
+      });
+      
+      const invoices = invoicesResponse.data;
+      setRecentInvoices(invoices);
+
+      // Load pro formas
+      const proFormasResponse = await InvoiceService.getInvoices({
+        status: [InvoiceStatus.PRO_FORMA],
+        page: 1,
+        pageSize: 100
+      });
+
+      // Calculate metrics
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      const paidThisMonth = invoices
+        .filter(inv => {
+          const paidDate = inv.date_paid ? new Date(inv.date_paid) : null;
+          return paidDate && 
+                 paidDate.getMonth() === currentMonth && 
+                 paidDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, inv) => sum + inv.total_amount, 0);
+
+      const overdueInvoices = invoices.filter(inv => inv.status === InvoiceStatus.OVERDUE);
+      const outstandingAmount = invoices
+        .filter(inv => inv.status !== InvoiceStatus.PAID)
+        .reduce((sum, inv) => sum + (inv.total_amount - (inv.amount_paid || 0)), 0);
+
+      setInvoiceMetrics({
+        totalInvoices: invoices.length,
+        totalProFormas: proFormasResponse.data.length,
+        outstandingAmount,
+        paidThisMonth,
+        overdueCount: overdueInvoices.length,
+        averagePaymentDays: 45, // This would be calculated from actual payment data
+        conversionRate: proFormasResponse.data.length > 0 
+          ? (proFormasResponse.data.filter(pf => pf.status === InvoiceStatus.CONVERTED).length / proFormasResponse.data.length) * 100 
+          : 0,
+        isLoading: false
+      });
+
+    } catch (error) {
+      console.error('Error loading invoice metrics:', error);
+      setInvoiceMetrics(prev => ({ ...prev, isLoading: false }));
+    }
+  };
 
   const loadDashboardData = async () => {
     setDashboardData(prev => ({ ...prev, isLoading: true }));
@@ -278,7 +355,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Button 
           variant="outline" 
           onClick={() => handleQuickAction('new-invoice')}
@@ -289,10 +366,18 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </Button>
         <Button 
           variant="outline" 
+          onClick={() => onNavigate?.('proforma')}
+          className="h-16 flex flex-col items-center justify-center"
+        >
+          <Calculator className="w-6 h-6 mb-1 text-judicial-blue-600" />
+          <span className="text-sm font-medium">Create Pro Forma</span>
+        </Button>
+        <Button 
+          variant="outline" 
           onClick={() => handleQuickAction('time-entry')}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Calendar className="w-6 h-6 mb-1 text-judicial-blue-600" />
+          <Clock className="w-6 h-6 mb-1 text-status-success-600" />
           <span className="text-sm font-medium">Quick Time Entry</span>
         </Button>
         <Button 
@@ -300,11 +385,75 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={handleViewAllMatters}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Briefcase className="w-6 h-6 mb-1 text-status-success-600" />
+          <Briefcase className="w-6 h-6 mb-1 text-neutral-600" />
           <span className="text-sm font-medium">View All Matters</span>
         </Button>
     </div>
 
+    {/* Invoice Metrics Row */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <Card hoverable onClick={() => onNavigate?.('invoices')} className="cursor-pointer hover:shadow-lg transition-shadow">
+        <CardContent className="p-6 text-center">
+          <div className="text-mpondo-gold-500 mb-2">
+            <FileText className="w-8 h-8 mx-auto" />
+          </div>
+          <h3 className="text-2xl font-bold text-neutral-900">
+            {invoiceMetrics.isLoading ? '...' : invoiceMetrics.totalInvoices}
+          </h3>
+          <p className="text-sm text-neutral-600">Total Invoices</p>
+          <div className="mt-2 text-xs text-mpondo-gold-600 flex items-center justify-center">
+            Manage Invoices <ArrowRight className="w-3 h-3 ml-1" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card hoverable onClick={() => onNavigate?.('proforma')} className="cursor-pointer hover:shadow-lg transition-shadow">
+        <CardContent className="p-6 text-center">
+          <div className="text-judicial-blue-500 mb-2">
+            <Calculator className="w-8 h-8 mx-auto" />
+          </div>
+          <h3 className="text-2xl font-bold text-neutral-900">
+            {invoiceMetrics.isLoading ? '...' : invoiceMetrics.totalProFormas}
+          </h3>
+          <p className="text-sm text-neutral-600">Pro Formas</p>
+          <div className="mt-2 text-xs text-judicial-blue-600 flex items-center justify-center">
+            View Pro Formas <ArrowRight className="w-3 h-3 ml-1" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card hoverable onClick={handleOverdueInvoicesClick} className="cursor-pointer hover:shadow-lg transition-shadow">
+        <CardContent className="p-6 text-center">
+          <div className="text-status-error-500 mb-2">
+            <AlertTriangle className="w-8 h-8 mx-auto" />
+          </div>
+          <h3 className="text-2xl font-bold text-neutral-900">
+            {invoiceMetrics.isLoading ? '...' : invoiceMetrics.overdueCount}
+          </h3>
+          <p className="text-sm text-neutral-600">Overdue Invoices</p>
+          <div className="mt-2 text-xs text-status-error-600 flex items-center justify-center">
+            Review Overdue <ArrowRight className="w-3 h-3 ml-1" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card hoverable className="cursor-pointer hover:shadow-lg transition-shadow">
+        <CardContent className="p-6 text-center">
+          <div className="text-status-success-500 mb-2">
+            <DollarSign className="w-8 h-8 mx-auto" />
+          </div>
+          <h3 className="text-2xl font-bold text-neutral-900">
+            {invoiceMetrics.isLoading ? '...' : formatCurrency(invoiceMetrics.paidThisMonth)}
+          </h3>
+          <p className="text-sm text-neutral-600">Collected This Month</p>
+          <div className="mt-2 text-xs text-status-success-600 flex items-center justify-center">
+            {invoiceMetrics.conversionRate.toFixed(1)}% Pro Forma Conversion
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    {/* Practice Metrics Row */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Quick Stats with click handlers */}
         <Card hoverable onClick={handleViewAllMatters} className="cursor-pointer hover:shadow-lg transition-shadow">
@@ -360,7 +509,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       </Card>
     </div>
 
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Card>
           <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="text-xl font-semibold text-neutral-900">Recent Matters</h2>
@@ -406,6 +555,58 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 </Button>
           </div>
             )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Invoices */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <h2 className="text-xl font-semibold text-neutral-900">Recent Invoices</h2>
+          <Button variant="ghost" size="sm" onClick={() => onNavigate?.('invoices')}>
+            View All <ArrowRight className="w-4 h-4 ml-1" />
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {invoiceMetrics.isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-mpondo-gold-500"></div>
+            </div>
+          ) : recentInvoices.length > 0 ? (
+            recentInvoices.slice(0, 5).map((invoice) => (
+              <div 
+                key={invoice.id}
+                className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg hover:bg-neutral-100 cursor-pointer transition-colors"
+                onClick={() => onNavigate?.('invoices')}
+              >
+                <div className="flex-1">
+                  <h4 className="font-medium text-neutral-900">{invoice.invoice_number}</h4>
+                  <p className="text-sm text-neutral-600">Matter: {invoice.matter_id}</p>
+                  <p className="text-xs text-neutral-500">
+                    {formatCurrency(invoice.total_amount)} • {new Date(invoice.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                    invoice.status === InvoiceStatus.PAID ? 'bg-status-success-100 text-status-success-800' : 
+                    invoice.status === InvoiceStatus.OVERDUE ? 'bg-status-error-100 text-status-error-800' :
+                    invoice.status === InvoiceStatus.SENT ? 'bg-judicial-blue-100 text-judicial-blue-800' :
+                    'bg-neutral-100 text-neutral-800'
+                  }`}>
+                    {invoice.status}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-neutral-400" />
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-neutral-500">
+              <FileText className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
+              <p>No recent invoices found</p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => handleQuickAction('new-invoice')}>
+                Generate First Invoice
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

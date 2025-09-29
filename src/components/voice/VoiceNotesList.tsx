@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Play, Pause, Trash2, Edit3, FileText, Clock, Mic, AlertCircle } from 'lucide-react';
 import { Card, CardContent, Button } from '../../design-system/components';
 import type { VoiceRecording } from '../../types';
+import VoicePlaybackComponent from './VoicePlaybackComponent';
 
 interface VoiceNotesListProps {
   recordings: VoiceRecording[];
@@ -226,7 +227,7 @@ export const VoiceNotesList: React.FC<VoiceNotesListProps> = ({
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between pt-2 border-t border-neutral-200">
                     <div className="flex items-center gap-2">
-                      {/* Play/Pause Button */}
+                      {/* Play/Pause Button for Audio */}
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -248,6 +249,17 @@ export const VoiceNotesList: React.FC<VoiceNotesListProps> = ({
                           </>
                         )}
                       </Button>
+
+                      {/* Voice Playback for Transcription */}
+                      {recording.transcription && (
+                        <VoicePlaybackComponent
+                          text={recording.transcription}
+                          language="en" // TODO: Use detected language from recording
+                          useCase="reading"
+                          showControls={true}
+                          className="ml-2"
+                        />
+                      )}
 
                       {/* Edit Button */}
                       {recording.transcription && (

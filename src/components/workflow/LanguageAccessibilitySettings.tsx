@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
   Volume2, 
+  VolumeX,
   Eye, 
   Type,
   Mic,
@@ -15,6 +16,8 @@ import {
   Pause
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
+import { getEnhancedSpeechService, type SpeechRequest } from '../../services/enhanced-speech.service';
+import VoicePlaybackComponent from '../voice/VoicePlaybackComponent';
 
 export const LanguageAccessibilitySettings: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
@@ -177,10 +180,13 @@ export const LanguageAccessibilitySettings: React.FC = () => {
 
                 {selectedLanguage === language.code && (
                   <div className="flex gap-2 mt-3">
-                    <Button size="sm" variant="outline">
-                      <Volume2 className="w-3 h-3 mr-1" />
-                      Test Voice
-                    </Button>
+                    <VoicePlaybackComponent
+                      text={`Hello, this is a voice test in ${language.name}. LexoHub supports natural voice synthesis for all South African languages.`}
+                      language={language.code}
+                      useCase="accessibility"
+                      showControls={true}
+                      className="flex-1"
+                    />
                     <Button size="sm" variant="outline">
                       <Eye className="w-3 h-3 mr-1" />
                       Preview

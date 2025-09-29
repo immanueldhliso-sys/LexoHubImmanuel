@@ -8,7 +8,8 @@ import {
   MoreHorizontal,
   Eye,
   Download,
-  Mail
+  Mail,
+  Trash2
 } from 'lucide-react';
 import { format, differenceInDays, isAfter } from 'date-fns';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
@@ -22,6 +23,8 @@ interface InvoiceCardProps {
   onSend?: (invoice: Invoice) => void;
   onDownload?: (invoice: Invoice) => void;
   onRecordPayment?: (invoice: Invoice) => void;
+  onUpdateStatus?: (status: InvoiceStatus) => void;
+  onDelete?: () => void;
 }
 
 export const InvoiceCard: React.FC<InvoiceCardProps> = ({
@@ -29,7 +32,9 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
   onView,
   onSend,
   onDownload,
-  onRecordPayment
+  onRecordPayment,
+  onUpdateStatus,
+  onDelete
 }) => {
   const getStatusConfig = (status: InvoiceStatus) => {
     switch (status) {
@@ -163,6 +168,60 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
                       <RandIcon size={16} />
                       Record Payment
                     </button>
+                  )}
+                  
+                  {onUpdateStatus && (
+                    <>
+                      <div className="border-t border-neutral-200 my-1"></div>
+                      <div className="px-3 py-1">
+                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                          Update Status
+                        </p>
+                      </div>
+                      
+                      {invoice.status === 'Draft' && (
+                        <button
+                          onClick={() => onUpdateStatus('Sent')}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                        >
+                          <Send className="w-4 h-4" />
+                          Mark as Sent
+                        </button>
+                      )}
+                      
+                      {(invoice.status === 'Sent' || invoice.status === 'Unpaid') && (
+                        <button
+                          onClick={() => onUpdateStatus('Paid')}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Mark as Paid
+                        </button>
+                      )}
+                      
+                      {invoice.status !== 'Overdue' && invoice.status !== 'Paid' && (
+                        <button
+                          onClick={() => onUpdateStatus('Overdue')}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                          Mark as Overdue
+                        </button>
+                      )}
+                    </>
+                  )}
+                  
+                  {onDelete && (
+                    <>
+                      <div className="border-t border-neutral-200 my-1"></div>
+                      <button
+                        onClick={onDelete}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-status-error-600 hover:bg-status-error-50"
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        Delete Invoice
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

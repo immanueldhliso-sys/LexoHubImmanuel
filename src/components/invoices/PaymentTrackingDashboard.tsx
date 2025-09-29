@@ -11,6 +11,8 @@ import { RandIcon } from '../icons/RandIcon';
 import { formatRand } from '../../lib/currency';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { ReminderService, type PaymentTrackingMetrics } from '../../services/reminder.service';
+import { InvoiceService } from '../../services/api/invoices.service';
+import { toast } from 'react-hot-toast';
 import type { Invoice } from '../../types';
 
 interface PaymentTrackingDashboardProps {
@@ -59,8 +61,32 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
     try {
       await reminderService.processReminders();
       await loadDashboardData(); // Refresh data
+      toast.success('Reminders processed successfully');
     } catch (err) {
       console.error('Error processing reminders:', err);
+      toast.error('Failed to process reminders');
+    }
+  };
+
+  const sendIndividualReminder = async (invoiceId: string) => {
+    try {
+      await reminderService.sendReminder(invoiceId);
+      await loadDashboardData(); // Refresh data
+      toast.success('Reminder sent successfully');
+    } catch (err) {
+      console.error('Error sending reminder:', err);
+      toast.error('Failed to send reminder');
+    }
+  };
+
+  const markAsPaid = async (invoiceId: string) => {
+    try {
+      await InvoiceService.updateInvoiceStatus(invoiceId, 'paid');
+      await loadDashboardData(); // Refresh data
+      toast.success('Invoice marked as paid');
+    } catch (err) {
+      console.error('Error updating invoice:', err);
+      toast.error('Failed to update invoice status');
     }
   };
 
@@ -213,20 +239,38 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {metrics.overdueInvoices.slice(0, 10).map((invoice) => (
                   <div key={invoice.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                    <div>
+                    <div className="flex-1">
                       <p className="font-medium text-neutral-900">{invoice.invoiceNumber}</p>
                       <p className="text-sm text-neutral-600">{invoice.clientName}</p>
                       <p className="text-xs text-neutral-500">
                         Due: {format(new Date(invoice.dateDue), 'dd MMM yyyy')}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-neutral-900">
-                        {formatRand(invoice.amount)}
-                      </p>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
-                        {invoice.status}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-semibold text-neutral-900">
+                          {formatRand(invoice.amount)}
+                        </p>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                          {invoice.status}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => sendIndividualReminder(invoice.id)}
+                          className="px-2 py-1 text-xs bg-mpondo-gold-100 text-mpondo-gold-700 rounded hover:bg-mpondo-gold-200 transition-colors"
+                          title="Send Reminder"
+                        >
+                          <Bell className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => markAsPaid(invoice.id)}
+                          className="px-2 py-1 text-xs bg-status-success-100 text-status-success-700 rounded hover:bg-status-success-200 transition-colors"
+                          title="Mark as Paid"
+                        >
+                          ✓
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -258,20 +302,38 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {metrics.upcomingDueDates.map((invoice) => (
                   <div key={invoice.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                    <div>
+                    <div className="flex-1">
                       <p className="font-medium text-neutral-900">{invoice.invoiceNumber}</p>
                       <p className="text-sm text-neutral-600">{invoice.clientName}</p>
                       <p className="text-xs text-neutral-500">
                         Due: {format(new Date(invoice.dateDue), 'dd MMM yyyy')}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-neutral-900">
-                        {formatRand(invoice.amount)}
-                      </p>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
-                        {invoice.status}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-semibold text-neutral-900">
+                          {formatRand(invoice.amount)}
+                        </p>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                          {invoice.status}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => sendIndividualReminder(invoice.id)}
+                          className="px-2 py-1 text-xs bg-judicial-blue-100 text-judicial-blue-700 rounded hover:bg-judicial-blue-200 transition-colors"
+                          title="Send Early Reminder"
+                        >
+                          <Bell className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => markAsPaid(invoice.id)}
+                          className="px-2 py-1 text-xs bg-status-success-100 text-status-success-700 rounded hover:bg-status-success-200 transition-colors"
+                          title="Mark as Paid"
+                        >
+                          ✓
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
