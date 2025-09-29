@@ -14,10 +14,13 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
 import { InvoiceService } from '../services/api/invoices.service';
+import { useAuth } from '@/contexts/AuthContext';
+import { matterApiService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 import type { PracticeMetrics, Invoice, InvoiceStatus } from '../types';
 
 const ReportsPage: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'performance' | 'cash-flow' | 'invoices' | 'proforma'>('overview');
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   const [isLoading, setIsLoading] = useState(false);
@@ -55,6 +58,30 @@ const ReportsPage: React.FC = () => {
     }
   });
 
+  // Derived data from real invoices and matters
+  const [monthlyBillings, setMonthlyBillings] = useState<{ month: string; year: number; amount: number; invoiceCount: number; collectionRate: number }[]>([]);
+  const [workDistribution, setWorkDistribution] = useState<{ type: string; percentage: number; revenue: number }[]>([]);
+  const [cashFlowData, setCashFlowData] = useState<{ month: string; inflow: number; outflow: number; net: number }[]>([]);
+
+  // Real metrics derived from invoices and matters
+  const [realMetrics, setRealMetrics] = useState<{
+    totalWip: number;
+    totalBilled: number;
+    totalCollected: number;
+    outstandingInvoices: number;
+    overdueInvoices: number;
+    averageCollectionDays: number;
+    mattersCount: number;
+  }>({
+    totalWip: 0,
+    totalBilled: 0,
+    totalCollected: 0,
+    outstandingInvoices: 0,
+    overdueInvoices: 0,
+    averageCollectionDays: 0,
+    mattersCount: 0,
+  });
+
   // Mock data for reports
   const mockMetrics: PracticeMetrics = {
     totalWip: 2500000,
@@ -90,8 +117,8 @@ const ReportsPage: React.FC = () => {
     { month: 'Jun', inflow: 275000, outflow: 62000, net: 213000 }
   ];
 
-  const collectionRate = (mockMetrics.totalCollected / mockMetrics.totalBilled) * 100;
-  const wipUtilization = (mockMetrics.totalBilled / mockMetrics.totalWip) * 100;
+  const collectionRate = realMetrics.totalBilled > 0 ? (realMetrics.totalCollected / realMetrics.totalBilled) * 100 : 0;
+  const wipUtilization = realMetrics.totalWip > 0 ? (realMetrics.totalBilled / realMetrics.totalWip) * 100 : 0;
 
   useEffect(() => {
     loadReportData();
@@ -118,6 +145,9 @@ const ReportsPage: React.FC = () => {
       const invoices = invoicesResponse.data;
       const proFormas = proFormasResponse.data;
 
+      // Load matters for work type distribution
+      const { data: matters } = user?.id ? await matterApiService.getByAdvocate(user.id) : { data: [] } as any;
+
       // Calculate aging analysis
       const now = new Date();
       const agingRanges = [
@@ -127,12 +157,12 @@ const ReportsPage: React.FC = () => {
         { range: '90+ days', min: 91, max: Infinity }
       ];
 
-      const outstandingInvoices = invoices.filter(inv => 
+      const unpaidInvoices = invoices.filter(inv => 
         inv.status !== InvoiceStatus.PAID && inv.status !== InvoiceStatus.WRITTEN_OFF
       );
 
       const agingAnalysis = agingRanges.map(range => {
-        const rangeInvoices = outstandingInvoices.filter(inv => {
+        const rangeInvoices = unpaidInvoices.filter(inv => {
           const daysPastDue = Math.floor((now.getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24));
           return daysPastDue >= range.min && daysPastDue <= range.max;
         });
@@ -179,6 +209,85 @@ const ReportsPage: React.FC = () => {
         agingAnalysis,
         conversionMetrics,
         paymentAnalysis
+      });
+
+      // Compute monthly billings from invoices (last 6 months)
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const nowDate = new Date();
+      const monthsWindow = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(nowDate);
+        d.setMonth(d.getMonth() - (5 - i));
+        return d;
+      });
+      const billings = monthsWindow.map(d => {
+        const month = d.getMonth();
+        const year = d.getFullYear();
+        const monthInvoices = invoices.filter(inv => {
+          const created = inv.invoice_date ? new Date(inv.invoice_date) : null;
+          return created ? (created.getMonth() === month && created.getFullYear() === year) : false;
+        });
+        const amount = monthInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+        const invoiceCount = monthInvoices.length;
+        const paidCount = monthInvoices.filter(inv => inv.status === InvoiceStatus.PAID).length;
+        const collectionRate = invoiceCount > 0 ? Math.round((paidCount / invoiceCount) * 100) : 0;
+        return { month: monthNames[month], year, amount, invoiceCount, collectionRate };
+      });
+      setMonthlyBillings(billings);
+
+      // Compute work type distribution from matters
+      const groups = new Map<string, { count: number; revenue: number }>();
+      (matters || []).forEach((m: any) => {
+        const type = m.briefType || m.matter_type || 'Other';
+        const revenue = (m.estimatedFee || m.wipValue || 0) as number;
+        const current = groups.get(type) || { count: 0, revenue: 0 };
+        groups.set(type, { count: current.count + 1, revenue: current.revenue + revenue });
+      });
+      const totalCount = Math.max((matters || []).length, 1);
+      const distribution = Array.from(groups.entries()).map(([type, { count, revenue }]) => ({
+        type,
+        percentage: Math.round((count * 100) / totalCount),
+        revenue
+      }));
+      setWorkDistribution(distribution);
+
+      // Compute cash flow data from paid invoices
+      const cashFlow = monthsWindow.map(d => {
+        const month = d.getMonth();
+        const year = d.getFullYear();
+        const paidInMonth = invoices.filter(inv => {
+          const paidDate = inv.date_paid ? new Date(inv.date_paid) : null;
+          return paidDate ? (paidDate.getMonth() === month && paidDate.getFullYear() === year) : false;
+        });
+        const inflow = paidInMonth.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+        const outflow = 0; // No expense tracking available yet
+        const net = inflow - outflow;
+        return { month: monthNames[month], inflow, outflow, net };
+      });
+      setCashFlowData(cashFlow);
+
+      // Compute real metrics for overview and financial tabs
+      const totalBilled = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+      const totalCollected = invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0);
+      const outstandingInvoices = invoices.filter(inv => (inv.balance_due || 0) > 0 && inv.status !== 'paid').length;
+      const overdueInvoices = invoices.filter(inv => inv.is_overdue).length;
+      const totalWip = (matters || []).reduce((sum: number, m: any) => sum + (m.wipValue || 0), 0);
+      const averageCollectionDays = paidInvoices.length > 0
+        ? Math.round(paidInvoices.reduce((sum, inv) => {
+            const invoiceDate = new Date(inv.invoice_date as string);
+            const paid = new Date(inv.date_paid as string);
+            const diffDays = Math.max(0, Math.round((paid.getTime() - invoiceDate.getTime()) / (1000 * 60 * 60 * 24)));
+            return sum + diffDays;
+          }, 0) / paidInvoices.length)
+        : 0;
+
+      setRealMetrics({
+        totalWip,
+        totalBilled,
+        totalCollected,
+        outstandingInvoices,
+        overdueInvoices,
+        averageCollectionDays,
+        mattersCount: (matters || []).length,
       });
 
     } catch (error) {
@@ -270,7 +379,7 @@ const ReportsPage: React.FC = () => {
                   <DollarSign className="w-8 h-8 mx-auto" />
                 </div>
                 <h3 className="text-2xl font-bold text-neutral-900">
-                  R{(mockMetrics.totalWip / 1000000).toFixed(1)}M
+                  R{(realMetrics.totalWip / 1000000).toFixed(1)}M
                 </h3>
                 <p className="text-sm text-neutral-600">Total WIP</p>
                 <div className="text-xs text-status-success-600 mt-1">
@@ -285,7 +394,7 @@ const ReportsPage: React.FC = () => {
                   <BarChart3 className="w-8 h-8 mx-auto" />
                 </div>
                 <h3 className="text-2xl font-bold text-neutral-900">
-                  R{(mockMetrics.totalBilled / 1000000).toFixed(1)}M
+                  R{(realMetrics.totalBilled / 1000000).toFixed(1)}M
                 </h3>
                 <p className="text-sm text-neutral-600">Total Billed</p>
                 <div className="text-xs text-status-success-600 mt-1">
@@ -315,7 +424,7 @@ const ReportsPage: React.FC = () => {
                   <AlertTriangle className="w-8 h-8 mx-auto" />
                 </div>
                 <h3 className="text-2xl font-bold text-neutral-900">
-                  {mockMetrics.averageCollectionDays}
+                  {realMetrics.averageCollectionDays}
                 </h3>
                 <p className="text-sm text-neutral-600">Avg Collection Days</p>
                 <div className="text-xs text-status-error-600 mt-1">
@@ -333,7 +442,7 @@ const ReportsPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockMetrics.monthlyBillings.map((billing, index) => (
+                  {monthlyBillings.map((billing, index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-12 text-sm text-neutral-600">{billing.month}</div>
@@ -341,7 +450,7 @@ const ReportsPage: React.FC = () => {
                           <div className="w-full bg-neutral-200 rounded-full h-2">
                             <div 
                               className="bg-mpondo-gold-500 h-2 rounded-full"
-                              style={{ width: `${(billing.amount / 300000) * 100}%` }}
+                              style={{ width: `${billing.amount > 0 ? Math.min((billing.amount / Math.max(monthlyBillings.reduce((max, b) => Math.max(max, b.amount), 0), 1)) * 100, 100) : 0}%` }}
                             />
                           </div>
                         </div>
@@ -366,7 +475,7 @@ const ReportsPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockMetrics.workTypeDistribution.map((work, index) => (
+                  {workDistribution.map((work, index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-32 text-sm text-neutral-900">{work.type}</div>
@@ -406,25 +515,25 @@ const ReportsPage: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Gross Revenue</span>
                     <span className="font-bold text-neutral-900">
-                      R{(mockMetrics.totalBilled / 1000000).toFixed(2)}M
+                      R{(realMetrics.totalBilled / 1000000).toFixed(2)}M
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Collections</span>
                     <span className="font-bold text-status-success-600">
-                      R{(mockMetrics.totalCollected / 1000000).toFixed(2)}M
+                      R{(realMetrics.totalCollected / 1000000).toFixed(2)}M
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Outstanding</span>
                     <span className="font-bold text-status-warning-600">
-                      R{((mockMetrics.totalBilled - mockMetrics.totalCollected) / 1000000).toFixed(2)}M
+                      R{((realMetrics.totalBilled - realMetrics.totalCollected) / 1000000).toFixed(2)}M
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">WIP Value</span>
                     <span className="font-bold text-neutral-900">
-                      R{(mockMetrics.totalWip / 1000000).toFixed(2)}M
+                      R{(realMetrics.totalWip / 1000000).toFixed(2)}M
                     </span>
                   </div>
                 </div>
@@ -440,19 +549,19 @@ const ReportsPage: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Total Invoices</span>
                     <span className="font-bold text-neutral-900">
-                      {mockMetrics.monthlyBillings.reduce((sum, b) => sum + b.invoiceCount, 0)}
+                      {invoiceData.invoices.length}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Outstanding</span>
                     <span className="font-bold text-status-warning-600">
-                      {mockMetrics.outstandingInvoices}
+                      {realMetrics.outstandingInvoices}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Overdue</span>
                     <span className="font-bold text-status-error-600">
-                      {mockMetrics.overdueInvoices}
+                      {realMetrics.overdueInvoices}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -486,13 +595,13 @@ const ReportsPage: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Avg Collection Days</span>
                     <span className="font-bold text-neutral-900">
-                      {mockMetrics.averageCollectionDays} days
+                      {realMetrics.averageCollectionDays} days
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Revenue per Matter</span>
                     <span className="font-bold text-neutral-900">
-                      R{(mockMetrics.totalBilled / 42 / 1000).toFixed(0)}k
+                      R{(realMetrics.totalBilled / Math.max(realMetrics.mattersCount, 1) / 1000).toFixed(0)}k
                     </span>
                   </div>
                 </div>
@@ -511,7 +620,7 @@ const ReportsPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockMetrics.monthlyBillings.map((billing, index) => (
+                  {monthlyBillings.map((billing, index) => (
                     <div key={index} className="p-4 bg-neutral-50 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="font-medium text-neutral-900">{billing.month} {billing.year}</h4>
@@ -610,10 +719,10 @@ const ReportsPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockCashFlowData.map((flow, index) => (
+                  {cashFlowData.map((flow, index) => (
                     <div key={index} className="p-4 bg-neutral-50 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium text-neutral-900">{flow.month} 2024</h4>
+                        <h4 className="font-medium text-neutral-900">{flow.month}</h4>
                         <span className={`text-sm font-medium ${
                           flow.net > 0 ? 'text-status-success-600' : 'text-status-error-600'
                         }`}>
@@ -637,7 +746,7 @@ const ReportsPage: React.FC = () => {
                       <div className="w-full bg-neutral-200 rounded-full h-2 mt-2">
                         <div 
                           className="bg-status-success-500 h-2 rounded-full"
-                          style={{ width: `${(flow.inflow / (flow.inflow + flow.outflow)) * 100}%` }}
+                          style={{ width: `${(flow.inflow + flow.outflow) > 0 ? (flow.inflow / (flow.inflow + flow.outflow)) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -655,26 +764,26 @@ const ReportsPage: React.FC = () => {
                   <div>
                     <h4 className="font-medium text-neutral-900 mb-3">Total Inflows (6 months)</h4>
                     <div className="text-2xl font-bold text-status-success-600">
-                      R{(mockCashFlowData.reduce((sum, f) => sum + f.inflow, 0) / 1000000).toFixed(2)}M
+                      R{(cashFlowData.reduce((sum, f) => sum + f.inflow, 0) / 1000000).toFixed(2)}M
                     </div>
-                    <p className="text-sm text-neutral-600">Average: R{(mockCashFlowData.reduce((sum, f) => sum + f.inflow, 0) / mockCashFlowData.length / 1000).toFixed(0)}k/month</p>
+                    <p className="text-sm text-neutral-600">Average: R{(cashFlowData.reduce((sum, f) => sum + f.inflow, 0) / Math.max(cashFlowData.length, 1) / 1000).toFixed(0)}k/month</p>
                   </div>
 
                   <div>
                     <h4 className="font-medium text-neutral-900 mb-3">Total Outflows (6 months)</h4>
                     <div className="text-2xl font-bold text-status-error-600">
-                      R{(mockCashFlowData.reduce((sum, f) => sum + f.outflow, 0) / 1000000).toFixed(2)}M
+                      R{(cashFlowData.reduce((sum, f) => sum + f.outflow, 0) / 1000000).toFixed(2)}M
                     </div>
-                    <p className="text-sm text-neutral-600">Average: R{(mockCashFlowData.reduce((sum, f) => sum + f.outflow, 0) / mockCashFlowData.length / 1000).toFixed(0)}k/month</p>
+                    <p className="text-sm text-neutral-600">Average: R{(cashFlowData.reduce((sum, f) => sum + f.outflow, 0) / Math.max(cashFlowData.length, 1) / 1000).toFixed(0)}k/month</p>
                   </div>
 
                   <div>
                     <h4 className="font-medium text-neutral-900 mb-3">Net Cash Flow</h4>
                     <div className="text-2xl font-bold text-neutral-900">
-                      R{(mockCashFlowData.reduce((sum, f) => sum + f.net, 0) / 1000000).toFixed(2)}M
+                      R{(cashFlowData.reduce((sum, f) => sum + f.net, 0) / 1000000).toFixed(2)}M
                     </div>
                     <p className="text-sm text-neutral-600">
-                      Margin: {((mockCashFlowData.reduce((sum, f) => sum + f.net, 0) / mockCashFlowData.reduce((sum, f) => sum + f.inflow, 0)) * 100).toFixed(1)}%
+                      Margin: {((cashFlowData.reduce((sum, f) => sum + f.net, 0) / Math.max(cashFlowData.reduce((sum, f) => sum + f.inflow, 0), 1)) * 100).toFixed(1)}%
                     </p>
                   </div>
 

@@ -1,17 +1,11 @@
 import React, { useState } from 'react';
-import { X, Plus, Save, RotateCcw } from 'lucide-react';
+import { X, Plus, Save, RotateCcw, Zap } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
 import { toast } from 'react-hot-toast';
+import { AdvancedFeaturesSettings } from '../components/settings/AdvancedFeaturesSettings';
 
 const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'practice' | 'integrations' | 'compliance' | 'billing'>('profile');
-  const [notifications, setNotifications] = useState({
-    emailReminders: true,
-    smsAlerts: false,
-    invoiceUpdates: true,
-    matterDeadlines: true,
-    paymentReceived: true
-  });
+  const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'advanced-features'>('practice');
   const [practiceSettings, setPracticeSettings] = useState({
     firmName: 'Mpondo & Associates',
     practiceAreas: ['Commercial Litigation', 'Employment Law', 'Mining Law'],
@@ -25,12 +19,7 @@ const SettingsPage: React.FC = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleNotificationChange = (key: keyof typeof notifications, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [key]: value }));
-    setHasUnsavedChanges(true);
-  };
-
-  const handlePracticeSettingChange = (key: keyof typeof practiceSettings, value: any) => {
+  const handlePracticeSettingChange = (key: keyof typeof practiceSettings, value: string | number | string[]) => {
     setPracticeSettings(prev => ({ ...prev, [key]: value }));
     setHasUnsavedChanges(true);
   };
@@ -44,7 +33,7 @@ const SettingsPage: React.FC = () => {
       // Here you would make actual API calls to save settings
       toast.success('Settings saved successfully!');
       setHasUnsavedChanges(false);
-    } catch (error) {
+    } catch {
       toast.error('Failed to save settings. Please try again.');
     } finally {
       setIsLoading(false);
@@ -104,138 +93,28 @@ const SettingsPage: React.FC = () => {
 
         {/* Tabs */}
         <div className="flex space-x-1 bg-neutral-100 rounded-lg p-1">
-          {(['profile', 'practice', 'integrations', 'compliance', 'billing'] as const).map((tab) => (
+          {(['practice', 'integrations', 'compliance', 'billing', 'advanced-features'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
                 activeTab === tab
                   ? 'bg-white text-neutral-900 shadow-sm'
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              {tab === 'profile' ? 'Profile' :
-               tab === 'practice' ? 'Practice' :
+              {tab === 'advanced-features' && <Zap className="w-4 h-4" />}
+              {tab === 'practice' ? 'Practice' :
                tab === 'integrations' ? 'Integrations' :
                tab === 'compliance' ? 'Compliance' :
-               'Billing'}
+               tab === 'billing' ? 'Billing' :
+               'Advanced Features'}
             </button>
           ))}
         </div>
       </div>
 
       {/* Content based on active tab */}
-        {activeTab === 'profile' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <h2 className="text-xl font-semibold text-neutral-900">Personal Information</h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">
-                        First Name
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="Thabo"
-                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="Mpondo"
-                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      defaultValue="thabo@mpondolaw.co.za"
-                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      defaultValue="+27 11 123 4567"
-                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">
-                      Professional Title
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue="Senior Partner & Advocate"
-                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <h2 className="text-xl font-semibold text-neutral-900">Notification Preferences</h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {Object.entries(notifications).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium text-neutral-900">
-                          {key === 'emailReminders' ? 'Email Reminders' :
-                           key === 'smsAlerts' ? 'SMS Alerts' :
-                           key === 'invoiceUpdates' ? 'Invoice Updates' :
-                           key === 'matterDeadlines' ? 'Matter Deadlines' :
-                           'Payment Received'}
-                        </label>
-                        <p className="text-xs text-neutral-600">
-                          {key === 'emailReminders' ? 'Receive email notifications for important events' :
-                           key === 'smsAlerts' ? 'Get SMS alerts for urgent matters' :
-                           key === 'invoiceUpdates' ? 'Notifications when invoices are paid or overdue' :
-                           key === 'matterDeadlines' ? 'Alerts for upcoming matter deadlines' :
-                           'Notifications when payments are received'}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleNotificationChange(key as keyof typeof notifications, !value)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          value ? 'bg-mpondo-gold-500' : 'bg-neutral-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            value ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-
-          <div className="flex justify-end space-x-4">
-            <Button variant="secondary">Cancel</Button>
-            <Button variant="primary">Save Changes</Button>
-          </div>
-        </div>
-      )}
-
       {activeTab === 'practice' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -707,6 +586,17 @@ const SettingsPage: React.FC = () => {
               {isLoading ? 'Saving...' : 'Save All Settings'}
             </Button>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'advanced-features' && (
+        <div className="space-y-6">
+          <AdvancedFeaturesSettings 
+            onFeatureToggle={(feature, enabled) => {
+              // Handle feature toggle if needed
+              console.log(`Feature ${feature.name} ${enabled ? 'enabled' : 'disabled'}`);
+            }}
+          />
         </div>
       )}
     </div>

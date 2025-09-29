@@ -8,8 +8,6 @@ import type {
   User, 
   Session, 
   AuthError, 
-  AuthResponse,
-  AuthChangeEvent,
   SignInWithPasswordCredentials,
   SignUpWithPasswordCredentials
 } from '@supabase/supabase-js';
@@ -137,14 +135,15 @@ export class AuthService {
         .from('advocates')
         .select('full_name, practice_number, bar, specialisations, hourly_rate')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error loading advocate profile:', error);
         return null;
       }
 
-      return data;
+      // When no profile exists yet, return null gracefully
+      return data || null;
     } catch (error) {
       console.error('Error loading advocate profile:', error);
       return null;
@@ -166,6 +165,8 @@ export class AuthService {
       // Update last login
       if (data.user) {
         await this.updateLastLogin(data.user.id);
+        // Ensure advocate profile exists after successful authentication
+        await this.ensureAdvocateProfileExists(data.user);
       }
 
       return { data, error: null };
@@ -190,7 +191,9 @@ export class AuthService {
         email,
         password,
         options: {
-          data: metadata
+          data: metadata,
+          // Send users back to the dedicated post-confirmation page
+          emailRedirectTo: `${window.location.origin}/welcome`
         }
       };
 
@@ -200,20 +203,18 @@ export class AuthService {
         return { data: null, error };
       }
 
-      // Create advocate profile if user was created
-      if (data.user && !error) {
-        const profileError = await this.createAdvocateProfile(data.user.id, metadata);
-        if (profileError) {
-          console.error('Error creating advocate profile:', profileError);
-          // Don't fail the signup, but log the error
-        }
-      }
+      // Defer advocate profile creation until the user is authenticated.
+      // We'll ensure the profile exists after the first successful login.
 
       return { data, error: null };
     } catch (error) {
+      // Provide a clearer error message when the auth server is unreachable
+      const message = error instanceof TypeError
+        ? 'Unable to reach authentication server. Please ensure Supabase is running or configured.'
+        : 'Unknown sign up error';
       return { 
         data: null, 
-        error: error instanceof Error ? error : new Error('Unknown sign up error') 
+        error: new Error(message) 
       };
     }
   }
@@ -221,13 +222,13 @@ export class AuthService {
   /**
    * Create advocate profile in database
    */
-  private async createAdvocateProfile(userId: string, metadata: UserMetadata): Promise<Error | null> {
+  private async createAdvocateProfile(userId: string, userEmail: string | null, metadata: UserMetadata): Promise<Error | null> {
     try {
       const { error } = await supabase
         .from('advocates')
         .insert({
           id: userId,
-          email: '', // Will be updated by trigger
+          email: userEmail || '',
           full_name: metadata.full_name,
           initials: metadata.initials,
           practice_number: metadata.practice_number,
@@ -248,6 +249,49 @@ export class AuthService {
       return error;
     } catch (error) {
       return error instanceof Error ? error : new Error('Unknown profile creation error');
+    }
+  }
+
+  /**
+   * Ensure an advocate profile exists for an authenticated user.
+   * If not present, create it using user_metadata from Supabase auth.
+   */
+  private async ensureAdvocateProfileExists(user: User): Promise<void> {
+    try {
+      const { data, error } = await supabase
+        .from('advocates')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Error checking advocate profile existence:', error);
+        return;
+      }
+
+      if (!data) {
+        const md: any = user.user_metadata || {};
+
+        const metadata: UserMetadata = {
+          full_name: md.full_name || user.email || 'New Advocate',
+          initials: md.initials || (md.full_name ? md.full_name.split(' ').map((w: string) => w[0]).join('').toUpperCase() : 'NA'),
+          practice_number: md.practice_number || 'UNKNOWN',
+          bar: md.bar || 'johannesburg',
+          year_admitted: md.year_admitted || new Date().getFullYear(),
+          specialisations: md.specialisations || [],
+          hourly_rate: md.hourly_rate || 0,
+          phone_number: md.phone_number,
+          chambers_address: md.chambers_address,
+          user_type: md.user_type,
+        };
+
+        const createError = await this.createAdvocateProfile(user.id, user.email || null, metadata);
+        if (createError) {
+          console.error('Error creating advocate profile post-login:', createError);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to ensure advocate profile exists:', e);
     }
   }
 

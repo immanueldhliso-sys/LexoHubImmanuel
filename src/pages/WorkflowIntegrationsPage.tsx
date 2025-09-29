@@ -33,8 +33,10 @@ import { CourtDiaryCard } from '../components/workflow/CourtDiaryCard';
 import { JudgeAnalyticsCard } from '../components/workflow/JudgeAnalyticsCard';
 import { VoiceAssistantPanel } from '../components/workflow/VoiceAssistantPanel';
 import { IntegrationsPanel } from '../components/workflow/IntegrationsPanel';
+import { useAuth } from '@/contexts/AuthContext';
 
 const WorkflowIntegrationsPage: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<WorkflowPage>('court-diary');
   const [loading, setLoading] = useState(false);
   
@@ -84,8 +86,12 @@ const WorkflowIntegrationsPage: React.FC = () => {
   };
 
   const loadCourtDiary = async () => {
+    if (!user?.id) {
+      toast.error('You must be signed in to load court diary');
+      return;
+    }
     const [entries, registries] = await Promise.all([
-      WorkflowIntegrationsService.getCourtDiary('current-user-id'), // TODO: Get from auth context
+      WorkflowIntegrationsService.getCourtDiary(user?.id || ''),
       WorkflowIntegrationsService.getCourtRegistries()
     ]);
     setDiaryEntries(entries);
@@ -101,7 +107,11 @@ const WorkflowIntegrationsPage: React.FC = () => {
   };
 
   const loadVoiceQueries = async () => {
-    const queries = await WorkflowIntegrationsService.getVoiceQueryHistory('current-user-id');
+    if (!user?.id) {
+      toast.error('You must be signed in to load voice history');
+      return;
+    }
+    const queries = await WorkflowIntegrationsService.getVoiceQueryHistory(user.id);
     setVoiceQueries(queries);
   };
 
@@ -113,7 +123,11 @@ const WorkflowIntegrationsPage: React.FC = () => {
   const syncCourtDiary = async (registryId: string) => {
     try {
       setLoading(true);
-      await WorkflowIntegrationsService.syncCourtDiary(registryId, 'current-user-id');
+      if (!user?.id) {
+        toast.error('You must be signed in to sync court diary');
+        return;
+      }
+      await WorkflowIntegrationsService.syncCourtDiary(registryId, user?.id || '');
       toast.success('Court diary synced successfully');
       await loadCourtDiary();
     } catch (error) {
@@ -125,8 +139,12 @@ const WorkflowIntegrationsPage: React.FC = () => {
 
   const processVoiceQuery = async (queryText: string, languageCode: string = 'en') => {
     try {
+      if (!user?.id) {
+        toast.error('You must be signed in to use voice assistant');
+        return;
+      }
       const result = await WorkflowIntegrationsService.processVoiceQuery(
-        'current-user-id',
+        user?.id || '',
         queryText,
         languageCode
       );

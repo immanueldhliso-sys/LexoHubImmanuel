@@ -7,7 +7,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const resolvedUrl = String(supabaseUrl);
+const isLocalSupabase = resolvedUrl.includes('127.0.0.1') || resolvedUrl.includes('localhost');
+
+if (isLocalSupabase) {
+  console.warn('[Supabase] Local URL detected for VITE_SUPABASE_URL:', resolvedUrl);
+}
+
+console.log('[Supabase] Using URL:', resolvedUrl);
+
+export const supabase = createClient(resolvedUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

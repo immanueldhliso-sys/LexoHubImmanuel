@@ -15,11 +15,10 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
 import { InvoiceService } from '../services/api/invoices.service';
-import { StrategicFinanceService } from '../services/api/strategic-finance.service';
+import { StrategicFinanceService, type SuccessFeeScenario } from '../services/api/strategic-finance.service';
 import { toast } from 'react-hot-toast';
 import type { 
   PerformanceBasedPricing, 
-  SuccessFeeCalculation, 
   Invoice, 
   InvoiceStatus,
   FeeOptimizationRecommendation 
@@ -134,19 +133,17 @@ const PerformanceBasedPricingCard: React.FC<{
 };
 
 const SuccessFeeCalculationTable: React.FC<{
-  calculations: SuccessFeeCalculation[];
-}> = ({ calculations }) => {
+  scenarios: SuccessFeeScenario[];
+}> = ({ scenarios }) => {
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Paid':
+      case 'Approved':
         return 'badge-success';
-      case 'Pending':
+      case 'Presented':
         return 'badge-warning';
-      case 'Disputed':
-        return 'badge-error';
       default:
         return 'badge';
     }
@@ -156,11 +153,11 @@ const SuccessFeeCalculationTable: React.FC<{
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-neutral-900">Success Fee Calculations</h2>
+          <h2 className="text-xl font-semibold text-neutral-900">Success Fee Scenarios</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-sm text-neutral-600">
               <Calculator className="w-4 h-4" />
-              <span>{calculations.length} calculations</span>
+              <span>{scenarios.length} scenarios</span>
             </div>
             <Button variant="outline" size="sm" onClick={() => toast.info('Exporting success fee calculations...')}>
               <Download className="w-4 h-4 mr-2" />
@@ -180,47 +177,51 @@ const SuccessFeeCalculationTable: React.FC<{
             <tr className="border-b border-neutral-200">
               <th className="table-header text-left py-3">Date</th>
               <th className="table-header text-left py-3">Matter</th>
-              <th className="table-header text-right py-3">Collected</th>
+              <th className="table-header text-right py-3">Expected Recovery</th>
               <th className="table-header text-right py-3">Fee %</th>
-              <th className="table-header text-right py-3">Success Fee</th>
-              <th className="table-header text-center py-3">Status</th>
+              <th className="table-header text-right py-3">Risk-Adjusted Fee</th>
+              <th className="table-header text-center py-3">Stage</th>
             </tr>
           </thead>
           <tbody>
-            {calculations.map((calc) => (
-              <tr key={calc.id} className="table-row">
-                <td className="py-3 text-sm text-neutral-900">
-                  {new Date(calc.calculationDate).toLocaleDateString('en-ZA')}
-                </td>
-                <td className="py-3 text-sm text-neutral-900">
-                  Matter #{calc.matterId.slice(-6)}
-                </td>
-                <td className="py-3 text-sm text-neutral-900 text-right">
-                  {formatCurrency(calc.collectedAmount)}
-                </td>
-                <td className="py-3 text-sm text-neutral-900 text-right">
-                  {calc.successFeePercentage}%
-                </td>
-                <td className="py-3 text-sm font-medium text-mpondo-gold-600 text-right">
-                  {formatCurrency(calc.successFeeAmount)}
-                </td>
-                <td className="py-3 text-center">
-                  <span className={`badge ${getStatusColor(calc.paymentStatus)}`}>
-                    {calc.paymentStatus}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {scenarios.map((sc) => {
+              const pct = sc.successFeePercentage <= 1 ? sc.successFeePercentage * 100 : sc.successFeePercentage;
+              const stage = sc.clientApproved ? 'Approved' : sc.presentedToClient ? 'Presented' : 'Draft';
+              return (
+                <tr key={sc.id} className="table-row">
+                  <td className="py-3 text-sm text-neutral-900">
+                    {new Date(sc.createdAt).toLocaleDateString('en-ZA')}
+                  </td>
+                  <td className="py-3 text-sm text-neutral-900">
+                    Matter #{sc.matterId.slice(-6)}
+                  </td>
+                  <td className="py-3 text-sm text-neutral-900 text-right">
+                    {formatCurrency(sc.expectedRecovery)}
+                  </td>
+                  <td className="py-3 text-sm text-neutral-900 text-right">
+                    {pct}%
+                  </td>
+                  <td className="py-3 text-sm font-medium text-mpondo-gold-600 text-right">
+                    {formatCurrency(sc.riskAdjustedFee ?? sc.expectedTotalFee)}
+                  </td>
+                  <td className="py-3 text-center">
+                    <span className={`badge ${getStatusColor(stage)}`}>
+                      {stage}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-        {calculations.length === 0 && (
+        {scenarios.length === 0 && (
           <div className="text-center py-8">
             <Calculator className="w-12 h-12 text-neutral-400 mx-auto mb-3" />
-            <p className="text-neutral-600">No success fee calculations yet</p>
+            <p className="text-neutral-600">No success fee scenarios yet</p>
             <p className="text-sm text-neutral-500 mt-1">
-              Calculations will appear here once payments are collected
+              Create scenarios using the calculator to see insights here
             </p>
           </div>
         )}
@@ -246,73 +247,19 @@ const PricingManagementPage: React.FC = () => {
   });
   
   const [feeOptimizationRecommendations, setFeeOptimizationRecommendations] = useState<FeeOptimizationRecommendation[]>([]);
+  const [successFeeScenarios, setSuccessFeeScenarios] = useState<SuccessFeeScenario[]>([]);
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [showNewPricingModal, setShowNewPricingModal] = useState(false);
 
-  // Mock data for performance-based pricing
-  const pricingPlans: PerformanceBasedPricing[] = [
-    {
-      id: '1',
-      pricingModel: PricingModel.SUCCESS_SHARING,
-      baseSubscriptionRate: 2500,
-      successFeePercentage: 15,
-      isActive: true,
-      performance: {
-        totalCollected: 850000,
-        totalSuccessFees: 127500,
-        averageCollectionRate: 87.5,
-        projectedAnnualSavings: 180000
-      }
-    },
-    {
-      id: '2',
-      pricingModel: PricingModel.CONTINGENCY,
-      baseSubscriptionRate: 1500,
-      successFeePercentage: 25,
-      isActive: false,
-      performance: {
-        totalCollected: 450000,
-        totalSuccessFees: 112500,
-        averageCollectionRate: 72.3,
-        projectedAnnualSavings: 95000
-      }
-    }
-  ];
+  // Pricing plans would be loaded from backend once implemented
+  const [pricingPlans] = useState<PerformanceBasedPricing[]>([]);
 
-  // Mock data for success fee calculations
-  const successFeeCalculations: SuccessFeeCalculation[] = [
-    {
-      id: '1',
-      matterId: 'MTR-2024-001234',
-      calculationDate: '2024-01-15',
-      collectedAmount: 125000,
-      successFeePercentage: 15,
-      successFeeAmount: 18750,
-      paymentStatus: 'Paid'
-    },
-    {
-      id: '2',
-      matterId: 'MTR-2024-001235',
-      calculationDate: '2024-01-20',
-      collectedAmount: 85000,
-      successFeePercentage: 15,
-      successFeeAmount: 12750,
-      paymentStatus: 'Pending'
-    },
-    {
-      id: '3',
-      matterId: 'MTR-2024-001236',
-      calculationDate: '2024-01-25',
-      collectedAmount: 200000,
-      successFeePercentage: 25,
-      successFeeAmount: 50000,
-      paymentStatus: 'Disputed'
-    }
-  ];
+  // Success fee scenarios loaded from database
 
   useEffect(() => {
     loadPerformanceData();
     loadFeeOptimizationRecommendations();
+    loadSuccessFeeScenarios();
   }, []);
 
   const loadPerformanceData = async () => {
@@ -341,12 +288,8 @@ const PricingManagementPage: React.FC = () => {
           }, 0) / paidInvoices.length
         : 0;
 
-      // Mock performance by fee type (would be calculated from actual matter data)
-      const performanceByFeeType = [
-        { feeType: 'Standard Hourly', performance: 85, revenue: totalCollected * 0.6 },
-        { feeType: 'Contingency', performance: 92, revenue: totalCollected * 0.25 },
-        { feeType: 'Success Fee', performance: 78, revenue: totalCollected * 0.15 }
-      ];
+      // Performance by fee type requires matter fee_type data; leave empty until implemented
+      const performanceByFeeType: { feeType: string; performance: number; revenue: number }[] = [];
 
       setInvoicePerformanceData({
         totalCollected,
@@ -370,6 +313,15 @@ const PricingManagementPage: React.FC = () => {
       setFeeOptimizationRecommendations(recommendations);
     } catch (error) {
       console.error('Error loading fee optimization recommendations:', error);
+    }
+  };
+
+  const loadSuccessFeeScenarios = async () => {
+    try {
+      const scenarios = await StrategicFinanceService.getSuccessFeeScenarios();
+      setSuccessFeeScenarios(scenarios);
+    } catch (error) {
+      console.error('Error loading success fee scenarios:', error);
     }
   };
 
@@ -438,17 +390,7 @@ const PricingManagementPage: React.FC = () => {
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
 
-  const calculateTotalSavings = () => {
-    return pricingPlans.reduce((total, plan) => 
-      total + plan.performance.projectedAnnualSavings, 0
-    );
-  };
-
-  const calculateTotalSuccessFees = () => {
-    return successFeeCalculations.reduce((total, calc) => 
-      total + calc.successFeeAmount, 0
-    );
-  };
+  // Future: aggregate pricing plan analytics when backend is available
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -642,20 +584,29 @@ const PricingManagementPage: React.FC = () => {
             Add New Plan
           </Button>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {pricingPlans.map((pricing) => (
-            <PerformanceBasedPricingCard
-              key={pricing.id}
-              pricing={pricing}
-              onEdit={handleEditPricing}
-            />
-          ))}
-        </div>
+        {pricingPlans.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-neutral-600">No pricing plans configured yet</p>
+              <p className="text-sm text-neutral-500 mt-1">Create a plan to manage performance-based pricing</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {pricingPlans.map((pricing) => (
+              <PerformanceBasedPricingCard
+                key={pricing.id}
+                pricing={pricing}
+                onEdit={handleEditPricing}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Success Fee Calculations */}
+      {/* Success Fee Scenarios */}
       <div>
-        <SuccessFeeCalculationTable calculations={successFeeCalculations} />
+        <SuccessFeeCalculationTable scenarios={successFeeScenarios} />
       </div>
 
       {/* Pricing Insights & Actions */}

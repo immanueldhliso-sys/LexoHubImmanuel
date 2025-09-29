@@ -137,7 +137,10 @@ export class InvoiceService {
           vat_amount: vatAmount,
           total_amount: totalAmount,
           disbursements: disbursements,
-          status: (isProForma ? 'Pro Forma' : 'Draft') as InvoiceStatus,
+          // Always use a valid DB enum value for status
+          status: 'draft',
+          // Tag pro forma using internal_notes so we can filter server-side
+          internal_notes: isProForma ? 'pro_forma' : null,
           fee_narrative: narrative,
           reminders_sent: 0,
           next_reminder_date: format(addDays(invoiceDate, rules.reminderSchedule[0]), 'yyyy-MM-dd'),
@@ -361,7 +364,21 @@ export class InvoiceService {
       
       // Apply filters
       if (status && status.length > 0) {
-        query = query.in('status', status);
+        // Only apply valid DB enum statuses to the query
+        const dbValidStatuses = ['draft','sent','viewed','paid','overdue','disputed','written_off'];
+        const hasProForma = status.includes('pro_forma' as any);
+        const validStatuses = status
+          .map(s => String(s))
+          .filter(s => dbValidStatuses.includes(s));
+
+        if (validStatuses.length > 0) {
+          query = query.in('status', validStatuses);
+        }
+
+        // Special handling: filter pro formas by internal_notes tag
+        if (hasProForma) {
+          query = query.ilike('internal_notes', '%pro_forma%');
+        }
       }
 
       if (matterId) {
@@ -481,7 +498,8 @@ export class InvoiceService {
         .select('*')
         .eq('id', proFormaId)
         .eq('advocate_id', user.id)
-        .eq('status', 'pro_forma')
+        // Identify pro forma by internal_notes tag set during generation
+        .ilike('internal_notes', '%pro_forma%')
         .single();
 
       if (proFormaError || !proForma) {
@@ -545,12 +563,12 @@ export class InvoiceService {
         throw new Error(`Failed to create final invoice: ${finalInvoiceError.message}`);
       }
 
-      // Update the pro forma status to indicate conversion
+      // Soft-delete or mark the original pro forma as converted without using invalid enum
       await supabase
         .from('invoices')
         .update({
-          status: 'converted',
           internal_notes: `Converted to final invoice ${finalInvoiceNumber}`,
+          deleted_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', proFormaId);
@@ -830,36 +848,7 @@ ${invoice.fee_narrative || 'No narrative provided'}
     return narrative;
   }
 
-  // Send invoice to client (Phase 3)
-  static async sendInvoice(invoiceId: string): Promise<void> {
-    try {
-      const { data: invoice, error } = await supabase
-        .from('invoices')
-        .update({ 
-          status: 'Sent' as InvoiceStatus,
-          sent_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', invoiceId)
-        .select('*, matter:matters(*)')
-        .single();
-      
-      if (error || !invoice) {
-        throw new Error('Invoice not found');
-      }
-      
-      // Schedule reminders
-      await this.scheduleReminders(invoice);
-      
-      toast.success('Invoice sent successfully');
-      
-    } catch (error) {
-      console.error('Error sending invoice:', error);
-      const message = error instanceof Error ? error.message : 'Failed to send invoice';
-      toast.error(message);
-      throw error;
-    }
-  }
+  
 
   // Automated reminder system (Phase 3)
   static async processReminders(): Promise<void> {
@@ -870,7 +859,7 @@ ${invoice.fee_narrative || 'No narrative provided'}
       const { data: invoices } = await supabase
         .from('invoices')
         .select('*, matter:matters(*)')
-        .eq('status', 'Sent')
+        .eq('status', 'sent')
         .lte('next_reminder_date', today)
         .is('deleted_at', null);
       

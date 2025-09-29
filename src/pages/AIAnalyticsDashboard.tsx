@@ -28,6 +28,8 @@ import { AdvancedNLPService } from '../services/ai/nlp-processor.service';
 import { ExternalAPIService } from '../services/integrations/external-api.service';
 import { toast } from 'react-hot-toast';
 import type { Matter, Invoice } from '../types';
+import { useAuth } from '@/contexts/AuthContext';
+import { matterApiService } from '@/services/api';
 
 interface AIInsight {
   id: string;
@@ -48,10 +50,12 @@ interface PracticeMetrics {
   riskScore: number;
   aiAccuracy: number;
   optimizationPotential: number;
+  averageSettlementProbability: number;
 }
 
 export const AIAnalyticsDashboard: React.FC = () => {
   // Core state
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'predictions' | 'optimizations' | 'insights' | 'integrations'>('overview');
@@ -63,7 +67,8 @@ export const AIAnalyticsDashboard: React.FC = () => {
     predictedSettlements: 0,
     riskScore: 0,
     aiAccuracy: 0,
-    optimizationPotential: 0
+    optimizationPotential: 0,
+    averageSettlementProbability: 0
   });
 
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
@@ -102,111 +107,110 @@ export const AIAnalyticsDashboard: React.FC = () => {
   };
 
   const loadPracticeMetrics = async () => {
-    // Simulate loading practice metrics with AI analysis
-    const metrics: PracticeMetrics = {
-      totalMatters: 42,
-      totalWIP: 1250000,
-      predictedSettlements: 28,
-      riskScore: 25, // Low risk
-      aiAccuracy: 87.5,
-      optimizationPotential: 15.2
-    };
-    
-    setPracticeMetrics(metrics);
+    if (!user?.id) {
+      setPracticeMetrics({
+        totalMatters: 0,
+        totalWIP: 0,
+        predictedSettlements: 0,
+        riskScore: 0,
+        aiAccuracy: 0,
+        optimizationPotential: 0,
+        averageSettlementProbability: 0
+      });
+      return;
+    }
+
+    const [{ data: matters }, stats] = await Promise.all([
+      matterApiService.getByAdvocate(user.id),
+      matterApiService.getStats(user.id)
+    ]);
+
+    const totalMatters = (matters || []).length;
+    const totalWIP = (stats?.totalWipValue as number) || 0;
+    const predictedSettlements = Math.round(((stats?.averageSettlementProbability as number) || 0) * totalMatters / 100);
+    const riskScore = Math.round(((stats?.overdue as number) || 0) * 100 / Math.max(totalMatters, 1));
+
+    // Derive AI accuracy from prediction confidence on a sample of matters
+    const sample = (matters || []).slice(0, 5);
+    let aiAccuracy = 0;
+    if (sample.length > 0) {
+      try {
+        const predictions = await Promise.all(
+          sample.map(m => PredictiveAnalyticsService.predictSettlement(m))
+        );
+        const avgConfidence = predictions.reduce((sum, p) => sum + (p.confidence || 0), 0) / predictions.length;
+        aiAccuracy = Math.round(avgConfidence * 100);
+      } catch (e) {
+        aiAccuracy = 0;
+      }
+    }
+
+    // Estimate optimization potential: matters where WIP exceeds estimated fee
+    const optimizationCandidates = (matters || []).reduce((count, m) => {
+      const wip = m.wipValue || 0;
+      const est = m.estimatedFee || 0;
+      return count + (wip > est ? 1 : 0);
+    }, 0);
+    const optimizationPotential = Math.round((optimizationCandidates * 100) / Math.max(totalMatters, 1));
+
+    const averageSettlementProbability = (stats?.averageSettlementProbability as number) || 0;
+
+    setPracticeMetrics({
+      totalMatters,
+      totalWIP,
+      predictedSettlements,
+      riskScore,
+      aiAccuracy,
+      optimizationPotential,
+      averageSettlementProbability
+    });
   };
 
   const loadAIInsights = async () => {
-    // Generate AI-powered insights
-    const insights: AIInsight[] = [
-      {
-        id: '1',
-        type: 'prediction',
-        title: 'High Settlement Probability Detected',
-        description: 'Matter ABC-2024-001 shows 89% settlement probability - consider initiating discussions',
-        impact: 'high',
-        confidence: 0.89,
-        actionable: true,
-        estimatedValue: 750000,
-        timeframe: '2-4 weeks'
-      },
-      {
-        id: '2',
-        type: 'optimization',
-        title: 'Fee Structure Optimization Opportunity',
-        description: 'Performance-based pricing could increase revenue by 18% for commercial matters',
-        impact: 'medium',
-        confidence: 0.82,
-        actionable: true,
-        estimatedValue: 225000,
-        timeframe: '1-3 months'
-      },
-      {
-        id: '3',
-        type: 'risk',
-        title: 'Timeline Risk Alert',
-        description: 'Matter XYZ-2024-005 showing extended timeline patterns - review resource allocation',
-        impact: 'medium',
-        confidence: 0.76,
-        actionable: true,
-        timeframe: 'Immediate'
-      },
-      {
-        id: '4',
-        type: 'opportunity',
-        title: 'Market Opportunity Identified',
-        description: 'ESG compliance matters showing 45% growth trend - consider specialization',
-        impact: 'high',
-        confidence: 0.91,
-        actionable: true,
-        estimatedValue: 450000,
-        timeframe: '3-6 months'
-      }
-    ];
-
+    if (!user?.id) {
+      setAiInsights([]);
+      return;
+    }
+    const { data: matters } = await matterApiService.getByAdvocate(user.id);
+    const topMatters = (matters || []).slice(0, 5);
+    const insights: AIInsight[] = topMatters.map((m) => ({
+      id: m.id,
+      type: 'prediction',
+      title: `Settlement Probability: ${m.title}`,
+      description: `${m.clientName || 'Client'} matter shows ${Math.round((m.settlementProbability || 0))}% settlement probability`,
+      impact: (m.settlementProbability || 0) > 70 ? 'high' : (m.settlementProbability || 0) > 40 ? 'medium' : 'low',
+      confidence: ((m.settlementProbability || 0) / 100),
+      actionable: true,
+      estimatedValue: m.estimatedFee || m.wipValue || 0,
+      timeframe: '2-8 weeks'
+    }));
     setAiInsights(insights);
   };
 
   const loadPredictiveAnalytics = async () => {
     try {
-      // Mock matter data for predictions
-      const mockMatters: Matter[] = [
-        {
-          id: '1',
-          title: 'Commercial Dispute - ABC Corp',
-          clientName: 'ABC Corporation',
-          briefType: 'Commercial Litigation',
-          wipValue: 125000,
-          estimatedFee: 200000,
-          actualFee: 0,
-          status: 'ACTIVE' as any,
-          dateCreated: '2024-01-15T10:00:00Z',
-          dateModified: '2024-02-10T14:30:00Z',
-          instructingAttorney: 'John Smith',
-          instructingFirm: 'Smith & Associates',
-          bar: 'johannesburg' as any,
-          description: 'Commercial contract dispute',
-          conflictCheckCompleted: true,
-          conflictCheckDate: '2024-01-14T09:00:00Z',
-          riskLevel: 'Medium',
-          settlementProbability: 78
-        }
-      ];
+      if (!user?.id) {
+        setSettlementPredictions([]);
+        setOutcomeAnalysis([]);
+        setFeeOptimizations([]);
+        return;
+      }
 
-      // Generate settlement predictions
+      const { data: matters } = await matterApiService.getByAdvocate(user.id);
+      const selected = (matters || []).slice(0, 5);
+
       const predictions = await Promise.all(
-        mockMatters.map(matter => PredictiveAnalyticsService.predictSettlement(matter))
+        selected.map(matter => PredictiveAnalyticsService.predictSettlement(matter))
       );
       setSettlementPredictions(predictions);
 
-      // Generate outcome analysis
       const outcomes = await Promise.all(
-        mockMatters.map(matter => PredictiveAnalyticsService.predictCaseOutcome(matter, []))
+        selected.map(matter => PredictiveAnalyticsService.predictCaseOutcome(matter, []))
       );
       setOutcomeAnalysis(outcomes);
 
-      // Generate fee optimizations
       const optimizations = await Promise.all(
-        mockMatters.map(matter => PredictiveAnalyticsService.optimizeFeeStructure(matter))
+        selected.map(matter => PredictiveAnalyticsService.optimizeFeeStructure(matter))
       );
       setFeeOptimizations(optimizations);
 
@@ -369,7 +373,7 @@ export const AIAnalyticsDashboard: React.FC = () => {
                   <TrendingUp className="w-8 h-8 text-status-success-500" />
                 </div>
                 <p className="text-sm text-status-success-600 mt-2">
-                  67% settlement probability
+                  {Math.round(practiceMetrics.averageSettlementProbability)}% average settlement probability
                 </p>
               </CardContent>
             </Card>
@@ -384,7 +388,7 @@ export const AIAnalyticsDashboard: React.FC = () => {
                   <CheckCircle className="w-8 h-8 text-status-success-500" />
                 </div>
                 <p className="text-sm text-status-success-600 mt-2">
-                  Low risk profile
+                  {practiceMetrics.riskScore < 20 ? 'Low' : practiceMetrics.riskScore < 50 ? 'Medium' : 'High'} risk profile
                 </p>
               </CardContent>
             </Card>

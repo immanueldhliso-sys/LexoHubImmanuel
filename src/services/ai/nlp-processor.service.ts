@@ -3,7 +3,7 @@
  * Handles natural language processing for voice commands, document analysis, and text understanding
  */
 
-import { toast } from 'react-hot-toast';
+// import { toast } from 'react-hot-toast';
 
 export interface NLPIntent {
   intent: string;

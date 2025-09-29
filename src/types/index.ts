@@ -210,7 +210,7 @@ export interface Invoice {
   reminders_sent: number;
   last_reminder_date?: string;
   next_reminder_date?: string;
-  reminder_history: any[];
+  reminder_history: unknown[];
   created_at: string;
   updated_at: string;
   sent_at?: string;
@@ -646,7 +646,7 @@ export interface CourtRegistry {
   code: string;
   jurisdiction: string;
   address?: string;
-  contactDetails?: Record<string, any>;
+  contactDetails?: Record<string, unknown>;
   integrationStatus: 'active' | 'inactive' | 'maintenance';
   apiEndpoint?: string;
   lastSyncAt?: string;
@@ -664,7 +664,7 @@ export interface CourtCase {
   filingDate?: string;
   allocatedJudgeId?: string;
   courtRoom?: string;
-  caseDetails?: Record<string, any>;
+  caseDetails?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -717,9 +717,9 @@ export interface VoiceQuery {
   queryLanguage: string;
   intent?: string;
   confidenceScore?: number;
-  extractedEntities?: Record<string, any>;
+  extractedEntities?: Record<string, unknown>;
   responseText?: string;
-  responseActions?: Record<string, any>;
+  responseActions?: Record<string, unknown>;
   processingTimeMs?: number;
   createdAt: string;
 }
@@ -742,7 +742,7 @@ export interface CourtIntegrationLog {
   recordsProcessed: number;
   recordsUpdated: number;
   recordsFailed: number;
-  errorDetails?: Record<string, any>;
+  errorDetails?: Record<string, unknown>;
   syncDurationMs?: number;
   createdAt: string;
 }
@@ -767,9 +767,9 @@ export interface DocumentIntelligence {
   id: string;
   document_id: string;
   analysis_type?: AnalysisType;
-  extracted_entities?: any;
+  extracted_entities?: unknown;
   key_issues: string[];
-  risk_factors?: any;
+  risk_factors?: unknown;
   suggested_actions: string[];
   is_brief: boolean;
   brief_deadline?: string;
@@ -913,7 +913,7 @@ export interface FeeOptimizationRecommendation {
   recommended_fee_structure: string;
   recommended_fixed_fee?: number;
   recommended_success_percentage?: number;
-  optimization_factors?: any;
+  optimization_factors?: unknown;
   potential_revenue_increase?: number;
   confidence_score?: number;
   accepted: boolean;

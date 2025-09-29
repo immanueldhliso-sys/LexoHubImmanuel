@@ -1,31 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Scale, BarChart3, TrendingUp, User as UserIcon } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'react-hot-toast';
 
 const ProfilePage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'specializations' | 'development' | 'achievements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview'>('overview');
   const [isEditing, setIsEditing] = useState(false);
+  const { user, updateProfile } = useAuth();
 
-  // Mock user profile data
+  // Real user profile bound to auth/advocate data
   const [userProfile, setUserProfile] = useState({
-    name: 'Advocate Sarah Johnson',
-    email: 'sarah.johnson@lexohub.co.za',
-    phone: '+27 11 123 4567',
-    practiceNumber: 'GP12345',
-    admissionDate: '2015-03-15',
-    chambers: 'Johannesburg Bar',
-    specializations: ['Commercial Law', 'Contract Disputes', 'Corporate Litigation'],
-    experience: '8 years',
-    successRate: '87%',
-    totalMatters: 156,
-    totalRecovered: 'R12.5M',
-    avatar: '/api/placeholder/120/120'
+    name: '',
+    email: '',
+    phone: '',
+    practiceNumber: '',
+    admissionDate: '',
+    chambers: '',
+    specializations: [] as string[],
+    experience: ''
   });
 
-  const handleSave = () => {
-    setIsEditing(false);
-    // Here you would typically save to backend
-    console.log('Profile saved:', userProfile);
+  useEffect(() => {
+    if (!user) return;
+    const md: any = user.user_metadata || {};
+    const ap = user.advocate_profile || ({} as any);
+    const year = md.year_admitted || new Date().getFullYear();
+    const experienceYears = Math.max(0, new Date().getFullYear() - (md.year_admitted || new Date().getFullYear()));
+    setUserProfile({
+      name: ap.full_name || md.full_name || user.email || '',
+      email: user.email || '',
+      phone: md.phone_number || '',
+      practiceNumber: ap.practice_number || md.practice_number || '',
+      admissionDate: `${year}-01-01`,
+      chambers: md.chambers_address || '',
+      specializations: ap.specialisations || md.specialisations || [],
+      experience: `${experienceYears} years`
+    });
+  }, [user]);
+
+  const handleSave = async () => {
+    try {
+      const year = userProfile.admissionDate ? Number(userProfile.admissionDate.split('-')[0]) : undefined;
+      const updates: any = {
+        full_name: userProfile.name,
+        practice_number: userProfile.practiceNumber,
+        phone_number: userProfile.phone || undefined,
+        chambers_address: userProfile.chambers || undefined,
+        specialisations: userProfile.specializations,
+        year_admitted: year
+      };
+      const { error } = await updateProfile(updates);
+      if (error) {
+        toast.error('Failed to update profile');
+      } else {
+        toast.success('Profile updated');
+        setIsEditing(false);
+      }
+    } catch (e) {
+      toast.error('Unexpected error updating profile');
+    }
   };
 
   const handleCancel = () => {
@@ -40,95 +74,14 @@ const ProfilePage: React.FC = () => {
     }));
   };
 
-  const specializations = [
-    {
-      id: 1,
-      area: 'Commercial Law',
-      level: 'Expert',
-      yearsExperience: 8,
-      certifications: ['Commercial Law Certificate', 'Advanced Contract Law'],
-      recentCases: 23,
-      successRate: '92%'
-    },
-    {
-      id: 2,
-      area: 'Contract Disputes',
-      level: 'Advanced',
-      yearsExperience: 6,
-      certifications: ['Contract Dispute Resolution'],
-      recentCases: 18,
-      successRate: '85%'
-    },
-    {
-      id: 3,
-      area: 'Corporate Litigation',
-      level: 'Intermediate',
-      yearsExperience: 4,
-      certifications: ['Corporate Law Basics'],
-      recentCases: 12,
-      successRate: '78%'
-    }
-  ];
+  const specializations: any[] = [];
 
-  const developmentGoals = [
-    {
-      id: 1,
-      title: 'Complete Advanced Arbitration Course',
-      category: 'Education',
-      progress: 65,
-      deadline: '2024-06-30',
-      status: 'in-progress'
-    },
-    {
-      id: 2,
-      title: 'Obtain Mediation Certification',
-      category: 'Certification',
-      progress: 30,
-      deadline: '2024-09-15',
-      status: 'in-progress'
-    },
-    {
-      id: 3,
-      title: 'Attend International Commercial Law Conference',
-      category: 'Networking',
-      progress: 0,
-      deadline: '2024-11-20',
-      status: 'planned'
-    }
-  ];
+  const developmentGoals: any[] = [];
 
-  const achievements = [
-    {
-      id: 1,
-      title: 'Top Performer 2023',
-      description: 'Highest success rate in commercial disputes',
-      date: '2023-12-15',
-      type: 'award',
-      icon: '🏆'
-    },
-    {
-      id: 2,
-      title: 'R5M Settlement Achievement',
-      description: 'Successfully negotiated largest settlement in practice history',
-      date: '2023-08-22',
-      type: 'milestone',
-      icon: '💰'
-    },
-    {
-      id: 3,
-      title: 'Client Satisfaction Excellence',
-      description: '98% client satisfaction rating for Q3 2023',
-      date: '2023-09-30',
-      type: 'recognition',
-      icon: '⭐'
-    }
-  ];
+  const achievements: any[] = [];
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: UserIcon },
-    { id: 'specializations', label: 'Specializations', icon: Scale },
-    { id: 'development', label: 'Development', icon: TrendingUp },
-    { id: 'achievements', label: 'Achievements', icon: BarChart3 }
+    { id: 'overview', label: 'Overview', icon: UserIcon }
   ];
 
   return (

@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from '../../lib/supabase';
 
 // Court Registry Types
 export interface CourtRegistry {
@@ -12,7 +7,7 @@ export interface CourtRegistry {
   code: string;
   jurisdiction: string;
   address?: string;
-  contactDetails?: Record<string, any>;
+  contactDetails?: Record<string, unknown>;
   integrationStatus: 'active' | 'inactive' | 'maintenance';
   apiEndpoint?: string;
   lastSyncAt?: string;
@@ -31,7 +26,7 @@ export interface CourtCase {
   filingDate?: string;
   allocatedJudgeId?: string;
   courtRoom?: string;
-  caseDetails?: Record<string, any>;
+  caseDetails?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }

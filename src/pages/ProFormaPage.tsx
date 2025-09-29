@@ -65,6 +65,74 @@ const ProFormaPage: React.FC = () => {
     }
   });
 
+  // Apply filters to pro formas
+  const applyFilters = useCallback((proFormas: Invoice[], filters: ProFormaFilters): Invoice[] => {
+    return proFormas.filter(proForma => {
+      // Search filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesSearch = 
+          proForma.invoice_number.toLowerCase().includes(searchLower) ||
+          (proForma.matter_id && proForma.matter_id.toLowerCase().includes(searchLower)) ||
+          (proForma.fee_narrative && proForma.fee_narrative.toLowerCase().includes(searchLower));
+        
+        if (!matchesSearch) return false;
+      }
+      
+      // Status filter
+      if (filters.status !== 'all') {
+        switch (filters.status) {
+          case 'active':
+            return proForma.status === InvoiceStatus.PRO_FORMA;
+          case 'converted':
+            return proForma.status === InvoiceStatus.CONVERTED;
+          case 'expired':
+            // Consider pro formas older than 30 days as expired
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            return new Date(proForma.created_at) < thirtyDaysAgo && proForma.status === InvoiceStatus.PRO_FORMA;
+          default:
+            return true;
+        }
+      }
+      
+      // Date range filter
+      if (filters.dateRange) {
+        const proFormaDate = new Date(proForma.created_at);
+        const startDate = new Date(filters.dateRange.start);
+        const endDate = new Date(filters.dateRange.end);
+        
+        if (proFormaDate < startDate || proFormaDate > endDate) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, []);
+
+  // Calculate summary statistics
+  const calculateSummaryStats = useCallback((proFormas: Invoice[]): ProFormaSummaryStats => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const currentMonthProFormas = proFormas.filter(pf => {
+      const pfDate = new Date(pf.created_at);
+      return pfDate.getMonth() === currentMonth && pfDate.getFullYear() === currentYear;
+    });
+    
+    const convertedProFormas = proFormas.filter(pf => pf.status === InvoiceStatus.CONVERTED);
+    const totalValue = proFormas.reduce((sum, pf) => sum + pf.total_amount, 0);
+    
+    return {
+      totalCount: proFormas.length,
+      estimatedValue: totalValue,
+      currentMonthCount: currentMonthProFormas.length,
+      conversionRate: proFormas.length > 0 ? (convertedProFormas.length / proFormas.length) * 100 : 0,
+      averageValue: proFormas.length > 0 ? totalValue / proFormas.length : 0
+    };
+  }, []);
+
   // Fetch pro forma invoices
   const fetchProFormas = useCallback(async () => {
     try {
@@ -167,74 +235,6 @@ const ProFormaPage: React.FC = () => {
       toast.success('Using demo data - Supabase backend not available');
     }
   }, [state.filters, applyFilters, calculateSummaryStats]);
-
-  // Apply filters to pro formas
-  const applyFilters = useCallback((proFormas: Invoice[], filters: ProFormaFilters): Invoice[] => {
-    return proFormas.filter(proForma => {
-      // Search filter
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const matchesSearch = 
-          proForma.invoice_number.toLowerCase().includes(searchLower) ||
-          (proForma.matter_id && proForma.matter_id.toLowerCase().includes(searchLower)) ||
-          (proForma.fee_narrative && proForma.fee_narrative.toLowerCase().includes(searchLower));
-        
-        if (!matchesSearch) return false;
-      }
-      
-      // Status filter
-      if (filters.status !== 'all') {
-        switch (filters.status) {
-          case 'active':
-            return proForma.status === InvoiceStatus.PRO_FORMA;
-          case 'converted':
-            return proForma.status === InvoiceStatus.CONVERTED;
-          case 'expired':
-            // Consider pro formas older than 30 days as expired
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            return new Date(proForma.created_at) < thirtyDaysAgo && proForma.status === InvoiceStatus.PRO_FORMA;
-          default:
-            return true;
-        }
-      }
-      
-      // Date range filter
-      if (filters.dateRange) {
-        const proFormaDate = new Date(proForma.created_at);
-        const startDate = new Date(filters.dateRange.start);
-        const endDate = new Date(filters.dateRange.end);
-        
-        if (proFormaDate < startDate || proFormaDate > endDate) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
-  }, []);
-
-  // Calculate summary statistics
-  const calculateSummaryStats = useCallback((proFormas: Invoice[]): ProFormaSummaryStats => {
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    
-    const currentMonthProFormas = proFormas.filter(pf => {
-      const pfDate = new Date(pf.created_at);
-      return pfDate.getMonth() === currentMonth && pfDate.getFullYear() === currentYear;
-    });
-    
-    const convertedProFormas = proFormas.filter(pf => pf.status === InvoiceStatus.CONVERTED);
-    const totalValue = proFormas.reduce((sum, pf) => sum + pf.total_amount, 0);
-    
-    return {
-      totalCount: proFormas.length,
-      estimatedValue: totalValue,
-      currentMonthCount: currentMonthProFormas.length,
-      conversionRate: proFormas.length > 0 ? (convertedProFormas.length / proFormas.length) * 100 : 0,
-      averageValue: proFormas.length > 0 ? totalValue / proFormas.length : 0
-    };
-  }, []);
 
   // Handle pro forma creation
   const handleCreateProForma = useCallback(async (data: InvoiceGenerationRequest) => {

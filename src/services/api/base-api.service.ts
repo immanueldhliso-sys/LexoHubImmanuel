@@ -22,7 +22,7 @@ export enum ErrorType {
 export interface ApiError {
   type: ErrorType;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   code?: string;
   timestamp: Date;
   requestId: string;
@@ -41,7 +41,7 @@ export interface PaginationOptions {
 }
 
 export interface FilterOptions {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface SortOptions {
@@ -53,7 +53,7 @@ export interface SortOptions {
  * Base API Service Class
  * Provides common database operations with consistent error handling
  */
-export abstract class BaseApiService<T = any> {
+export abstract class BaseApiService<T = unknown> {
   protected tableName: string;
   protected selectFields: string;
 

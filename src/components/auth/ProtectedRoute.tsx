@@ -6,7 +6,8 @@
 import React, { ReactNode } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoadingSpinner } from '../design-system/components/LoadingSpinner';
-import { LoginPage } from '../../pages/LoginPage';
+import LoginPage from '../../pages/LoginPage';
+import WelcomePage from '../../pages/WelcomePage';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -20,6 +21,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallback 
 }) => {
   const { user, loading, hasPermission } = useAuth();
+  const pathname = window.location.pathname;
 
   // Show loading spinner while checking auth
   if (loading) {
@@ -28,6 +30,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <LoadingSpinner size="lg" />
       </div>
     );
+  }
+
+  // Public route for post-confirmation landing
+  if (pathname === '/welcome') {
+    return <WelcomePage />;
   }
 
   // Redirect to login if not authenticated

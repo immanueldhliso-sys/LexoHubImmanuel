@@ -1,49 +1,77 @@
 import React, { useState, useEffect } from 'react';
 import { X, Zap, FileText, Clock, DollarSign } from 'lucide-react';
 import { DocumentIntelligenceService } from '../../services/api/document-intelligence.service';
+import { matterApiService } from '../../services/api/matter-api.service';
+import { TimeEntryService } from '../../services/api/time-entries.service';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Matter, TimeEntry } from '../../types';
 import { toast } from 'react-hot-toast';
 
 interface FeeNarrativeGeneratorModalProps {
   onClose: () => void;
 }
 
-// Mock data - in real app this would come from API
-const mockMatters = [
-  { id: '1', title: 'Smith v Jones Commercial Dispute', client: 'ABC Corporation' },
-  { id: '2', title: 'XYZ Mining Rights Appeal', client: 'XYZ Mining Ltd' },
-  { id: '3', title: 'Employment Law Consultation', client: 'Tech Innovations Inc' }
-];
-
-const mockTimeEntries = [
-  { id: '1', description: 'Draft heads of argument', duration: 180, amount: 4500 },
-  { id: '2', description: 'Research case precedents', duration: 120, amount: 3000 },
-  { id: '3', description: 'Client consultation meeting', duration: 60, amount: 1500 },
-  { id: '4', description: 'Review discovery documents', duration: 240, amount: 6000 },
-  { id: '5', description: 'Court appearance - motion hearing', duration: 90, amount: 2250 }
-];
-
 export const FeeNarrativeGeneratorModal: React.FC<FeeNarrativeGeneratorModalProps> = ({ onClose }) => {
+  const { user } = useAuth();
+  const [matters, setMatters] = useState<Matter[]>([]);
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [selectedMatter, setSelectedMatter] = useState('');
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
   const [includeValueProps, setIncludeValueProps] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [narrative, setNarrative] = useState('');
 
+  // Load matters for current advocate
+  useEffect(() => {
+    const loadMatters = async () => {
+      try {
+        if (!user?.id) return;
+        const { data } = await matterApiService.getByAdvocate(user.id, {
+          filters: { status: ['active', 'pending'] },
+        });
+        setMatters(data || []);
+      } catch (error) {
+        console.error('Failed to load matters', error);
+        toast.error('Failed to load matters');
+      }
+    };
+    loadMatters();
+  }, [user?.id]);
+
+  // Load unbilled, billable time entries for selected matter
+  useEffect(() => {
+    const loadEntries = async () => {
+      try {
+        if (!selectedMatter) {
+          setTimeEntries([]);
+          setSelectedEntries([]);
+          return;
+        }
+        const entries = await TimeEntryService.getUnbilledTimeEntries(selectedMatter);
+        setTimeEntries(entries || []);
+        setSelectedEntries([]);
+      } catch (error) {
+        console.error('Failed to load time entries', error);
+        toast.error('Failed to load time entries');
+      }
+    };
+    loadEntries();
+  }, [selectedMatter]);
   const totalHours = selectedEntries.reduce((sum, entryId) => {
-    const entry = mockTimeEntries.find(e => e.id === entryId);
-    return sum + (entry ? entry.duration / 60 : 0);
+    const entry = timeEntries.find(e => e.id === entryId);
+    return sum + (entry ? (entry.duration_minutes || 0) / 60 : 0);
   }, 0);
 
   const totalAmount = selectedEntries.reduce((sum, entryId) => {
-    const entry = mockTimeEntries.find(e => e.id === entryId);
-    return sum + (entry ? entry.amount : 0);
+    const entry = timeEntries.find(e => e.id === entryId);
+    return sum + (entry ? (entry.amount || 0) : 0);
   }, 0);
 
   const handleSelectAll = () => {
-    if (selectedEntries.length === mockTimeEntries.length) {
+    if (selectedEntries.length === timeEntries.length) {
       setSelectedEntries([]);
     } else {
-      setSelectedEntries(mockTimeEntries.map(e => e.id));
+      setSelectedEntries(timeEntries.map(e => e.id));
     }
   };
 
@@ -115,9 +143,9 @@ export const FeeNarrativeGeneratorModal: React.FC<FeeNarrativeGeneratorModalProp
                   className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-mpondo-gold-500"
                 >
                   <option value="">Choose a matter...</option>
-                  {mockMatters.map(matter => (
+                  {matters.map(matter => (
                     <option key={matter.id} value={matter.id}>
-                      {matter.title} - {matter.client}
+                      {matter.title} - {matter.client_name}
                     </option>
                   ))}
                 </select>
@@ -133,12 +161,12 @@ export const FeeNarrativeGeneratorModal: React.FC<FeeNarrativeGeneratorModalProp
                     onClick={handleSelectAll}
                     className="text-sm text-mpondo-gold-600 hover:text-mpondo-gold-700"
                   >
-                    {selectedEntries.length === mockTimeEntries.length ? 'Deselect All' : 'Select All'}
+                    {selectedEntries.length === timeEntries.length ? 'Deselect All' : 'Select All'}
                   </button>
                 </div>
                 
                 <div className="border border-neutral-300 rounded-lg divide-y divide-neutral-200">
-                  {mockTimeEntries.map(entry => (
+                  {timeEntries.map(entry => (
                     <label
                       key={entry.id}
                       className="flex items-center gap-3 p-3 hover:bg-neutral-50 cursor-pointer"
@@ -154,11 +182,11 @@ export const FeeNarrativeGeneratorModal: React.FC<FeeNarrativeGeneratorModalProp
                         <div className="flex items-center gap-4 text-sm text-neutral-600 mt-1">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {(entry.duration / 60).toFixed(1)}h
+                            {((entry.duration_minutes || 0) / 60).toFixed(1)}h
                           </span>
                           <span className="flex items-center gap-1">
                             <DollarSign className="w-3 h-3" />
-                            R{entry.amount.toLocaleString()}
+                            R{(entry.amount || 0).toLocaleString()}
                           </span>
                         </div>
                       </div>

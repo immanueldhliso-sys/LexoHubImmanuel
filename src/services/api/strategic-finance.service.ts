@@ -162,6 +162,107 @@ const SuccessFeeScenarioSchema = z.object({
 });
 
 export class StrategicFinanceService {
+  // Generate fee optimization recommendations (wrapper for UI compatibility)
+  static async generateFeeOptimizationRecommendations(matterId?: string): Promise<FeeOptimizationRecommendation[]> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // If no matterId provided, get recommendations for all active matters
+      if (!matterId) {
+        const { data: matters } = await supabase
+          .from('matters')
+          .select('id')
+          .eq('advocate_id', user.id)
+          .eq('status', 'active')
+          .limit(5);
+
+        if (!matters || matters.length === 0) {
+          // No active matters, return empty recommendations in production
+          toast.info('No active matters found for fee optimization');
+          return [];
+        }
+
+        // Get recommendations for the first active matter
+        matterId = matters[0].id;
+      }
+
+      return this.getFeeOptimizationRecommendations({ matterId });
+    } catch (error) {
+      console.error('Error generating fee optimization recommendations:', error);
+      toast.error('Failed to generate fee optimization recommendations');
+      return [];
+    }
+  }
+
+  // Generate mock recommendations for development
+  private static generateMockRecommendations(advocateId: string): FeeOptimizationRecommendation[] {
+    return [
+      {
+        id: 'mock-1',
+        advocateId,
+        currentHourlyRate: 2500,
+        currentFeeStructure: 'Standard hourly billing at R2,500/hour',
+        recommendedModel: 'premium_urgency',
+        recommendedHourlyRate: 3200,
+        recommendedFeeStructure: 'Premium urgency model with 28% increase for urgent matters',
+        potentialRevenueIncrease: 0.28,
+        confidenceScore: 0.85,
+        optimizationFactors: {
+          urgency: 0.8,
+          complexity: 0.7,
+          clientType: 'corporate',
+          marketPosition: 0.9
+        },
+        accepted: false,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'mock-2',
+        advocateId,
+        currentHourlyRate: 2500,
+        currentFeeStructure: 'Standard hourly billing',
+        recommendedModel: 'success_based',
+        recommendedSuccessPercentage: 0.25,
+        recommendedFeeStructure: 'Success-based fee: 25% of recovery above R500k',
+        potentialRevenueIncrease: 0.45,
+        confidenceScore: 0.72,
+        optimizationFactors: {
+          complexity: 0.9,
+          clientType: 'individual',
+          volume: 0.6
+        },
+        accepted: false,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ];
+  }
+
+  // List success fee scenarios for current advocate
+  static async getSuccessFeeScenarios(): Promise<SuccessFeeScenario[]> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('success_fee_scenarios')
+        .select('*')
+        .eq('advocate_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      return (data || []).map(this.mapSuccessFeeScenario);
+    } catch (error) {
+      console.error('Error fetching success fee scenarios:', error);
+      toast.error('Failed to fetch success fee scenarios');
+      return [];
+    }
+  }
+
   // Get fee optimization recommendations
   static async getFeeOptimizationRecommendations(data: z.infer<typeof FeeOptimizationRequestSchema>): Promise<FeeOptimizationRecommendation[]> {
     try {
@@ -379,7 +480,7 @@ export class StrategicFinanceService {
         .eq('advocate_id', user.id)
         .order('calculation_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
 

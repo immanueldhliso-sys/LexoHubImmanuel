@@ -204,65 +204,19 @@ export class AdvancedOCRService {
    * Extract text using advanced OCR
    */
   private static async extractTextWithOCR(preprocessedData: any): Promise<OCRResult> {
-    // Simulate OCR processing with mock results
-    // In production, this would call actual OCR services
-    
-    const mockText = `
-NOTICE OF MOTION
-
-Case No: 2024/12345
-In the High Court of South Africa (Gauteng Division, Pretoria)
-
-In the matter between:
-
-SMITH INDUSTRIES (PTY) LTD                           Applicant
-and
-JONES CONSTRUCTION CC                                Respondent
-
-TO: The Respondent
-    The Registrar of the High Court
-
-TAKE NOTICE that on 15 March 2024 at 10:00 or as soon thereafter as counsel can be heard, 
-the Applicant will make application to the above Honourable Court for an order in the following terms:
-
-1. That the Respondent be ordered to pay to the Applicant the amount of R 750,000.00 
-   (Seven Hundred and Fifty Thousand Rand) together with interest thereon at the rate 
-   of 10.25% per annum from 1 December 2023 to date of payment.
-
-2. That the Respondent be ordered to pay the costs of this application on an attorney 
-   and client scale.
-
-3. Further and/or alternative relief.
-
-The grounds upon which this application is made are fully set out in the founding 
-affidavit of John Smith filed herewith.
-
-DATED at JOHANNESBURG this 1st day of March 2024.
-
-SMITH & ASSOCIATES
-Attorneys for Applicant
-    `;
-
+    // No mock OCR output. Return an empty result until a provider is configured.
+    toast.info('OCR provider not configured. Returning empty extraction.');
     return {
       id: `ocr-${Date.now()}`,
-      text: mockText.trim(),
-      confidence: 0.92,
-      pages: [
-        {
-          pageNumber: 1,
-          text: mockText.trim(),
-          confidence: 0.92,
-          boundingBoxes: this.generateMockBoundingBoxes(mockText),
-          tables: [],
-          images: []
-        }
-      ],
-      structuredData: {} as DocumentStructure, // Will be filled by analyzeDocumentStructure
-      processingTime: 0, // Will be calculated later
+      text: '',
+      confidence: 0,
+      pages: [],
+      structuredData: {} as DocumentStructure,
+      processingTime: 0,
       metadata: {
-        fileType: 'application/pdf',
-        fileSize: 245760,
-        pageCount: 1,
+        fileType: 'unknown',
+        fileSize: 0,
+        pageCount: 0,
         language: 'en',
         orientation: 0
       }
@@ -384,27 +338,8 @@ Attorneys for Applicant
    * Generate mock bounding boxes for demonstration
    */
   private static generateMockBoundingBoxes(text: string): BoundingBox[] {
-    const lines = text.split('\n');
-    const boundingBoxes: BoundingBox[] = [];
-    
-    lines.forEach((line, index) => {
-      if (line.trim()) {
-        const type = this.classifyLineType(line);
-        boundingBoxes.push({
-          text: line.trim(),
-          confidence: 0.9 + Math.random() * 0.1,
-          coordinates: {
-            x: 50,
-            y: 100 + (index * 20),
-            width: line.length * 8,
-            height: 16
-          },
-          type
-        });
-      }
-    });
-    
-    return boundingBoxes;
+    // Deprecated: No mock bounding boxes
+    return [];
   }
 
   /**

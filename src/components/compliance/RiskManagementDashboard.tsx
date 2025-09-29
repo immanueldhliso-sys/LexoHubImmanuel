@@ -10,12 +10,31 @@ import {
   Activity
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
+import { useAuth } from '@/contexts/AuthContext';
+import { matterApiService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
 export const RiskManagementDashboard: React.FC = () => {
+  const { user } = useAuth();
   const [riskLevel, setRiskLevel] = useState('medium');
   const [isRunningAudit, setIsRunningAudit] = useState(false);
   const [lastAuditDate, setLastAuditDate] = useState<string | null>(null);
+  const [complianceMetrics, setComplianceMetrics] = useState({
+    overallScore: 0,
+    ethicsCompliance: 0,
+    trustAccountCompliance: 0,
+    dataProtection: 0,
+    auditReadiness: 0
+  });
+  const [alerts, setAlerts] = useState<Array<{
+    id: string;
+    type: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    title: string;
+    description: string;
+    dueDate?: string;
+    status: 'active' | 'pending' | 'scheduled' | 'resolved';
+  }>>([]);
 
   const handleConfigureEthics = () => {
     toast.success('Opening ethics configuration...');
@@ -57,43 +76,43 @@ export const RiskManagementDashboard: React.FC = () => {
     // In real implementation, this would open alert details modal
   };
 
-  const complianceMetrics = {
-    overallScore: 87,
-    ethicsCompliance: 92,
-    trustAccountCompliance: 85,
-    dataProtection: 90,
-    auditReadiness: 78
-  };
+  React.useEffect(() => {
+    const loadComplianceData = async () => {
+      if (!user?.id) return;
+      try {
+        const res = await matterApiService.getByAdvocate(user.id, {
+          pagination: { page: 1, limit: 100 }
+        });
+        const matters = res.error ? [] : (res.data || []);
 
-  const alerts = [
-    {
-      id: '1',
-      type: 'ethics',
-      severity: 'high',
-      title: 'Ethics Rule Alert: Conflict of Interest',
-      description: 'Potential conflict detected in matter ABC-2024-001',
-      dueDate: '2024-02-16',
-      status: 'active'
-    },
-    {
-      id: '2',
-      type: 'trust',
-      severity: 'medium',
-      title: 'Trust Account Reconciliation Due',
-      description: 'Monthly reconciliation required by end of month',
-      dueDate: '2024-02-29',
-      status: 'pending'
-    },
-    {
-      id: '3',
-      type: 'audit',
-      severity: 'low',
-      title: 'Audit Trail Update Required',
-      description: 'Update document access logs for compliance',
-      dueDate: '2024-03-01',
-      status: 'scheduled'
-    }
-  ];
+        const total = matters.length || 1; // avoid division by zero
+        const ethicsCompleted = matters.filter((m: any) => m.conflict_check_completed).length;
+        const trustOk = matters.filter((m: any) => (m.trust_balance ?? 0) >= 0).length;
+
+        const ethicsCompliance = Math.round((ethicsCompleted / total) * 100);
+        const trustAccountCompliance = Math.round((trustOk / total) * 100);
+
+        // Placeholder computations until real data protection/audit signals exist
+        const dataProtection = 100; // assume compliant until violations tracked
+        const auditReadiness = Math.round((ethicsCompliance + trustAccountCompliance + dataProtection) / 3);
+        const overallScore = Math.round((ethicsCompliance + trustAccountCompliance + dataProtection + auditReadiness) / 4);
+
+        setComplianceMetrics({
+          overallScore,
+          ethicsCompliance,
+          trustAccountCompliance,
+          dataProtection,
+          auditReadiness
+        });
+
+        // Alerts should come from a compliance service; none if no violations
+        setAlerts([]);
+      } catch (e) {
+        // keep metrics at 0 on error
+      }
+    };
+    loadComplianceData();
+  }, [user?.id]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {

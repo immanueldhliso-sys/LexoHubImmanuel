@@ -14,8 +14,11 @@ import {
 import { Card, CardContent, Button, CardHeader } from '../design-system/components';
 import { VoiceRecordingModal, VoiceNotesList, VoiceTimeEntryForm } from '../components/voice';
 import { InvoiceGenerationModal } from '../components/invoices/InvoiceGenerationModal';
+import { NewMatterModal } from '../components/matters/NewMatterModal';
 import { voiceManagementService } from '../services/voice-management.service';
 import { InvoiceService } from '../services/api/invoices.service';
+import { matterApiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import type { Matter, VoiceRecording, TimeEntry, Invoice } from '../types';
 import { MatterStatus, BarAssociation, FeeType, RiskLevel } from '../types';
@@ -33,80 +36,57 @@ const MattersPage: React.FC = () => {
   const [voiceRecordings, setVoiceRecordings] = useState<VoiceRecording[]>([]);
   const [playingRecordingId, setPlayingRecordingId] = useState<string | undefined>(undefined);
   const [matterInvoices, setMatterInvoices] = useState<Record<string, Invoice[]>>({});
+  const [matters, setMatters] = useState<Matter[]>([]);
+  const [loadingMatters, setLoadingMatters] = useState<boolean>(false);
+  const { user } = useAuth();
 
-  // Mock data - in real app this would come from API
-  const mockMatters: Matter[] = useMemo(() => [
-    {
-      id: '1',
-      advocate_id: 'adv-1',
-      reference_number: 'MAT-2024-001',
-      title: 'Smith v Jones Commercial Dispute',
-      description: 'Contract dispute regarding supply agreement breach',
-      matter_type: 'Commercial Litigation',
-      court_case_number: undefined,
-      bar: BarAssociation.JOHANNESBURG,
-      client_name: 'ABC Corporation',
-      client_email: undefined,
-      client_phone: undefined,
-      client_address: undefined,
-      client_type: undefined,
-      instructing_attorney: 'John Smith',
-      instructing_attorney_email: undefined,
-      instructing_attorney_phone: undefined,
-      instructing_firm: 'Smith & Associates',
-      instructing_firm_ref: undefined,
-      fee_type: FeeType.STANDARD,
-      estimated_fee: 200000,
-      fee_cap: undefined,
-      actual_fee: undefined,
-      wip_value: 125000,
-      trust_balance: 0,
-      disbursements: 0,
-      vat_exempt: false,
-      status: MatterStatus.ACTIVE,
-      risk_level: RiskLevel.MEDIUM,
-      settlement_probability: 72,
-      expected_completion_date: undefined,
-      conflict_check_completed: true,
-      conflict_check_date: '2024-01-14T09:00:00Z',
-      conflict_check_cleared: true,
-      conflict_notes: undefined,
-      date_instructed: '2024-01-15T10:00:00Z',
-      date_accepted: '2024-01-15T10:00:00Z',
-      date_commenced: '2024-01-16T10:00:00Z',
-      date_settled: undefined,
-      date_closed: undefined,
-      next_court_date: undefined,
-      prescription_date: undefined,
-      tags: ['commercial', 'contract'],
-      created_at: '2024-01-15T10:00:00Z',
-      updated_at: '2024-02-20T14:30:00Z',
-      deleted_at: undefined,
-      days_active: 30,
-      is_overdue: false
-    }
-  ], []);
+  // Load matters from API based on current user
+  React.useEffect(() => {
+    const fetchMatters = async () => {
+      if (!user?.id) return;
+      setLoadingMatters(true);
+      try {
+        const { data, error } = await matterApiService.getByAdvocate(user.id);
+        if (error) {
+          console.error('Error loading matters:', error);
+          toast.error('Failed to load matters');
+          setMatters([]);
+        } else {
+          setMatters(data || []);
+        }
+      } catch (err) {
+        console.error('Unexpected error loading matters:', err);
+        toast.error('Unexpected error loading matters');
+        setMatters([]);
+      } finally {
+        setLoadingMatters(false);
+      }
+    };
+    fetchMatters();
+  }, [user?.id]);
 
-  // Load existing voice recordings and matter invoices on component mount
+  // Load existing voice recordings and matter invoices when matters are available
   React.useEffect(() => {
     setVoiceRecordings(voiceManagementService.getVoiceRecordings());
-    loadMatterInvoices();
-  }, []);
+    if (matters.length > 0) {
+      loadMatterInvoices();
+    }
+  }, [matters.length]);
 
   const loadMatterInvoices = async () => {
     try {
       // Load invoices for all matters
-      const invoicePromises = mockMatters.map(async (matter) => {
+      const invoicePromises = matters.map(async (matter) => {
         const response = await InvoiceService.getInvoices({ matterId: matter.id });
         return { matterId: matter.id, invoices: response.data };
       });
-      
+
       const results = await Promise.all(invoicePromises);
       const invoiceMap: Record<string, Invoice[]> = {};
       results.forEach(({ matterId, invoices }) => {
         invoiceMap[matterId] = invoices;
       });
-      
+
       setMatterInvoices(invoiceMap);
     } catch (error) {
       console.error('Error loading matter invoices:', error);
@@ -118,8 +98,8 @@ const MattersPage: React.FC = () => {
     const handleVoiceRecordingComplete = async (recording: VoiceRecording) => {
       try {
         await voiceManagementService.processVoiceRecording(
-          recording, 
-          mockMatters
+          recording,
+          matters
         );
         setVoiceRecordings(voiceManagementService.getVoiceRecordings());
         console.log('Voice recording processed successfully');
@@ -176,7 +156,7 @@ const MattersPage: React.FC = () => {
       handleConvertToTimeEntry,
       handleTimeEntrySave
     };
-  }, [playingRecordingId, mockMatters]);
+  }, [playingRecordingId, matters]);
 
   // Invoice Generation Handlers
   const handleGenerateInvoice = (matter: Matter, isProForma: boolean = false) => {
@@ -213,7 +193,7 @@ const MattersPage: React.FC = () => {
   };
 
   const filteredMatters = useMemo(() => {
-    return mockMatters.filter(matter => {
+    return matters.filter(matter => {
       const matchesSearch = matter.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            matter.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            matter.instructing_attorney.toLowerCase().includes(searchTerm.toLowerCase());
@@ -222,7 +202,7 @@ const MattersPage: React.FC = () => {
                         (activeTab === 'active' && matter.status === MatterStatus.ACTIVE);
       return matchesSearch && matchesStatus && matchesTab;
     });
-  }, [mockMatters, searchTerm, filterStatus, activeTab]);
+  }, [matters, searchTerm, filterStatus, activeTab]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -431,7 +411,7 @@ const MattersPage: React.FC = () => {
           isOpen={showVoiceTimeEntryForm}
           recording={selectedVoiceRecording}
           extractedData={selectedVoiceRecording.extractedData}
-          availableMatters={mockMatters}
+          availableMatters={matters}
           onSave={voiceHandlers.handleTimeEntrySave}
           onCancel={() => {
             setShowVoiceTimeEntryForm(false);
@@ -454,16 +434,15 @@ const MattersPage: React.FC = () => {
         />
       )}
 
-      {/* New Matter Modal Placeholder */}
-      {showNewMatterModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">New Matter</h3>
-            <p className="text-neutral-600 mb-4">New matter modal would be implemented here.</p>
-            <Button onClick={() => setShowNewMatterModal(false)}>Close</Button>
-          </div>
-        </div>
-      )}
+      {/* New Matter Modal */}
+      <NewMatterModal
+        isOpen={showNewMatterModal}
+        onClose={() => setShowNewMatterModal(false)}
+        onMatterCreated={(newMatter) => {
+          setMatters(prev => [newMatter, ...prev]);
+          toast.success(`Matter "${newMatter.title}" created successfully`);
+        }}
+      />
     </div>
   );
 };

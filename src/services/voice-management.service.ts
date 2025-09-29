@@ -3,13 +3,11 @@
  * Orchestrates the complete voice-to-time-entry workflow
  */
 
-import { AudioRecordingService } from './audio-recording.service';
 import { speechToTextService } from './speech-to-text.service';
 import { nlpProcessor } from './nlp-processor.service';
-import type { VoiceRecording, ExtractedTimeEntryData, Matter, TimeEntry, TranscriptionResult } from '../types';
+import type { VoiceRecording, Matter, TimeEntry, TranscriptionResult } from '../types';
 
 export class VoiceManagementService {
-  private audioService: AudioRecordingService | null = null;
   private recordings: Map<string, VoiceRecording> = new Map();
   private playingAudio: HTMLAudioElement | null = null;
 
@@ -269,7 +267,8 @@ export class VoiceManagementService {
     exportDate: string;
   } {
     const recordings = Array.from(this.recordings.values()).map(recording => {
-      const { audioBlob, ...recordingData } = recording;
+      const { audioBlob: __omit, ...recordingData } = recording;
+      void __omit;
       return recordingData;
     });
 

@@ -474,6 +474,28 @@ UPDATE invoices SET
     ELSE false 
   END;
 
+-- Insert sample user preferences for demo users
+INSERT INTO user_preferences (
+  user_id,
+  advanced_features,
+  feature_discovery
+) VALUES 
+(
+  '00000000-0000-0000-0000-000000000001',
+  '{"financial_growth_tools": true, "ai_document_intelligence": false, "professional_development": false}',
+  '{"notification_shown": true, "notification_dismissed_at": "2024-09-20T10:00:00Z", "first_login_date": "2024-08-15T09:00:00Z"}'
+),
+(
+  '00000000-0000-0000-0000-000000000002',
+  '{"financial_growth_tools": false, "ai_document_intelligence": true, "professional_development": true}',
+  '{"notification_shown": false, "notification_dismissed_at": null, "first_login_date": "2024-09-01T08:30:00Z"}'
+),
+(
+  '00000000-0000-0000-0000-000000000003',
+  '{"financial_growth_tools": false, "ai_document_intelligence": false, "professional_development": false}',
+  '{"notification_shown": false, "notification_dismissed_at": null, "first_login_date": "2024-09-15T14:15:00Z"}'
+) ON CONFLICT (user_id) DO NOTHING;
+
 -- Refresh materialized views if they exist
 -- Note: These will be created in future migrations
 -- REFRESH MATERIALIZED VIEW advocate_dashboard_summary;

@@ -243,37 +243,9 @@ export class ExternalAPIService {
         throw new Error(`Court system ${courtId} is currently ${courtAPI.status}`);
       }
 
-      // Simulate API call to court system
-      const mockCases: CourtCase[] = [
-        {
-          caseNumber: 'GHC/2024/12345',
-          court: 'Gauteng High Court',
-          parties: [
-            { name: 'Smith Industries Ltd', role: 'Plaintiff' },
-            { name: 'Jones Construction CC', role: 'Defendant' }
-          ],
-          filingDate: '2024-01-15',
-          status: 'active',
-          nextHearing: {
-            date: '2024-03-15',
-            time: '10:00',
-            courtroom: 'Court A',
-            purpose: 'Motion Hearing'
-          },
-          documents: [
-            {
-              id: 'DOC001',
-              title: 'Notice of Motion',
-              type: 'motion',
-              filedDate: '2024-01-15',
-              filedBy: 'Smith & Associates'
-            }
-          ]
-        }
-      ];
-
-      toast.success(`Synced ${mockCases.length} cases from ${courtAPI.name}`);
-      return mockCases;
+      // No mock responses: require real integration
+      toast.info(`Court diary sync requires configured integration for ${courtAPI.name}`);
+      return [];
     } catch (error) {
       console.error('Error syncing court diary:', error);
       toast.error(`Failed to sync court diary: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -287,23 +259,9 @@ export class ExternalAPIService {
       // Validate filing
       this.validateElectronicFiling(filing);
 
-      // Simulate file submission
-      const submittedFiling: ElectronicFiling = {
-        ...filing,
-        id: `EF${Date.now()}`,
-        status: 'pending',
-        filingDate: new Date().toISOString()
-      };
-
-      // Simulate processing delay
-      setTimeout(() => {
-        submittedFiling.status = 'accepted';
-        submittedFiling.confirmationNumber = `CONF${Date.now()}`;
-        toast.success(`Electronic filing accepted: ${submittedFiling.confirmationNumber}`);
-      }, 3000);
-
-      toast.success('Electronic filing submitted successfully');
-      return submittedFiling;
+      // No mock submission: require real e-filing integration
+      toast.error('Electronic filing integration not configured');
+      throw new Error('Electronic filing integration not configured');
     } catch (error) {
       console.error('Error submitting electronic filing:', error);
       toast.error(`Failed to submit electronic filing: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -319,20 +277,9 @@ export class ExternalAPIService {
         throw new Error(`Court system ${courtId} not found`);
       }
 
-      // Simulate API call
-      const mockCase: CourtCase = {
-        caseNumber,
-        court: courtAPI.name,
-        parties: [
-          { name: 'Tracked Party A', role: 'Applicant' },
-          { name: 'Tracked Party B', role: 'Respondent' }
-        ],
-        filingDate: '2024-01-10',
-        status: 'active',
-        documents: []
-      };
-
-      return mockCase;
+      // No mock tracking: require real integration
+      toast.info(`Case tracking requires configured integration for ${courtAPI.name}`);
+      return null;
     } catch (error) {
       console.error('Error tracking case status:', error);
       throw error;
@@ -359,24 +306,9 @@ export class ExternalAPIService {
       // Simulate OAuth flow or API key validation
       await this.authenticateWithBank(bankAPI, credentials);
 
-      // Simulate account retrieval
-      const mockAccounts: BankAccount[] = [
-        {
-          accountId: 'ACC001',
-          accountNumber: '****1234',
-          accountType: 'business',
-          bankName: bankAPI.bankName,
-          balance: {
-            current: 125000.50,
-            available: 120000.50,
-            currency: 'ZAR'
-          },
-          lastUpdated: new Date().toISOString()
-        }
-      ];
-
-      toast.success(`Connected to ${bankAPI.bankName} - ${mockAccounts.length} accounts found`);
-      return mockAccounts;
+      // No mock accounts: return empty until integration configured
+      toast.info(`Connected to ${bankAPI.bankName}, no accounts until integration is configured`);
+      return [];
     } catch (error) {
       console.error('Error connecting bank account:', error);
       toast.error(`Failed to connect bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -391,38 +323,8 @@ export class ExternalAPIService {
     toDate: string
   ): Promise<BankTransaction[]> {
     try {
-      // Simulate API call to fetch transactions
-      const mockTransactions: BankTransaction[] = [
-        {
-          transactionId: 'TXN001',
-          accountId,
-          date: '2024-02-10',
-          amount: 75000.00,
-          currency: 'ZAR',
-          type: 'credit',
-          description: 'Payment from ABC Corp',
-          reference: 'INV-2024-001',
-          category: 'Legal Fees',
-          balance: 125000.50,
-          reconciled: false,
-          invoiceId: 'INV-2024-001'
-        },
-        {
-          transactionId: 'TXN002',
-          accountId,
-          date: '2024-02-08',
-          amount: 2500.00,
-          currency: 'ZAR',
-          type: 'debit',
-          description: 'Office Rent',
-          reference: 'RENT-FEB24',
-          category: 'Operating Expenses',
-          balance: 50000.50,
-          reconciled: true
-        }
-      ];
-
-      return mockTransactions;
+      // No mock transactions: return empty until integration configured
+      return [];
     } catch (error) {
       console.error('Error fetching bank transactions:', error);
       throw error;
@@ -432,35 +334,8 @@ export class ExternalAPIService {
   // Get invoice financing offers
   static async getInvoiceFinancingOffers(invoiceAmount: number): Promise<InvoiceFinancingOffer[]> {
     try {
-      // Simulate multiple financing offers
-      const mockOffers: InvoiceFinancingOffer[] = [
-        {
-          offerId: 'OFFER001',
-          provider: 'Nedbank Invoice Finance',
-          invoiceAmount,
-          advanceRate: 80,
-          advanceAmount: invoiceAmount * 0.8,
-          fee: invoiceAmount * 0.025,
-          totalCost: invoiceAmount * 0.025,
-          terms: '80% advance, 2.5% fee, 30-day term',
-          validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          approvalStatus: 'approved'
-        },
-        {
-          offerId: 'OFFER002',
-          provider: 'Standard Bank Business Finance',
-          invoiceAmount,
-          advanceRate: 75,
-          advanceAmount: invoiceAmount * 0.75,
-          fee: invoiceAmount * 0.02,
-          totalCost: invoiceAmount * 0.02,
-          terms: '75% advance, 2.0% fee, 45-day term',
-          validUntil: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-          approvalStatus: 'pending'
-        }
-      ];
-
-      return mockOffers;
+      // No mock offers: return empty until integration configured
+      return [];
     } catch (error) {
       console.error('Error getting invoice financing offers:', error);
       throw error;
@@ -474,28 +349,8 @@ export class ExternalAPIService {
   // Verify company registration with CIPC
   static async verifyCompanyRegistration(registrationNumber: string): Promise<CompanyVerification> {
     try {
-      // Simulate CIPC API call
-      const mockVerification: CompanyVerification = {
-        registrationNumber,
-        companyName: 'Example Company (Pty) Ltd',
-        status: 'active',
-        registrationDate: '2020-05-15',
-        directors: [
-          {
-            name: 'John Smith',
-            idNumber: '****1234',
-            appointmentDate: '2020-05-15',
-            status: 'active'
-          }
-        ],
-        address: {
-          registered: '123 Business Street, Johannesburg, 2000',
-          postal: 'PO Box 123, Johannesburg, 2000'
-        },
-        lastUpdated: new Date().toISOString()
-      };
-
-      return mockVerification;
+      // No mock verification: require real government API integration
+      throw new Error('Company verification integration not configured');
     } catch (error) {
       console.error('Error verifying company registration:', error);
       throw error;
@@ -505,16 +360,8 @@ export class ExternalAPIService {
   // Check tax compliance status with SARS
   static async checkTaxCompliance(taxNumber: string): Promise<TaxComplianceStatus> {
     try {
-      // Simulate SARS API call
-      const mockStatus: TaxComplianceStatus = {
-        taxNumber,
-        companyName: 'Example Company (Pty) Ltd',
-        status: 'compliant',
-        lastAssessment: '2024-01-31',
-        nextReturn: '2024-02-28'
-      };
-
-      return mockStatus;
+      // No mock tax status: require real SARS integration
+      throw new Error('Tax compliance integration not configured');
     } catch (error) {
       console.error('Error checking tax compliance:', error);
       throw error;

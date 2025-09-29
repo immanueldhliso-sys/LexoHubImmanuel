@@ -126,8 +126,8 @@ export class MatterApiService extends BaseApiService<Matter> {
       expected_completion_date: formData.expectedCompletionDate,
       tags: formData.tags || [],
       // Set defaults
-      status: 'pending',
-      risk_level: 'low',
+      status: 'active',
+      risk_level: formData.riskLevel || 'medium',
       wip_value: 0,
       trust_balance: 0,
       disbursements: 0,

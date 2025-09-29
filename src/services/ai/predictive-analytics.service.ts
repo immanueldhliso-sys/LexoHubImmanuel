@@ -3,7 +3,7 @@
  * Advanced machine learning models for legal practice optimization
  */
 
-import { toast } from 'react-hot-toast';
+// import { toast } from 'react-hot-toast';
 import type { Matter, Invoice, TimeEntry } from '../../types';
 
 export interface SettlementPrediction {
@@ -539,7 +539,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static calculateGrowthPotential(practiceData: any) {
+  private static calculateGrowthPotential(practiceData: unknown) {
     return {
       nextQuarter: 12.5,
       nextYear: 35.2,
@@ -547,7 +547,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static identifyMarketOpportunities(practiceData: any) {
+  private static identifyMarketOpportunities(practiceData: unknown) {
     return [
       {
         practiceArea: 'ESG Compliance',
@@ -624,7 +624,7 @@ export class PredictiveAnalyticsService {
     ];
   }
 
-  private static generateCashFlowRecommendations(baseProjection: any, scenarios: any) {
+  private static generateCashFlowRecommendations(baseProjection: unknown, scenarios: unknown) {
     return [
       'Prioritize collection of overdue invoices to improve short-term cash flow',
       'Consider invoice factoring for large outstanding amounts',

@@ -7,6 +7,8 @@ import { TimeEntryService } from '@/services/api/time-entries.service';
 import { DocumentIntelligenceService } from '@/services/api/document-intelligence.service';
 import { formatRand } from '../../lib/currency';
 import type { Matter, TimeEntry, InvoiceGenerationRequest } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { matterApiService } from '@/services/api';
 
 interface InvoiceGenerationModalProps {
   isOpen: boolean;
@@ -23,6 +25,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   onInvoiceGenerated,
   defaultToProForma = false
 }) => {
+  const { user } = useAuth();
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
   const [customNarrative, setCustomNarrative] = useState('');
@@ -39,36 +42,19 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   const loadAvailableMatters = useCallback(async () => {
     try {
       setIsLoading(true);
-      // Mock matters for now - in real app this would fetch from API
-      const mockMatters: Matter[] = [
-        {
-          id: '1',
-          title: 'Smith v Jones Commercial Dispute',
-          clientName: 'ABC Corporation',
-          instructingAttorney: 'John Smith',
-          instructingFirm: 'Smith & Associates',
-          wipValue: 125000,
-          estimatedFee: 200000,
-          actualFee: 0,
-          status: 'ACTIVE' as any,
-          dateCreated: '2024-01-15T10:00:00Z',
-          dateModified: '2024-01-20T14:30:00Z',
-          bar: 'johannesburg' as any,
-          briefType: 'Commercial Litigation',
-          description: 'Contract dispute regarding supply agreement breach',
-          conflictCheckCompleted: true,
-          conflictCheckDate: '2024-01-14T09:00:00Z',
-          riskLevel: 'Medium',
-          settlementProbability: 72
-        }
-      ];
-      setAvailableMatters(mockMatters);
+      // Load real matters for the current advocate
+      if (!user?.id) {
+        setAvailableMatters([]);
+      } else {
+        const { data } = await matterApiService.getByAdvocate(user.id);
+        setAvailableMatters((data || []) as unknown as Matter[]);
+      }
     } catch (error) {
       console.error('Error loading matters:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   const loadUnbilledTimeEntries = useCallback(async () => {
     try {

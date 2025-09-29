@@ -15,7 +15,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { NewMatterModal } from '../components/matters/NewMatterModal';
 import { InvoiceService } from '../services/api/invoices.service';
+import { matterApiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import type { Matter, Page, Invoice } from '../types';
 import { MatterStatus, BarAssociation, FeeType, RiskLevel, InvoiceStatus } from '../types';
@@ -25,18 +28,19 @@ interface DashboardPageProps {
 }
 
 const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
+  const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState({
-    activeMatters: 42,
-    outstandingWip: 1200000,
-    monthlyBilling: 890000,
-    overdueInvoices: 7,
-    collectionRate: 87,
-    avgBillTime: 45,
-    settlementRate: 72,
-    totalMatters: 95,
-    thisWeekMatters: 3,
-    pendingConflictChecks: 2,
-    upcomingDeadlines: 5,
+    activeMatters: 0,
+    outstandingWip: 0,
+    monthlyBilling: 0,
+    overdueInvoices: 0,
+    collectionRate: 0,
+    avgBillTime: 0,
+    settlementRate: 0,
+    totalMatters: 0,
+    thisWeekMatters: 0,
+    pendingConflictChecks: 0,
+    upcomingDeadlines: 0,
     isLoading: false
   });
 
@@ -134,113 +138,56 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const loadDashboardData = async () => {
     setDashboardData(prev => ({ ...prev, isLoading: true }));
     try {
-      // Simulate API calls - in real implementation these would be proper service calls
-      setTimeout(() => {
-        // Mock recent matters using new database schema
-        const mockRecentMatters: Matter[] = [
-          {
-            id: '1',
-            advocate_id: 'adv-1',
-            reference_number: 'MAT-2024-001',
-            title: 'Smith v Jones',
-            description: 'Commercial contract dispute',
-            matter_type: 'Contract Dispute',
-            court_case_number: undefined,
-            bar: BarAssociation.JOHANNESBURG,
-            client_name: 'Smith Ltd',
-            client_email: undefined,
-            client_phone: undefined,
-            client_address: undefined,
-            client_type: undefined,
-            instructing_attorney: 'John Smith',
-            instructing_attorney_email: undefined,
-            instructing_attorney_phone: undefined,
-            instructing_firm: 'Smith & Associates',
-            instructing_firm_ref: undefined,
-            fee_type: FeeType.STANDARD,
-            estimated_fee: 200000,
-            fee_cap: undefined,
-            actual_fee: undefined,
-            wip_value: 125000,
-            trust_balance: 0,
-            disbursements: 0,
-            vat_exempt: false,
-            status: MatterStatus.ACTIVE,
-            risk_level: RiskLevel.MEDIUM,
-            settlement_probability: 78,
-            expected_completion_date: undefined,
-            conflict_check_completed: true,
-            conflict_check_date: new Date().toISOString(),
-            conflict_check_cleared: true,
-            conflict_notes: undefined,
-            date_instructed: new Date().toISOString(),
-            date_accepted: new Date().toISOString(),
-            date_commenced: new Date().toISOString(),
-            date_settled: undefined,
-            date_closed: undefined,
-            next_court_date: undefined,
-            prescription_date: undefined,
-            tags: ['commercial', 'contract'],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            deleted_at: undefined,
-            days_active: 15,
-            is_overdue: false
-          },
-          {
-            id: '2', 
-            advocate_id: 'adv-1',
-            reference_number: 'MAT-2024-002',
-            title: 'ABC Corporation Litigation',
-            description: 'Commercial litigation matter',
-            matter_type: 'Commercial Litigation',
-            court_case_number: undefined,
-            bar: BarAssociation.JOHANNESBURG,
-            client_name: 'ABC Corp',
-            client_email: undefined,
-            client_phone: undefined,
-            client_address: undefined,
-            client_type: undefined,
-            instructing_attorney: 'Jane Doe',
-            instructing_attorney_email: undefined,
-            instructing_attorney_phone: undefined,
-            instructing_firm: 'Doe & Partners',
-            instructing_firm_ref: undefined,
-            fee_type: FeeType.STANDARD,
-            estimated_fee: 150000,
-            fee_cap: undefined,
-            actual_fee: undefined,
-            wip_value: 85000,
-            trust_balance: 0,
-            disbursements: 0,
-            vat_exempt: false,
-            status: MatterStatus.PENDING,
-            risk_level: RiskLevel.LOW,
-            settlement_probability: 65,
-            expected_completion_date: undefined,
-            conflict_check_completed: true,
-            conflict_check_date: new Date().toISOString(),
-            conflict_check_cleared: true,
-            conflict_notes: undefined,
-            date_instructed: new Date().toISOString(),
-            date_accepted: undefined,
-            date_commenced: undefined,
-            date_settled: undefined,
-            date_closed: undefined,
-            next_court_date: undefined,
-            prescription_date: undefined,
-            tags: ['commercial', 'litigation'],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            deleted_at: undefined,
-            days_active: 8,
-            is_overdue: false
-          }
-        ];
-        
-        setRecentMatters(mockRecentMatters);
-        setDashboardData(prev => ({ ...prev, isLoading: false }));
-      }, 500);
+      // Load recent matters from database
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const recentMattersResponse = await matterApiService.getByAdvocate(user.id, {
+        pagination: { page: 1, limit: 5 }
+      });
+
+      if (recentMattersResponse.error) {
+        console.error('Error loading matters:', recentMattersResponse.error);
+        // Don't throw error, just use empty array
+        setRecentMatters([]);
+      } else {
+        setRecentMatters(recentMattersResponse.data || []);
+      }
+
+      // Load broader set of matters to compute metrics
+      const allMattersResponse = await matterApiService.getByAdvocate(user.id, {
+        pagination: { page: 1, limit: 100 }
+      });
+
+      let allMatters: Matter[] = [];
+      if (allMattersResponse.error) {
+        console.error('Error loading all matters:', allMattersResponse.error);
+        allMatters = [];
+      } else {
+        allMatters = allMattersResponse.data || [];
+      }
+
+      const now = new Date();
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 7);
+
+      const computed = {
+        activeMatters: allMatters.filter(m => m.status === MatterStatus.ACTIVE).length,
+        totalMatters: allMatters.length,
+        outstandingWip: allMatters.reduce((sum, m) => sum + (m.wip_value || 0), 0),
+        thisWeekMatters: allMatters.filter(m => {
+          const created = m.created_at ? new Date(m.created_at) : null;
+          return created ? created >= weekAgo : false;
+        }).length,
+        pendingConflictChecks: allMatters.filter(m => !m.conflict_check_completed).length,
+        upcomingDeadlines: allMatters.filter(m => {
+          const deadline = m.expected_completion_date ? new Date(m.expected_completion_date) : null;
+          return deadline ? (deadline >= now && deadline <= new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)) : false;
+        }).length
+      };
+
+      setDashboardData(prev => ({ ...prev, ...computed, isLoading: false }));
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -656,37 +603,15 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       {/* Modal Components */}
       
       {/* New Matter Modal */}
-      {quickActions.newMatterModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Create New Matter</h3>
-            <p className="text-neutral-600 mb-4">
-              Complete new matter creation form with client details, conflict checks, and fee arrangements.
-            </p>
-            <div className="space-y-3">
-              <Button 
-                variant="primary" 
-                className="w-full"
-                onClick={() => {
-                  setQuickActions(prev => ({ ...prev, newMatterModal: false }));
-                  if (onNavigate) onNavigate('matters');
-                  toast.success('Opening comprehensive matter creation...');
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Open Matter Creation Form
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => setQuickActions(prev => ({ ...prev, newMatterModal: false }))}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NewMatterModal
+        isOpen={quickActions.newMatterModal}
+        onClose={() => setQuickActions(prev => ({ ...prev, newMatterModal: false }))}
+        onMatterCreated={(newMatter) => {
+          setQuickActions(prev => ({ ...prev, newMatterModal: false }));
+          toast.success(`Matter "${newMatter.title}" created successfully`);
+          if (onNavigate) onNavigate('matters');
+        }}
+      />
 
       {/* New Invoice Modal */}
       {quickActions.newInvoiceModal && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { clsx } from 'clsx';
+import clsx from 'clsx';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Card variant */

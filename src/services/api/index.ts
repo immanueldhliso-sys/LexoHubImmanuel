@@ -33,6 +33,17 @@ export {
   type InvoiceGenerationOptions
 } from './invoice-api.service';
 
+export {
+  userPreferencesService,
+  type UserPreferencesUpdate
+} from './user-preferences.service';
+
+export {
+  academyService,
+  type AcademyCourse,
+  type AcademyEvent
+} from './academy.service';
+
 // Re-export commonly used types from the main types file
 export type {
   Matter,

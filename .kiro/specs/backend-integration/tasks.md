@@ -101,7 +101,10 @@
     - Create competitive bidding system for factoring offers
     - _Requirements: 4.5_
 
-  - [ ] 5.4 Connect Strategic Finance UI to backend
+  - [x] 5.4 Connect Strategic Finance UI to backend
+
+
+
     - Update StrategicFinancePage with real data integration
     - Connect CashFlowChart to live forecasting data
     - Implement real-time financial health monitoring

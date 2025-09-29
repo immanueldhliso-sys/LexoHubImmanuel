@@ -251,7 +251,7 @@ export class NLPProcessor {
     
     for (const matter of availableMatters) {
       let confidence = 0;
-      let matchReasons: string[] = [];
+      const matchReasons: string[] = [];
 
       // Check client name match
       if (matter.clientName) {

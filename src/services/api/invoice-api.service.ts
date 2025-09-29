@@ -5,7 +5,7 @@
  */
 
 import { BaseApiService, type ApiResponse, type FilterOptions, type PaginationOptions } from './base-api.service';
-import type { Invoice, InvoiceStatus, NewInvoiceForm, TimeEntry } from '../../types';
+import type { Invoice, InvoiceStatus, TimeEntry } from '../../types';
 
 export interface InvoiceFilters extends FilterOptions {
   advocate_id?: string;
