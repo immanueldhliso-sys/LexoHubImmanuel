@@ -31,12 +31,13 @@ The design system is your **immutable style guide** consisting of two parts:
 This file defines the entire data schema of the application. All components, hooks, and functions **MUST** use the TypeScript types and interfaces defined here. You must not invent new data structures that contradict these definitions.
 
 **Core Entities:**
-- `Matter`, `Invoice`, `TimeEntry`, `User` - Core business entities
+- `Matter`, `Invoice`, `TimeEntry`, `User`, `ExtendedUser` - Core business entities with authentication
 - `PerformanceBasedPricing`, `SuccessFeeCalculation` - Advanced pricing models
-- `VoiceRecording`, `DocumentAnalysis`, `ReferralOpportunity` - Intelligence features (planned)
-- `AppState` for global application state
-- Enums: `Bar`, `MatterStatus`, `InvoiceStatus`, `PricingModel`
-- Form types: `NewMatterForm`, `NewInvoiceForm`, `ExtractedTimeEntryData` (planned)
+- `VoiceRecording`, `VoiceQuery`, `DocumentAnalysis` - Intelligence features (implemented/planned)
+- `InvoiceGenerationRequest`, `AuthMetadata`, `UserMetadata` - Request and metadata types
+- `AppState`, `Page` - Global application state and navigation types
+- Enums: `Bar`, `MatterStatus`, `InvoiceStatus` (including `PRO_FORMA`), `PricingModel`, `UserType`
+- Form types: `NewMatterForm`, `NewInvoiceForm`, `ExtractedTimeEntryData` - Data capture interfaces
 
 ## 2. The Architectural Blueprint
 
@@ -54,6 +55,7 @@ All UI must be built using a composition of small, reusable components. **ALWAYS
 - Page components import and compose design system components and shared components
 - Page components manage their own local state and side effects
 - Page components should be exported as default exports from their respective files
+- All page components must be properly exported through `src/pages/index.ts` for centralized imports
 
 **Design System Component Usage:**
 ```tsx
@@ -74,31 +76,50 @@ import { Button, Card, Modal, Input } from './design-system/components';
 - `Navigation` (sidebar navigation)
 - **Page Components** (located in `src/pages/`):
   - `DashboardPage` - Practice intelligence dashboard with metrics and quick stats
-  - `MattersPage` - Comprehensive matter management with analytics and settlement probability
+  - `MattersPage` - Comprehensive matter management with analytics, settlement probability, and voice recording
   - `InvoicesPage` - Advanced invoice management with payment tracking and automated reminders
+  - `ProFormaPage` - Dedicated pro forma invoice creation and management with conversion workflow
   - `ReportsPage` - Comprehensive practice analytics and financial reporting
   - `SettingsPage` - Application settings with compliance and integration management
   - `ProfilePage` - Professional profile management with specializations and development tracking
   - `PricingManagementPage` - Performance-based pricing and success fee management
+  - `StrategicFinancePage` - Financial optimization and strategic planning tools
+  - `PracticeGrowthPage` - Practice development and networking capabilities
+  - `WorkflowIntegrationsPage` - Third-party integrations and workflow automation
 - **Shared Components** (in `src/components/`):
-  - `invoices/` - Invoice management components (InvoiceList, PaymentTrackingDashboard)
+  - `invoices/` - Invoice management components (InvoiceList, InvoiceGenerationModal, PaymentTrackingDashboard)
+  - `auth/` - Authentication components (ProtectedRoute, LoginPage)
+  - `design-system/` - Core UI components (LoadingSpinner, Button, Card, Modal, Input)
   - `voice/` - Voice capture and transcription components (planned)
   - `documents/` - Document analysis and processing components (planned)
   - `referrals/` - Practice growth and referral engine components (planned)
 - **Services** (in `src/services/`):
+  - `auth.service.ts` - Authentication and session management with demo mode support
   - `reminder.service.ts` - Automated reminder processing with Bar-specific rules
-  - `api/` - External API integration services
+  - `voice-management.service.ts` - Voice recording and transcription management
+  - `voice-query.service.ts` - Voice-based query processing and intent recognition
+  - `api/` - External API integration services:
+    - `invoices.service.ts` - Invoice generation, management, and pro forma handling
+    - `time-entries.service.ts` - Time entry tracking and billing integration
+    - `document-intelligence.service.ts` - AI-powered document analysis and fee narrative generation
 - **Utility Components** (in `src/App.tsx`):
   - `LoadingSpinner` - Reusable loading indicator
   - `DefaultErrorFallback` - Error boundary fallback UI
 
 ### State Management
-- **Application-wide state** (like the active page, open modals, or the logged-in user) is managed within the main `App` component's state
-- **Component-local state** should be managed within the component itself
-- **Server state** is managed via React Query (`@tanstack/react-query`)
+- **Application-wide state** (like the active page, open modals, or the logged-in user) is managed via React Context (`AuthContext`) and the main `App` component's state
+- **Authentication state** is managed by `AuthContext` with Supabase integration and demo mode support
+- **Component-local state** should be managed within the component itself using React hooks
+- **Server state** is managed via React Query (`@tanstack/react-query`) for caching and synchronization
+- **Form state** is managed locally within components using `useState` with proper validation
 
 ### Data Fetching
-All asynchronous data fetching from APIs (like Supabase) **MUST** be encapsulated within custom React hooks (e.g., `useMatters`, `useInvoices`). Pages and components should be declarative and consume these hooks, reacting to `loading`, `error`, and `data` states.
+All asynchronous data fetching from APIs (like Supabase) **MUST** be encapsulated within service classes or custom React hooks. The application uses static service methods for API interactions:
+- `InvoiceService.getInvoices()`, `InvoiceService.generateInvoice()` - Invoice operations
+- `TimeEntryService.getTimeEntries()` - Time entry management
+- `AuthService.signIn()`, `AuthService.signOut()` - Authentication operations
+
+Pages and components should handle `loading`, `error`, and `data` states gracefully with proper user feedback.
 
 ## 3. The Quality & Compliance Mandate
 
@@ -202,6 +223,9 @@ The following are **STRICTLY PROHIBITED**:
 10. **Creating page components outside of `src/pages/` without architectural justification**
 11. **Bypassing the centralized page exports in `src/pages/index.ts`**
 12. **Creating components in `src/App.tsx` that should be extracted to separate files**
+13. **Function hoisting violations** - Always define `useCallback` functions before `useEffect` dependencies
+14. **Service instantiation errors** - Use static service methods, not `new ServiceClass()`
+15. **Missing error boundaries** - All async operations must have proper error handling
 
 ## Design System Migration Guidelines
 
@@ -249,27 +273,39 @@ import { PaymentTrackingDashboard } from '../components/invoices';
 
 ## LexoHub Feature Ecosystem Implementation Status
 
-### ✅ Implemented Features (30-35% Complete)
-1. **Core Financial Engine** (Partial)
+### ✅ Implemented Features (40-45% Complete)
+1. **Core Financial Engine** (Well Implemented)
    - Rule-aware fee lifecycle with 60/90-day payment timelines
    - Automated professional reminders via email/WhatsApp
    - Disbursement recovery tracking
    - Performance-based pricing management
+   - Pro forma invoice generation and management
 
-2. **Invoice Management** (Well Implemented)
-   - Comprehensive invoice generation and management
+2. **Invoice Management** (Comprehensive)
+   - Advanced invoice generation with matter selection
+   - Pro forma invoice creation and conversion workflow
    - Payment tracking dashboard with analytics
    - Automated reminder scheduling with Bar-specific rules
+   - Real-time invoice status management
+   - Time entry integration with billing status tracking
 
-3. **Matter Management** (Basic)
+3. **Matter Management** (Functional)
    - Matter creation with conflict checking
    - WIP tracking and settlement probability
    - Risk assessment and analytics
+   - Voice recording integration for time entries
+   - Comprehensive matter details and analytics
 
 4. **Practice Analytics** (Basic)
    - Financial reporting and cash flow analysis
    - Practice performance metrics
    - User profile and specialization management
+
+5. **Authentication & Security** (Implemented)
+   - Supabase-based authentication system
+   - Demo mode for testing and demonstrations
+   - Role-based access control (Junior/Senior advocates)
+   - Protected routes and session management
 
 ### 🚧 Planned Major Features (Specs Created)
 1. **Voice-First Time Capture** - Natural language time entry via voice
@@ -287,11 +323,18 @@ import { PaymentTrackingDashboard } from '../components/invoices';
 8. **Multi-language Support** - All 11 official South African languages
 
 ### Implementation Roadmap
-- **Phase 1** (Months 1-3): Core Intelligence Features (Voice, AI, Analytics)
+- **Phase 1** (Months 1-3): Core Intelligence Features (Voice, AI, Analytics) - **IN PROGRESS**
 - **Phase 2** (Months 4-6): Practice Growth and Networking
-- **Phase 3** (Months 7-9): Advanced Finance and Optimization
+- **Phase 3** (Months 7-9): Advanced Finance and Optimization  
 - **Phase 4** (Months 10-12): External Integrations and Compliance
 - **Phase 5** (Months 13-15): Professional Development and Polish
+
+### Recent Achievements (Current Sprint)
+- ✅ **Enhanced Authentication System**: Demo mode, role-based access, session management
+- ✅ **Advanced Invoice Management**: Pro forma creation, matter selection, conversion workflow
+- ✅ **Comprehensive UI Framework**: Responsive design, accessibility, error handling
+- ✅ **Voice Integration Foundation**: Recording management, query processing architecture
+- ✅ **Service Layer Architecture**: Static service methods, proper error handling, type safety
 
 ---
 
