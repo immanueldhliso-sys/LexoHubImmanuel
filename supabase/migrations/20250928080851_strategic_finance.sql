@@ -209,21 +209,13 @@ CREATE TABLE IF NOT EXISTS success_fee_scenarios (
   expected_recovery DECIMAL(12,2),
   maximum_recovery DECIMAL(12,2),
   
-  -- Fee calculations
-  minimum_total_fee DECIMAL(12,2) GENERATED ALWAYS AS (
-    base_fee + LEAST(minimum_recovery * success_fee_percentage, COALESCE(success_fee_cap, minimum_recovery * success_fee_percentage))
-  ) STORED,
-  expected_total_fee DECIMAL(12,2) GENERATED ALWAYS AS (
-    base_fee + LEAST(expected_recovery * success_fee_percentage, COALESCE(success_fee_cap, expected_recovery * success_fee_percentage))
-  ) STORED,
-  maximum_total_fee DECIMAL(12,2) GENERATED ALWAYS AS (
-    base_fee + LEAST(maximum_recovery * success_fee_percentage, COALESCE(success_fee_cap, maximum_recovery * success_fee_percentage))
-  ) STORED,
+  -- Fee calculations (updated via triggers)
+  minimum_total_fee DECIMAL(12,2) DEFAULT 0,
+  expected_total_fee DECIMAL(12,2) DEFAULT 0,
+  maximum_total_fee DECIMAL(12,2) DEFAULT 0,
   
   -- Risk assessment
-  risk_adjusted_fee DECIMAL(12,2) GENERATED ALWAYS AS (
-    base_fee + (expected_total_fee - base_fee) * success_probability
-  ) STORED,
+  risk_adjusted_fee DECIMAL(12,2) DEFAULT 0,
   breakeven_probability DECIMAL(3,2),
   
   -- Client approval

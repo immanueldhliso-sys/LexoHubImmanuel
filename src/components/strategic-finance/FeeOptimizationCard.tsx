@@ -1,3 +1,5 @@
+// Duplicate legacy implementation removed to avoid conflicting exports
+
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Zap, DollarSign, Target, AlertCircle, CheckCircle } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';

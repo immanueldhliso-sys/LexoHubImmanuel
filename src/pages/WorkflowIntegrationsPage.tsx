@@ -1,380 +1,415 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Globe, 
   Calendar, 
-  BarChart3, 
-  Settings,
-  Link,
-  MessageSquare,
-  Bell,
-  Clock,
-  MapPin,
-  User,
-  FileText,
+  Gavel, 
+  Mic, 
+  Settings, 
+  RefreshCw, 
+  Plus,
+  Search,
+  Filter,
+  Globe,
+  Sync,
   CheckCircle,
   AlertCircle,
-  ExternalLink
+  Clock
 } from 'lucide-react';
-import { Card, CardHeader, CardContent, Button } from '../design-system/components';
-import { CourtIntegrationDashboard } from '../components/workflow/CourtIntegrationDashboard';
+import { Button, Card, CardHeader, CardContent } from '../design-system/components';
+import { WorkflowIntegrationsService } from '../services/api/workflow-integrations.service';
+import type { 
+  WorkflowPage, 
+  CourtDiaryEntry, 
+  CourtRegistry, 
+  Judge, 
+  JudgeAnalytics,
+  VoiceQuery,
+  CourtIntegrationLog 
+} from '../types';
+import { toast } from 'react-hot-toast';
+import { format, isToday, isTomorrow, addDays } from 'date-fns';
+
+// Component imports will be created below
+import { CourtDiaryCard } from '../components/workflow/CourtDiaryCard';
 import { JudgeAnalyticsCard } from '../components/workflow/JudgeAnalyticsCard';
-import { LanguageAccessibilitySettings } from '../components/workflow/LanguageAccessibilitySettings';
-import { AutomatedDiarySync } from '../components/workflow/AutomatedDiarySync';
+import { VoiceAssistantPanel } from '../components/workflow/VoiceAssistantPanel';
+import { IntegrationsPanel } from '../components/workflow/IntegrationsPanel';
 
-export const WorkflowIntegrationsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'court' | 'diary' | 'analytics' | 'language'>('overview');
-  const [connectionStatus, setConnectionStatus] = useState({
-    gautengHigh: 'connected',
-    westernCapeHigh: 'disconnected',
-    magistratesCourts: 'partial',
-    supremeCourt: 'connected'
-  });
+const WorkflowIntegrationsPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<WorkflowPage>('court-diary');
+  const [loading, setLoading] = useState(false);
+  
+  // Court Diary State
+  const [diaryEntries, setDiaryEntries] = useState<CourtDiaryEntry[]>([]);
+  const [courtRegistries, setCourtRegistries] = useState<CourtRegistry[]>([]);
+  
+  // Judge Analytics State
+  const [judges, setJudges] = useState<Judge[]>([]);
+  const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
+  const [judgeAnalytics, setJudgeAnalytics] = useState<JudgeAnalytics | null>(null);
+  
+  // Voice Assistant State
+  const [voiceQueries, setVoiceQueries] = useState<VoiceQuery[]>([]);
+  const [isListening, setIsListening] = useState(false);
+  
+  // Integrations State
+  const [integrationLogs, setIntegrationLogs] = useState<CourtIntegrationLog[]>([]);
+  
+  // Load data based on active tab
+  useEffect(() => {
+    loadData();
+  }, [activeTab]);
 
-  const integrationStats = {
-    totalIntegrations: 8,
-    activeConnections: 6,
-    lastSync: '2 minutes ago',
-    pendingActions: 3
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      switch (activeTab) {
+        case 'court-diary':
+          await loadCourtDiary();
+          break;
+        case 'judge-analytics':
+          await loadJudgeAnalytics();
+          break;
+        case 'voice-assistant':
+          await loadVoiceQueries();
+          break;
+        case 'integrations':
+          await loadIntegrations();
+          break;
+      }
+    } catch (error) {
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const recentActivity = [
-    {
-      id: '1',
-      type: 'court_filing',
-      message: 'Document filed in Johannesburg High Court',
-      timestamp: '10 minutes ago',
-      status: 'success'
-    },
-    {
-      id: '2',
-      type: 'diary_sync',
-      message: 'Court diary synchronized',
-      timestamp: '15 minutes ago',
-      status: 'success'
-    },
-    {
-      id: '3',
-      type: 'language_update',
-      message: 'Afrikaans translation updated',
-      timestamp: '1 hour ago',
-      status: 'info'
-    },
-    {
-      id: '4',
-      type: 'court_notice',
-      message: 'Postponement notice received',
-      timestamp: '2 hours ago',
-      status: 'warning'
+  const loadCourtDiary = async () => {
+    const [entries, registries] = await Promise.all([
+      WorkflowIntegrationsService.getCourtDiary('current-user-id'), // TODO: Get from auth context
+      WorkflowIntegrationsService.getCourtRegistries()
+    ]);
+    setDiaryEntries(entries);
+    setCourtRegistries(registries);
+  };
+
+  const loadJudgeAnalytics = async () => {
+    const judgesData = await WorkflowIntegrationsService.getJudges();
+    setJudges(judgesData);
+    if (judgesData.length > 0 && !selectedJudge) {
+      setSelectedJudge(judgesData[0]);
     }
+  };
+
+  const loadVoiceQueries = async () => {
+    const queries = await WorkflowIntegrationsService.getVoiceQueryHistory('current-user-id');
+    setVoiceQueries(queries);
+  };
+
+  const loadIntegrations = async () => {
+    const logs = await WorkflowIntegrationsService.getIntegrationLogs();
+    setIntegrationLogs(logs);
+  };
+
+  const syncCourtDiary = async (registryId: string) => {
+    try {
+      setLoading(true);
+      await WorkflowIntegrationsService.syncCourtDiary(registryId, 'current-user-id');
+      toast.success('Court diary synced successfully');
+      await loadCourtDiary();
+    } catch (error) {
+      toast.error('Failed to sync court diary');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const processVoiceQuery = async (queryText: string, languageCode: string = 'en') => {
+    try {
+      const result = await WorkflowIntegrationsService.processVoiceQuery(
+        'current-user-id',
+        queryText,
+        languageCode
+      );
+      
+      toast.success(result.response);
+      await loadVoiceQueries();
+      
+      // Execute actions based on response
+      if (result.actions?.action) {
+        handleVoiceAction(result.actions);
+      }
+    } catch (error) {
+      toast.error('Failed to process voice query');
+    }
+  };
+
+  const handleVoiceAction = (actions: any) => {
+    switch (actions.action) {
+      case 'show_court_diary':
+        setActiveTab('court-diary');
+        break;
+      case 'show_matters':
+        // Navigate to matters page (would need to be implemented in parent)
+        break;
+      case 'show_invoices':
+        // Navigate to invoices page
+        break;
+      case 'show_help':
+        // Show help modal
+        break;
+    }
+  };
+
+  const tabs = [
+    { id: 'court-diary' as WorkflowPage, label: 'Court Diary', icon: Calendar },
+    { id: 'judge-analytics' as WorkflowPage, label: 'Judge Analytics', icon: Gavel },
+    { id: 'voice-assistant' as WorkflowPage, label: 'Voice Assistant', icon: Mic },
+    { id: 'integrations' as WorkflowPage, label: 'Integrations', icon: Settings }
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'connected':
-        return 'text-success-600 bg-success-100';
-      case 'disconnected':
-        return 'text-error-600 bg-error-100';
-      case 'partial':
-        return 'text-warning-600 bg-warning-100';
-      default:
-        return 'text-neutral-600 bg-neutral-100';
-    }
+  const getUpcomingHearings = () => {
+    const today = new Date();
+    const nextWeek = addDays(today, 7);
+    
+    return diaryEntries.filter(entry => {
+      const hearingDate = new Date(entry.hearingDate);
+      return hearingDate >= today && hearingDate <= nextWeek;
+    }).sort((a, b) => new Date(a.hearingDate).getTime() - new Date(b.hearingDate).getTime());
   };
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'court_filing':
-        return <FileText className="w-4 h-4" />;
-      case 'diary_sync':
-        return <Calendar className="w-4 h-4" />;
-      case 'language_update':
-        return <Globe className="w-4 h-4" />;
-      case 'court_notice':
-        return <Bell className="w-4 h-4" />;
-      default:
-        return <MessageSquare className="w-4 h-4" />;
-    }
+  const getHearingDateLabel = (date: string) => {
+    const hearingDate = new Date(date);
+    if (isToday(hearingDate)) return 'Today';
+    if (isTomorrow(hearingDate)) return 'Tomorrow';
+    return format(hearingDate, 'EEE, dd MMM');
   };
 
-  const getActivityColor = (status: string) => {
-    switch (status) {
-      case 'success':
-        return 'text-success-600';
-      case 'warning':
-        return 'text-warning-600';
-      case 'error':
-        return 'text-error-600';
+  const renderCourtDiary = () => (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-neutral-900">Court Diary</h2>
+          <p className="text-neutral-600">Manage your court appearances and hearings</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => syncCourtDiary(courtRegistries[0]?.id)}
+            disabled={loading || courtRegistries.length === 0}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Sync Diary
+          </Button>
+          <Button variant="primary">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Entry
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-600">Today</p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  {diaryEntries.filter(e => isToday(new Date(e.hearingDate))).length}
+                </p>
+              </div>
+              <Calendar className="w-8 h-8 text-mpondo-gold-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-600">This Week</p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  {getUpcomingHearings().length}
+                </p>
+              </div>
+              <Clock className="w-8 h-8 text-judicial-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-600">Synced</p>
+                <p className="text-2xl font-bold text-success-600">
+                  {diaryEntries.filter(e => e.syncStatus === 'synced').length}
+                </p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-success-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-600">Pending</p>
+                <p className="text-2xl font-bold text-warning-600">
+                  {diaryEntries.filter(e => e.syncStatus === 'pending').length}
+                </p>
+              </div>
+              <AlertCircle className="w-8 h-8 text-warning-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Upcoming Hearings */}
+      <Card>
+        <CardHeader>
+          <h3 className="text-lg font-semibold text-neutral-900">Upcoming Hearings</h3>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {getUpcomingHearings().length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="w-12 h-12 text-neutral-400 mx-auto mb-3" />
+                <p className="text-neutral-600">No upcoming hearings</p>
+              </div>
+            ) : (
+              getUpcomingHearings().map(entry => (
+                <CourtDiaryCard key={entry.id} entry={entry} />
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderJudgeAnalytics = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-neutral-900">Judge Analytics</h2>
+          <p className="text-neutral-600">Insights into judicial patterns and performance</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedJudge?.id || ''}
+            onChange={(e) => {
+              const judge = judges.find(j => j.id === e.target.value);
+              setSelectedJudge(judge || null);
+            }}
+            className="px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500"
+          >
+            <option value="">Select Judge</option>
+            {judges.map(judge => (
+              <option key={judge.id} value={judge.id}>
+                {judge.name} - {judge.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {selectedJudge && (
+        <JudgeAnalyticsCard 
+          judge={selectedJudge} 
+          analytics={judgeAnalytics}
+          onLoadAnalytics={async (judgeId, periodMonths) => {
+            const analytics = await WorkflowIntegrationsService.getJudgeAnalytics(judgeId, periodMonths);
+            setJudgeAnalytics(analytics);
+          }}
+        />
+      )}
+    </div>
+  );
+
+  const renderVoiceAssistant = () => (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold text-neutral-900">Voice Assistant</h2>
+        <p className="text-neutral-600">Query your practice data using natural language</p>
+      </div>
+
+      <VoiceAssistantPanel
+        isListening={isListening}
+        onStartListening={() => setIsListening(true)}
+        onStopListening={() => setIsListening(false)}
+        onProcessQuery={processVoiceQuery}
+        queryHistory={voiceQueries}
+      />
+    </div>
+  );
+
+  const renderIntegrations = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-neutral-900">Integrations</h2>
+          <p className="text-neutral-600">Manage external system connections</p>
+        </div>
+        <Button variant="primary">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Integration
+        </Button>
+      </div>
+
+      <IntegrationsPanel
+        courtRegistries={courtRegistries}
+        integrationLogs={integrationLogs}
+        onSync={syncCourtDiary}
+        loading={loading}
+      />
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'court-diary':
+        return renderCourtDiary();
+      case 'judge-analytics':
+        return renderJudgeAnalytics();
+      case 'voice-assistant':
+        return renderVoiceAssistant();
+      case 'integrations':
+        return renderIntegrations();
       default:
-        return 'text-judicial-blue-600';
+        return renderCourtDiary();
     }
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      {/* Header */}
-      <div className="bg-white border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900">Workflow & Integrations</h1>
-              <p className="text-neutral-600 mt-1">
-                Court integrations, automated diary sync, and multi-language accessibility
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => {}}
-                variant="outline"
-                size="sm"
+    <div className="space-y-6">
+      {/* Tab Navigation */}
+      <div className="border-b border-neutral-200">
+        <nav className="flex space-x-8">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-mpondo-gold-500 text-mpondo-gold-600'
+                    : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+                }`}
               >
-                <Settings className="w-4 h-4 mr-2" />
-                Integration Settings
-              </Button>
-              <Button
-                onClick={() => {}}
-                className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
-              >
-                <Link className="w-4 h-4 mr-2" />
-                Connect New Integration
-              </Button>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="mt-6 flex items-center gap-6 border-b border-neutral-200">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`pb-3 px-1 text-sm font-medium transition-colors ${
-                activeTab === 'overview'
-                  ? 'text-mpondo-gold-600 border-b-2 border-mpondo-gold-600'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Overview
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('court')}
-              className={`pb-3 px-1 text-sm font-medium transition-colors ${
-                activeTab === 'court'
-                  ? 'text-mpondo-gold-600 border-b-2 border-mpondo-gold-600'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Court Integrations
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('diary')}
-              className={`pb-3 px-1 text-sm font-medium transition-colors ${
-                activeTab === 'diary'
-                  ? 'text-mpondo-gold-600 border-b-2 border-mpondo-gold-600'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Diary Sync
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`pb-3 px-1 text-sm font-medium transition-colors ${
-                activeTab === 'analytics'
-                  ? 'text-mpondo-gold-600 border-b-2 border-mpondo-gold-600'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Judge Analytics
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('language')}
-              className={`pb-3 px-1 text-sm font-medium transition-colors ${
-                activeTab === 'language'
-                  ? 'text-mpondo-gold-600 border-b-2 border-mpondo-gold-600'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
-                Language Access
-              </div>
-            </button>
-          </div>
-        </div>
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-neutral-600">Total Integrations</p>
-                      <p className="text-2xl font-bold text-neutral-900">{integrationStats.totalIntegrations}</p>
-                    </div>
-                    <Link className="w-8 h-8 text-judicial-blue-500" />
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-2">Across all platforms</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-neutral-600">Active Connections</p>
-                      <p className="text-2xl font-bold text-success-600">{integrationStats.activeConnections}</p>
-                    </div>
-                    <CheckCircle className="w-8 h-8 text-success-500" />
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-2">Currently online</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-neutral-600">Last Sync</p>
-                      <p className="text-2xl font-bold text-neutral-900">{integrationStats.lastSync}</p>
-                    </div>
-                    <Clock className="w-8 h-8 text-mpondo-gold-500" />
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-2">Data synchronization</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-neutral-600">Pending Actions</p>
-                      <p className="text-2xl font-bold text-warning-600">{integrationStats.pendingActions}</p>
-                    </div>
-                    <AlertCircle className="w-8 h-8 text-warning-500" />
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-2">Require attention</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Connection Status */}
-            <Card>
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-neutral-900">Connection Status</h3>
-                <p className="text-neutral-600">Real-time status of court system integrations</p>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-neutral-500" />
-                      <div>
-                        <p className="font-medium text-neutral-900">Gauteng High Court</p>
-                        <p className="text-sm text-neutral-600">Electronic filing enabled</p>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(connectionStatus.gautengHigh)}`}>
-                      Connected
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-neutral-500" />
-                      <div>
-                        <p className="font-medium text-neutral-900">Western Cape High Court</p>
-                        <p className="text-sm text-neutral-600">Setup required</p>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(connectionStatus.westernCapeHigh)}`}>
-                      Disconnected
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-neutral-500" />
-                      <div>
-                        <p className="font-medium text-neutral-900">Magistrates Courts</p>
-                        <p className="text-sm text-neutral-600">Regional access</p>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(connectionStatus.magistratesCourts)}`}>
-                      Partial
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-neutral-500" />
-                      <div>
-                        <p className="font-medium text-neutral-900">Supreme Court of Appeal</p>
-                        <p className="text-sm text-neutral-600">Full integration</p>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(connectionStatus.supremeCourt)}`}>
-                      Connected
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-neutral-900">Recent Activity</h3>
-                <p className="text-neutral-600">Latest integration and synchronization events</p>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-center gap-3 p-3 hover:bg-neutral-50 rounded-lg">
-                      <div className={`p-2 rounded-full ${getActivityColor(activity.status)}`}>
-                        {getActivityIcon(activity.type)}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-neutral-900">{activity.message}</p>
-                        <p className="text-xs text-neutral-500">{activity.timestamp}</p>
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-neutral-400" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === 'court' && (
-          <CourtIntegrationDashboard />
-        )}
-
-        {activeTab === 'diary' && (
-          <AutomatedDiarySync />
-        )}
-
-        {activeTab === 'analytics' && (
-          <JudgeAnalyticsCard />
-        )}
-
-        {activeTab === 'language' && (
-          <LanguageAccessibilitySettings />
-        )}
-      </div>
+      {renderContent()}
     </div>
   );
 };

@@ -4,10 +4,11 @@ import {
   Clock, 
   AlertTriangle, 
   Calendar,
-  DollarSign,
   Target,
   Bell
 } from 'lucide-react';
+import { RandIcon } from '../icons/RandIcon';
+import { formatRand } from '../../lib/currency';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { ReminderService, type PaymentTrackingMetrics } from '../../services/reminder.service';
 import type { Invoice } from '../../types';
@@ -132,12 +133,12 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
         <div className="bg-white p-6 rounded-lg border border-neutral-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-error-100 rounded-lg">
-              <DollarSign className="w-5 h-5 text-error-600" />
+              <RandIcon size={20} className="text-error-600" />
             </div>
             <div>
               <p className="text-sm text-neutral-600">Outstanding</p>
               <p className="text-xl font-semibold text-neutral-900">
-                R {metrics.totalOutstanding.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                {formatRand(metrics.totalOutstanding)}
               </p>
             </div>
           </div>
@@ -151,7 +152,7 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
             <div>
               <p className="text-sm text-neutral-600">Overdue</p>
               <p className="text-xl font-semibold text-neutral-900">
-                R {metrics.overdueAmount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                {formatRand(metrics.overdueAmount)}
               </p>
             </div>
           </div>
@@ -221,7 +222,7 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-neutral-900">
-                        R {invoice.amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                        {formatRand(invoice.amount)}
                       </p>
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
                         {invoice.status}
@@ -266,7 +267,7 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-neutral-900">
-                        R {invoice.amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                        {formatRand(invoice.amount)}
                       </p>
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
                         {invoice.status}
@@ -302,7 +303,7 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-neutral-900">
-                      R {reminder.invoice.amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                      {formatRand(reminder.invoice.amount)}
                     </p>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getReminderUrgency(reminder.dueDate)}`}>
                       {format(reminder.dueDate, 'dd MMM')}

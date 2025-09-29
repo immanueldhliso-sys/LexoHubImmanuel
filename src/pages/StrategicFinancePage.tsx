@@ -12,20 +12,19 @@ import {
   Zap,
   RefreshCw
 } from 'lucide-react';
-import { format, addMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { 
   StrategicFinanceService, 
   type CashFlowPrediction, 
   type PracticeFinancialHealth,
-  type FactoringOffer,
-  type SuccessFeeScenario
+  type FactoringOffer
 } from '../services/api/strategic-finance.service';
-import { CashFlowChart } from '../components/strategic-finance/CashFlowChart';
-import { FinancialHealthCard } from '../components/strategic-finance/FinancialHealthCard';
-import { FactoringMarketplace } from '../components/strategic-finance/FactoringMarketplace';
-import { SuccessFeeCalculator } from '../components/strategic-finance/SuccessFeeCalculator';
-import { FeeOptimizationCard } from '../components/strategic-finance/FeeOptimizationCard';
-import { AdvancedCashFlowChart } from '../components/strategic-finance/AdvancedCashFlowChart';
+import { CashFlowChart } from '@/components/strategic-finance/CashFlowChart';
+import { FinancialHealthCard } from '@/components/strategic-finance/FinancialHealthCard';
+import { FactoringMarketplace } from '@/components/strategic-finance/FactoringMarketplace';
+import { SuccessFeeCalculator } from '@/components/strategic-finance/SuccessFeeCalculator';
+import { FeeOptimizationCard } from '@/components/strategic-finance/FeeOptimizationCard';
+// import { AdvancedCashFlowChart } from '../components/strategic-finance/AdvancedCashFlowChart';
 
 export const StrategicFinancePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'cashflow' | 'factoring' | 'optimization' | 'success-fees'>('overview');
@@ -37,7 +36,8 @@ export const StrategicFinancePage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadData();
+    void loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const loadData = async () => {
@@ -48,15 +48,12 @@ export const StrategicFinancePage: React.FC = () => {
       setFinancialHealth(health);
 
       // Load tab-specific data
-      switch (activeTab) {
-        case 'cashflow':
-          const predictions = await StrategicFinanceService.generateCashFlowPredictions({ monthsAhead: 6 });
-          setCashFlowPredictions(predictions);
-          break;
-        case 'factoring':
-          const offers = await StrategicFinanceService.getFactoringOffers();
-          setFactoringOffers(offers);
-          break;
+      if (activeTab === 'cashflow') {
+        const predictions = await StrategicFinanceService.generateCashFlowPredictions({ monthsAhead: 6 });
+        setCashFlowPredictions(predictions);
+      } else if (activeTab === 'factoring') {
+        const offers = await StrategicFinanceService.getFactoringOffers();
+        setFactoringOffers(offers);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -320,7 +317,7 @@ export const StrategicFinancePage: React.FC = () => {
               <div className="space-y-6">
                 {/* Cash Flow Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {cashFlowPredictions.slice(0, 3).map((prediction, index) => (
+                  {cashFlowPredictions.slice(0, 3).map((prediction) => (
                     <div key={prediction.id} className="bg-white rounded-lg border border-neutral-200 p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-medium text-neutral-900">

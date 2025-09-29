@@ -41,7 +41,8 @@ const InvoiceGenerationValidation = z.object({
   matterId: z.string().uuid('Invalid matter ID'),
   timeEntryIds: z.array(z.string().uuid()).optional(),
   customNarrative: z.string().optional(),
-  includeUnbilledTime: z.boolean().default(true)
+  includeUnbilledTime: z.boolean().default(true),
+  isProForma: z.boolean().default(false)
 });
 
 export class InvoiceService {
@@ -49,7 +50,7 @@ export class InvoiceService {
   static async generateInvoice(request: InvoiceGenerationRequest): Promise<Invoice> {
     try {
       const validated = InvoiceGenerationValidation.parse(request);
-      const { matterId, timeEntryIds, customNarrative } = validated;
+      const { matterId, timeEntryIds, customNarrative, isProForma } = validated;
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -132,7 +133,7 @@ export class InvoiceService {
           vat_amount: vatAmount,
           total_amount: totalAmount,
           disbursements: disbursements,
-          status: 'Draft' as InvoiceStatus,
+          status: (isProForma ? 'Pro Forma' : 'Draft') as InvoiceStatus,
           fee_narrative: narrative,
           reminders_sent: 0,
           next_reminder_date: format(addDays(invoiceDate, rules.reminderSchedule[0]), 'yyyy-MM-dd'),
@@ -144,17 +145,20 @@ export class InvoiceService {
       
       if (invoiceError) throw invoiceError;
       
-      // Mark time entries as billed
-      await supabase
-        .from('time_entries')
-        .update({ 
-          billed: true, 
-          invoice_id: invoice.id,
-          updated_at: new Date().toISOString()
-        })
+      // Mark time entries as billed (only for final invoices, not pro forma)
+      if (!isProForma) {
+        await supabase
+          .from('time_entries')
+          .update({ 
+            billed: true, 
+            invoice_id: invoice.id,
+            updated_at: new Date().toISOString()
+          })
         .in('id', timeEntries.map(e => e.id));
+      }
       
-      // Update matter WIP value
+      // Update matter WIP value (only for final invoices, not pro forma)
+      if (!isProForma) {
       await supabase
         .from('matters')
         .update({ 
@@ -163,8 +167,9 @@ export class InvoiceService {
           updated_at: new Date().toISOString()
         })
         .eq('id', matterId);
+      }
       
-      toast.success('Invoice generated successfully');
+      toast.success(isProForma ? 'Pro forma invoice generated successfully' : 'Invoice generated successfully');
       return this.mapDatabaseToInvoice(invoice);
       
     } catch (error) {

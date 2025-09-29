@@ -129,25 +129,10 @@ CREATE TABLE IF NOT EXISTS referral_relationships (
   total_value_a_to_b DECIMAL(12,2) DEFAULT 0,
   total_value_b_to_a DECIMAL(12,2) DEFAULT 0,
   
-  -- Reciprocity tracking
-  reciprocity_ratio DECIMAL(5,2) GENERATED ALWAYS AS (
-    CASE 
-      WHEN referrals_a_to_b = 0 AND referrals_b_to_a = 0 THEN 1
-      WHEN referrals_a_to_b = 0 THEN 0
-      WHEN referrals_b_to_a = 0 THEN NULL
-      ELSE CAST(referrals_b_to_a AS DECIMAL) / CAST(referrals_a_to_b AS DECIMAL)
-    END
-  ) STORED,
-  
+  -- Reciprocity tracking (updated via triggers)
+  reciprocity_ratio DECIMAL(5,2) DEFAULT 1.0,
   last_referral_date TIMESTAMPTZ,
-  relationship_quality VARCHAR(20) GENERATED ALWAYS AS (
-    CASE 
-      WHEN reciprocity_ratio IS NULL THEN 'one_sided'
-      WHEN reciprocity_ratio BETWEEN 0.8 AND 1.2 THEN 'balanced'
-      WHEN reciprocity_ratio < 0.8 THEN 'imbalanced'
-      ELSE 'imbalanced'
-    END
-  ) STORED,
+  relationship_quality VARCHAR(20) DEFAULT 'balanced',
   
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -233,7 +218,7 @@ SELECT
   ob.*,
   a.full_name as posting_advocate_name,
   a.bar as posting_advocate_bar,
-  COUNT(ba.id) as application_count
+  COUNT(ba.id) as current_applications
 FROM overflow_briefs ob
 JOIN advocates a ON ob.posting_advocate_id = a.id
 LEFT JOIN brief_applications ba ON ob.id = ba.brief_id

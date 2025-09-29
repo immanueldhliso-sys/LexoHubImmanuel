@@ -1,19 +1,26 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster, toast } from 'react-hot-toast';
-import { Scale, Briefcase, FileText, BarChart3, Settings, User as UserIcon, Menu, X, Users } from 'lucide-react';
+import { Scale, Briefcase, FileText, BarChart3, Settings, User as UserIcon, Menu, X, Users, LogOut, Brain } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from './design-system/components';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { LoadingSpinner } from './components/design-system/components/LoadingSpinner';
 import type { Page } from './types';
 import {
   DashboardPage,
   MattersPage,
   InvoicesPage,
+  ProFormaPage,
   ReportsPage,
   SettingsPage,
   ProfilePage,
-  PricingManagementPage
+  PricingManagementPage,
+  WorkflowIntegrationsPage,
+  AIAnalyticsDashboard
 } from './pages';
 import { PracticeGrowthPage } from './pages/PracticeGrowthPage';
+import { StrategicFinancePage } from './pages/StrategicFinancePage';
 
 // Create Query Client with proper configuration
 const queryClient = new QueryClient({
@@ -84,39 +91,7 @@ const DefaultErrorFallback: React.FC<{ error: Error }> = ({ error }) => (
   </div>
 );
 
-// Loading Component
-const LoadingSpinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
-  const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12'
-  };
 
-  return (
-    <div className="flex justify-center items-center p-4">
-      <svg
-        className={`${sizeClasses[size]} animate-spin text-mpondo-gold-500`}
-        fill="none"
-        viewBox="0 0 24 24"
-        aria-label="Loading"
-      >
-        <circle
-          className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
-        />
-        <path
-          className="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        />
-      </svg>
-    </div>
-  );
-};
 
 // Navigation Component
 const Navigation: React.FC<{
@@ -125,18 +100,23 @@ const Navigation: React.FC<{
   onPageChange: (page: Page) => void;
   onToggleSidebar: () => void;
 }> = ({ activePage, sidebarOpen, onPageChange, onToggleSidebar }) => {
+  const { user, signOut } = useAuth();
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+    { id: 'ai-analytics', label: 'AI Analytics', icon: Brain },
     { id: 'matters', label: 'Matters', icon: Briefcase },
     { id: 'invoices', label: 'Invoices', icon: FileText },
+    { id: 'proforma', label: 'Pro Forma', icon: FileText },
+    { id: 'strategic-finance', label: 'Finance', icon: Scale },
     { id: 'practice-growth', label: 'Practice Growth', icon: Users },
+    { id: 'workflow-integrations', label: 'Workflow', icon: Settings },
     { id: 'pricing-management', label: 'Pricing', icon: Scale },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'profile', label: 'Profile', icon: UserIcon },
   ] as const;
 
   return (
-    <nav className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-neutral-200 transform transition-transform duration-300 ease-in-out ${
+    <nav className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-neutral-200 transform transition-transform duration-300 ease-in-out flex flex-col ${
       sidebarOpen ? 'translate-x-0' : '-translate-x-full'
     } lg:translate-x-0`}>
       <div className="flex items-center justify-between h-16 px-6 border-b border-neutral-200">
@@ -153,7 +133,7 @@ const Navigation: React.FC<{
         </button>
       </div>
       
-      <div className="px-3 py-4">
+      <div className="px-3 py-4 flex-1">
         <ul className="space-y-1">
           {navigationItems.map((item) => {
             const Icon = item.icon;
@@ -177,6 +157,32 @@ const Navigation: React.FC<{
             );
           })}
         </ul>
+      </div>
+
+      {/* User Profile & Sign Out */}
+      <div className="px-3 py-4 border-t border-neutral-200">
+        <div className="flex items-center gap-3 px-3 py-2 text-sm text-neutral-700">
+          <div className="w-8 h-8 bg-mpondo-gold-100 rounded-full flex items-center justify-center">
+            <span className="text-mpondo-gold-700 font-medium">
+              {user?.advocate_profile?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">
+              {user?.advocate_profile?.full_name || 'User'}
+            </p>
+            <p className="text-xs text-neutral-500 truncate">
+              {user?.advocate_profile?.practice_number || user?.email}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={signOut}
+          className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 rounded-lg transition-colors mt-2"
+        >
+          <LogOut className="w-5 h-5" />
+          Sign Out
+        </button>
       </div>
     </nav>
   );
@@ -223,8 +229,8 @@ const MainLayout: React.FC<{
   );
 };
 
-// Main App Component
-function App() {
+// App Content Component (wrapped by AuthProvider)
+const AppContent: React.FC = () => {
   type AppUiState = {
     activePage: Page;
     sidebarOpen: boolean;
@@ -273,15 +279,23 @@ function App() {
   const renderPage = () => {
     switch (appState.activePage) {
       case 'dashboard':
-        return <DashboardPage />;
+        return <DashboardPage onNavigate={handlePageChange} />;
+      case 'ai-analytics':
+        return <AIAnalyticsDashboard />;
       case 'matters':
         return <MattersPage />;
       case 'invoices':
         return <InvoicesPage />;
+      case 'proforma':
+        return <ProFormaPage />;
       case 'reports':
         return <ReportsPage />;
+      case 'strategic-finance':
+        return <StrategicFinancePage />;
       case 'practice-growth':
         return <PracticeGrowthPage />;
+      case 'workflow-integrations':
+        return <WorkflowIntegrationsPage />;
       case 'pricing-management':
         return <PricingManagementPage />;
       case 'settings':
@@ -294,31 +308,42 @@ function App() {
   };
 
   return (
+    <ProtectedRoute>
+      <div className="App">
+        <MainLayout
+          activePage={appState.activePage}
+          sidebarOpen={appState.sidebarOpen}
+          onPageChange={handlePageChange}
+          onToggleSidebar={handleToggleSidebar}
+        >
+          <Suspense fallback={<LoadingSpinner />}>
+            {renderPage()}
+          </Suspense>
+        </MainLayout>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+          }}
+        />
+      </div>
+    </ProtectedRoute>
+  );
+};
+
+// Main App Component
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <div className="App">
-          <MainLayout
-            activePage={appState.activePage}
-            sidebarOpen={appState.sidebarOpen}
-            onPageChange={handlePageChange}
-            onToggleSidebar={handleToggleSidebar}
-          >
-            <Suspense fallback={<LoadingSpinner />}>
-              {renderPage()}
-            </Suspense>
-          </MainLayout>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-              },
-            }}
-          />
-        </div>
-      </ErrorBoundary>
+      <AuthProvider>
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

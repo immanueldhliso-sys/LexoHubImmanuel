@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Calculator, TrendingUp, AlertCircle, Info } from 'lucide-react';
-import { StrategicFinanceService } from '../../services/api/strategic-finance.service';
+import { StrategicFinanceService } from '@/services/api/strategic-finance.service';
 import { toast } from 'react-hot-toast';
 
 interface SuccessFeeCalculatorProps {
@@ -288,7 +288,7 @@ export const SuccessFeeCalculator: React.FC<SuccessFeeCalculatorProps> = ({ onCl
                     </div>
                   </div>
 
-                  <div className="border-t border-neutral-200 pt-4">
+                  <div className="pt-4 border-t border-neutral-200">
                     <p className="text-sm text-neutral-600 mb-2">Risk Analysis</p>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center p-3 bg-white rounded-lg">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Save, RotateCcw } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { toast } from 'react-hot-toast';
 
 const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'profile' | 'practice' | 'integrations' | 'compliance' | 'billing'>('profile');
@@ -20,6 +21,77 @@ const SettingsPage: React.FC = () => {
     workingHours: { start: '08:00', end: '17:00' },
     billingCycle: 'monthly'
   });
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleNotificationChange = (key: keyof typeof notifications, value: boolean) => {
+    setNotifications(prev => ({ ...prev, [key]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handlePracticeSettingChange = (key: keyof typeof practiceSettings, value: any) => {
+    setPracticeSettings(prev => ({ ...prev, [key]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveSettings = async () => {
+    setIsLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Here you would make actual API calls to save settings
+      toast.success('Settings saved successfully!');
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      toast.error('Failed to save settings. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetToDefaults = () => {
+    if (window.confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
+      setNotifications({
+        emailReminders: true,
+        smsAlerts: false,
+        invoiceUpdates: true,
+        matterDeadlines: true,
+        paymentReceived: true
+      });
+      setPracticeSettings({
+        firmName: 'Mpondo & Associates',
+        practiceAreas: ['Commercial Litigation', 'Employment Law', 'Mining Law'],
+        defaultHourlyRate: 2500,
+        currency: 'ZAR',
+        timeZone: 'Africa/Johannesburg',
+        workingHours: { start: '08:00', end: '17:00' },
+        billingCycle: 'monthly'
+      });
+      setHasUnsavedChanges(true);
+      toast.success('Settings reset to defaults');
+    }
+  };
+
+  const addPracticeArea = () => {
+    const newArea = prompt('Enter new practice area:');
+    if (newArea && newArea.trim()) {
+      setPracticeSettings(prev => ({
+        ...prev,
+        practiceAreas: [...prev.practiceAreas, newArea.trim()]
+      }));
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const removePracticeArea = (index: number) => {
+    setPracticeSettings(prev => ({
+      ...prev,
+      practiceAreas: prev.practiceAreas.filter((_, i) => i !== index)
+    }));
+    setHasUnsavedChanges(true);
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -140,7 +212,7 @@ const SettingsPage: React.FC = () => {
                         </p>
                       </div>
                       <button
-                        onClick={() => setNotifications(prev => ({ ...prev, [key]: !value }))}
+                        onClick={() => handleNotificationChange(key as keyof typeof notifications, !value)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                           value ? 'bg-mpondo-gold-500' : 'bg-neutral-200'
                         }`}
@@ -179,7 +251,7 @@ const SettingsPage: React.FC = () => {
                   <input
                     type="text"
                     value={practiceSettings.firmName}
-                    onChange={(e) => setPracticeSettings(prev => ({ ...prev, firmName: e.target.value }))}
+                    onChange={(e) => handlePracticeSettingChange('firmName', e.target.value)}
                     className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
                   />
                 </div>
@@ -196,17 +268,14 @@ const SettingsPage: React.FC = () => {
                           onChange={(e) => {
                             const newAreas = [...practiceSettings.practiceAreas];
                             newAreas[index] = e.target.value;
-                            setPracticeSettings(prev => ({ ...prev, practiceAreas: newAreas }));
+                            handlePracticeSettingChange('practiceAreas', newAreas);
                           }}
                           className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
                         />
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => {
-                            const newAreas = practiceSettings.practiceAreas.filter((_, i) => i !== index);
-                            setPracticeSettings(prev => ({ ...prev, practiceAreas: newAreas }));
-                          }}
+                          onClick={() => removePracticeArea(index)}
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -215,10 +284,7 @@ const SettingsPage: React.FC = () => {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => setPracticeSettings(prev => ({ 
-                        ...prev, 
-                        practiceAreas: [...prev.practiceAreas, 'New Practice Area'] 
-                      }))}
+                      onClick={addPracticeArea}
                       className="flex items-center space-x-2"
                     >
                       <Plus className="w-4 h-4" />
@@ -624,8 +690,22 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div className="flex justify-end space-x-4">
-            <Button variant="secondary">Reset to Defaults</Button>
-            <Button variant="primary">Save All Settings</Button>
+            <Button 
+              variant="outline" 
+              onClick={handleResetToDefaults}
+              disabled={isLoading}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset to Defaults
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleSaveSettings}
+              disabled={!hasUnsavedChanges || isLoading}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isLoading ? 'Saving...' : 'Save All Settings'}
+            </Button>
           </div>
         </div>
       )}

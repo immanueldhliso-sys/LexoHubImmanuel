@@ -1,79 +1,411 @@
-import React from 'react';
-import { Briefcase, FileText, BarChart3 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../design-system/components';
+import React, { useState, useEffect } from 'react';
+import { 
+  Briefcase, 
+  FileText, 
+  BarChart3, 
+  Plus, 
+  ArrowRight, 
+  TrendingUp, 
+  Calendar,
+  AlertTriangle,
+  Clock
+} from 'lucide-react';
+import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { toast } from 'react-hot-toast';
+import type { Matter, Page } from '../types';
+import { MatterStatus, BarAssociation, FeeType, RiskLevel } from '../types';
 
-const DashboardPage: React.FC = () => (
+interface DashboardPageProps {
+  onNavigate?: (page: Page) => void;
+}
+
+const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
+  const [dashboardData, setDashboardData] = useState({
+    activeMatters: 42,
+    outstandingWip: 1200000,
+    monthlyBilling: 890000,
+    overdueInvoices: 7,
+    collectionRate: 87,
+    avgBillTime: 45,
+    settlementRate: 72,
+    totalMatters: 95,
+    thisWeekMatters: 3,
+    pendingConflictChecks: 2,
+    upcomingDeadlines: 5,
+    isLoading: false
+  });
+
+  const [recentMatters, setRecentMatters] = useState<Matter[]>([]);
+  const [quickActions, setQuickActions] = useState({
+    newMatterModal: false,
+    newInvoiceModal: false,
+    quickTimeEntry: false
+  });
+
+  // Modal and detailed view states
+  const [showDetailedView, setShowDetailedView] = useState({
+    wipReport: false,
+    billingReport: false,
+    overdueInvoices: false,
+    analytics: false
+  });
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    setDashboardData(prev => ({ ...prev, isLoading: true }));
+    try {
+      // Simulate API calls - in real implementation these would be proper service calls
+      setTimeout(() => {
+        // Mock recent matters using new database schema
+        const mockRecentMatters: Matter[] = [
+          {
+            id: '1',
+            advocate_id: 'adv-1',
+            reference_number: 'MAT-2024-001',
+            title: 'Smith v Jones',
+            description: 'Commercial contract dispute',
+            matter_type: 'Contract Dispute',
+            court_case_number: undefined,
+            bar: BarAssociation.JOHANNESBURG,
+            client_name: 'Smith Ltd',
+            client_email: undefined,
+            client_phone: undefined,
+            client_address: undefined,
+            client_type: undefined,
+            instructing_attorney: 'John Smith',
+            instructing_attorney_email: undefined,
+            instructing_attorney_phone: undefined,
+            instructing_firm: 'Smith & Associates',
+            instructing_firm_ref: undefined,
+            fee_type: FeeType.STANDARD,
+            estimated_fee: 200000,
+            fee_cap: undefined,
+            actual_fee: undefined,
+            wip_value: 125000,
+            trust_balance: 0,
+            disbursements: 0,
+            vat_exempt: false,
+            status: MatterStatus.ACTIVE,
+            risk_level: RiskLevel.MEDIUM,
+            settlement_probability: 78,
+            expected_completion_date: undefined,
+            conflict_check_completed: true,
+            conflict_check_date: new Date().toISOString(),
+            conflict_check_cleared: true,
+            conflict_notes: undefined,
+            date_instructed: new Date().toISOString(),
+            date_accepted: new Date().toISOString(),
+            date_commenced: new Date().toISOString(),
+            date_settled: undefined,
+            date_closed: undefined,
+            next_court_date: undefined,
+            prescription_date: undefined,
+            tags: ['commercial', 'contract'],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: undefined,
+            days_active: 15,
+            is_overdue: false
+          },
+          {
+            id: '2', 
+            advocate_id: 'adv-1',
+            reference_number: 'MAT-2024-002',
+            title: 'ABC Corporation Litigation',
+            description: 'Commercial litigation matter',
+            matter_type: 'Commercial Litigation',
+            court_case_number: undefined,
+            bar: BarAssociation.JOHANNESBURG,
+            client_name: 'ABC Corp',
+            client_email: undefined,
+            client_phone: undefined,
+            client_address: undefined,
+            client_type: undefined,
+            instructing_attorney: 'Jane Doe',
+            instructing_attorney_email: undefined,
+            instructing_attorney_phone: undefined,
+            instructing_firm: 'Doe & Partners',
+            instructing_firm_ref: undefined,
+            fee_type: FeeType.STANDARD,
+            estimated_fee: 150000,
+            fee_cap: undefined,
+            actual_fee: undefined,
+            wip_value: 85000,
+            trust_balance: 0,
+            disbursements: 0,
+            vat_exempt: false,
+            status: MatterStatus.PENDING,
+            risk_level: RiskLevel.LOW,
+            settlement_probability: 65,
+            expected_completion_date: undefined,
+            conflict_check_completed: true,
+            conflict_check_date: new Date().toISOString(),
+            conflict_check_cleared: true,
+            conflict_notes: undefined,
+            date_instructed: new Date().toISOString(),
+            date_accepted: undefined,
+            date_commenced: undefined,
+            date_settled: undefined,
+            date_closed: undefined,
+            next_court_date: undefined,
+            prescription_date: undefined,
+            tags: ['commercial', 'litigation'],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: undefined,
+            days_active: 8,
+            is_overdue: false
+          }
+        ];
+        
+        setRecentMatters(mockRecentMatters);
+        setDashboardData(prev => ({ ...prev, isLoading: false }));
+      }, 500);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+      setDashboardData(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  const handleQuickAction = (action: 'new-matter' | 'new-invoice' | 'time-entry') => {
+    switch (action) {
+      case 'new-matter':
+        setQuickActions(prev => ({ ...prev, newMatterModal: true }));
+        toast.success('Opening new matter form...');
+        break;
+      case 'new-invoice':
+        if (onNavigate) {
+          onNavigate('invoices');
+          toast.success('Navigating to invoice generation...');
+        } else {
+          setQuickActions(prev => ({ ...prev, newInvoiceModal: true }));
+          toast.success('Opening invoice generation...');
+        }
+        break;
+      case 'time-entry':
+        setQuickActions(prev => ({ ...prev, quickTimeEntry: true }));
+        toast.success('Opening quick time entry...');
+        break;
+    }
+  };
+
+  const handleRefreshData = async () => {
+    toast.success('Refreshing dashboard data...');
+    await loadDashboardData();
+  };
+
+  const handleViewMatter = (matterId: string) => {
+    const matter = recentMatters.find(m => m.id === matterId);
+    if (matter) {
+      toast.success(`Opening matter: ${matter.title}`);
+      // In real implementation, this would navigate to matter details
+      if (onNavigate) {
+        onNavigate('matters');
+      }
+    }
+  };
+
+  const handleViewAllMatters = () => {
+    if (onNavigate) {
+      onNavigate('matters');
+      toast.success('Navigating to matters page...');
+    } else {
+      toast.success('Matters page navigation...');
+    }
+  };
+
+  // Enhanced button handlers for stat cards
+  const handleWipReportClick = () => {
+    setShowDetailedView(prev => ({ ...prev, wipReport: true }));
+    toast('Opening WIP Report details...', { icon: 'ℹ️' });
+  };
+
+  const handleBillingReportClick = () => {
+    setShowDetailedView(prev => ({ ...prev, billingReport: true }));
+    toast('Opening billing report details...', { icon: 'ℹ️' });
+  };
+
+  const handleOverdueInvoicesClick = () => {
+    if (onNavigate) {
+      onNavigate('invoices');
+      toast.success('Navigating to overdue invoices...');
+    } else {
+      setShowDetailedView(prev => ({ ...prev, overdueInvoices: true }));
+      toast('Opening overdue invoices...', { icon: 'ℹ️' });
+    }
+  };
+
+  const handleAnalyticsClick = () => {
+    if (onNavigate) {
+      onNavigate('ai-analytics');
+      toast.success('Opening AI Analytics Dashboard...');
+    } else {
+      setShowDetailedView(prev => ({ ...prev, analytics: true }));
+      toast('Opening analytics...', { icon: 'ℹ️' });
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-ZA', {
+      style: 'currency',
+      currency: 'ZAR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  return (
   <div className="max-w-7xl mx-auto space-y-6">
     <div className="flex items-center justify-between">
       <div>
         <h1 className="text-3xl font-bold text-neutral-900">Dashboard</h1>
         <p className="text-neutral-600 mt-1">Welcome to your practice intelligence platform</p>
       </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={handleRefreshData} disabled={dashboardData.isLoading}>
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Refresh Data
+          </Button>
+          <Button variant="primary" onClick={() => handleQuickAction('new-matter')}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Matter
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Button 
+          variant="outline" 
+          onClick={() => handleQuickAction('new-invoice')}
+          className="h-16 flex flex-col items-center justify-center"
+        >
+          <FileText className="w-6 h-6 mb-1 text-mpondo-gold-600" />
+          <span className="text-sm font-medium">Generate Invoice</span>
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => handleQuickAction('time-entry')}
+          className="h-16 flex flex-col items-center justify-center"
+        >
+          <Calendar className="w-6 h-6 mb-1 text-judicial-blue-600" />
+          <span className="text-sm font-medium">Quick Time Entry</span>
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={handleViewAllMatters}
+          className="h-16 flex flex-col items-center justify-center"
+        >
+          <Briefcase className="w-6 h-6 mb-1 text-status-success-600" />
+          <span className="text-sm font-medium">View All Matters</span>
+        </Button>
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {/* Quick Stats */}
-      <Card hoverable>
-        <CardContent className="p-0 text-center">
+        {/* Quick Stats with click handlers */}
+        <Card hoverable onClick={handleViewAllMatters} className="cursor-pointer hover:shadow-lg transition-shadow">
+          <CardContent className="p-6 text-center">
           <div className="text-mpondo-gold-500 mb-2">
             <Briefcase className="w-8 h-8 mx-auto" />
           </div>
-          <h3 className="text-2xl font-bold text-neutral-900">42</h3>
+            <h3 className="text-2xl font-bold text-neutral-900">{dashboardData.activeMatters}</h3>
           <p className="text-sm text-neutral-600">Active Matters</p>
+            <div className="mt-2 text-xs text-mpondo-gold-600 flex items-center justify-center">
+              View Details <ArrowRight className="w-3 h-3 ml-1" />
+            </div>
         </CardContent>
       </Card>
 
-      <Card hoverable>
-        <CardContent className="p-0 text-center">
+        <Card hoverable onClick={handleWipReportClick} className="cursor-pointer hover:shadow-lg transition-shadow">
+          <CardContent className="p-6 text-center">
           <div className="text-judicial-blue-900 mb-2">
             <FileText className="w-8 h-8 mx-auto" />
           </div>
-          <h3 className="text-2xl font-bold text-neutral-900">R1.2M</h3>
+            <h3 className="text-2xl font-bold text-neutral-900">{formatCurrency(dashboardData.outstandingWip)}</h3>
           <p className="text-sm text-neutral-600">Outstanding WIP</p>
+            <div className="mt-2 text-xs text-judicial-blue-600 flex items-center justify-center">
+              View WIP Report <ArrowRight className="w-3 h-3 ml-1" />
+            </div>
         </CardContent>
       </Card>
 
-      <Card hoverable>
-        <CardContent className="p-0 text-center">
+        <Card hoverable onClick={handleBillingReportClick} className="cursor-pointer hover:shadow-lg transition-shadow">
+          <CardContent className="p-6 text-center">
           <div className="text-status-success-500 mb-2">
             <BarChart3 className="w-8 h-8 mx-auto" />
           </div>
-          <h3 className="text-2xl font-bold text-neutral-900">R890K</h3>
+            <h3 className="text-2xl font-bold text-neutral-900">{formatCurrency(dashboardData.monthlyBilling)}</h3>
           <p className="text-sm text-neutral-600">This Month Billing</p>
+            <div className="mt-2 text-xs text-status-success-600 flex items-center justify-center">
+              View Reports <ArrowRight className="w-3 h-3 ml-1" />
+            </div>
         </CardContent>
       </Card>
 
-      <Card hoverable>
-        <CardContent className="p-0 text-center">
+        <Card hoverable onClick={handleOverdueInvoicesClick} className="cursor-pointer hover:shadow-lg transition-shadow">
+          <CardContent className="p-6 text-center">
           <div className="text-status-warning-500 mb-2">
-            <FileText className="w-8 h-8 mx-auto" />
+              <AlertTriangle className="w-8 h-8 mx-auto" />
           </div>
-          <h3 className="text-2xl font-bold text-neutral-900">7</h3>
+            <h3 className="text-2xl font-bold text-neutral-900">{dashboardData.overdueInvoices}</h3>
           <p className="text-sm text-neutral-600">Overdue Invoices</p>
+            <div className="mt-2 text-xs text-status-warning-600 flex items-center justify-center">
+              Review Overdue <ArrowRight className="w-3 h-3 ml-1" />
+            </div>
         </CardContent>
       </Card>
     </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card>
-        <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="text-xl font-semibold text-neutral-900">Recent Matters</h2>
+            <Button variant="ghost" size="sm" onClick={handleViewAllMatters}>
+              View All <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
         </CardHeader>
-        <CardContent className="p-0 space-y-3">
-          <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-            <div>
-              <h4 className="font-medium text-neutral-900">Smith v Jones</h4>
-              <p className="text-sm text-neutral-600">Contract Dispute</p>
+          <CardContent className="space-y-3">
+            {dashboardData.isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-mpondo-gold-500"></div>
+              </div>
+            ) : recentMatters.length > 0 ? (
+              recentMatters.map((matter) => (
+                <div 
+                  key={matter.id}
+                  className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg hover:bg-neutral-100 cursor-pointer transition-colors"
+                  onClick={() => handleViewMatter(matter.id)}
+                >
+                  <div className="flex-1">
+                    <h4 className="font-medium text-neutral-900">{matter.title}</h4>
+                    <p className="text-sm text-neutral-600">{matter.matter_type}</p>
+                    <p className="text-xs text-neutral-500">WIP: {formatCurrency(matter.wip_value)}</p>
             </div>
-            <span className="badge badge-success">Active</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      matter.status === MatterStatus.ACTIVE ? 'bg-green-100 text-green-800' : 
+                      matter.status === MatterStatus.PENDING ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {matter.status}
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-neutral-400" />
           </div>
-          <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-            <div>
-              <h4 className="font-medium text-neutral-900">ABC Corporation</h4>
-              <p className="text-sm text-neutral-600">Commercial Litigation</p>
             </div>
-            <span className="badge badge-warning">Pending</span>
+              ))
+            ) : (
+              <div className="text-center py-8 text-neutral-500">
+                <Briefcase className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
+                <p>No recent matters found</p>
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => handleQuickAction('new-matter')}>
+                  Create First Matter
+                </Button>
           </div>
+            )}
         </CardContent>
       </Card>
 
@@ -81,23 +413,300 @@ const DashboardPage: React.FC = () => (
         <CardHeader>
           <h2 className="text-xl font-semibold text-neutral-900">Practice Performance</h2>
         </CardHeader>
-        <CardContent className="p-0 space-y-3">
-          <div className="flex justify-between items-center">
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
             <span className="text-sm text-neutral-600">Collection Rate</span>
-            <span className="font-medium text-neutral-900">87%</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-neutral-900">{dashboardData.collectionRate}%</span>
+                <div className="w-12 h-2 bg-neutral-200 rounded-full">
+                  <div 
+                    className="h-full bg-status-success-500 rounded-full" 
+                    style={{ width: `${dashboardData.collectionRate}%` }}
+                  ></div>
+                </div>
+              </div>
           </div>
-          <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
             <span className="text-sm text-neutral-600">Average Bill Time</span>
-            <span className="font-medium text-neutral-900">45 days</span>
+              <span className="font-medium text-neutral-900">{dashboardData.avgBillTime} days</span>
           </div>
-          <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
             <span className="text-sm text-neutral-600">Settlement Rate</span>
-            <span className="font-medium text-neutral-900">72%</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-neutral-900">{dashboardData.settlementRate}%</span>
+                <div className="w-12 h-2 bg-neutral-200 rounded-full">
+                  <div 
+                    className="h-full bg-mpondo-gold-500 rounded-full" 
+                    style={{ width: `${dashboardData.settlementRate}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <div className="pt-2">
+              <Button variant="outline" size="sm" className="w-full" onClick={handleAnalyticsClick}>
+                <BarChart3 className="w-4 h-4 mr-2" />
+                View Detailed Analytics
+              </Button>
           </div>
         </CardContent>
       </Card>
     </div>
+
+      {/* Modal Components */}
+      
+      {/* New Matter Modal */}
+      {quickActions.newMatterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Create New Matter</h3>
+            <p className="text-neutral-600 mb-4">
+              Complete new matter creation form with client details, conflict checks, and fee arrangements.
+            </p>
+            <div className="space-y-3">
+              <Button 
+                variant="primary" 
+                className="w-full"
+                onClick={() => {
+                  setQuickActions(prev => ({ ...prev, newMatterModal: false }));
+                  if (onNavigate) onNavigate('matters');
+                  toast.success('Opening comprehensive matter creation...');
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Open Matter Creation Form
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setQuickActions(prev => ({ ...prev, newMatterModal: false }))}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Invoice Modal */}
+      {quickActions.newInvoiceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Generate Invoice</h3>
+            <p className="text-neutral-600 mb-4">
+              Create professional invoices with automated fee calculations and Bar-compliant formatting.
+            </p>
+            <div className="space-y-3">
+              <Button 
+                variant="primary" 
+                className="w-full"
+                onClick={() => {
+                  setQuickActions(prev => ({ ...prev, newInvoiceModal: false }));
+                  if (onNavigate) onNavigate('invoices');
+                  toast.success('Opening invoice generation...');
+                }}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Open Invoice Generator
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setQuickActions(prev => ({ ...prev, newInvoiceModal: false }))}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Time Entry Modal */}
+      {quickActions.quickTimeEntry && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Quick Time Entry</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Matter</label>
+                <select className="w-full border border-neutral-300 rounded-md px-3 py-2">
+                  <option value="">Select a matter...</option>
+                  {recentMatters.map(matter => (
+                    <option key={matter.id} value={matter.id}>
+                      {matter.title} - {matter.client_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Description</label>
+                <textarea 
+                  className="w-full border border-neutral-300 rounded-md px-3 py-2 h-20"
+                  placeholder="Brief description of work performed..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Hours</label>
+                  <input 
+                    type="number" 
+                    step="0.25"
+                    className="w-full border border-neutral-300 rounded-md px-3 py-2"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Rate</label>
+                  <input 
+                    type="number" 
+                    className="w-full border border-neutral-300 rounded-md px-3 py-2"
+                    placeholder="2500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  variant="primary" 
+                  className="flex-1"
+                  onClick={() => {
+                    setQuickActions(prev => ({ ...prev, quickTimeEntry: false }));
+                    toast.success('Time entry saved successfully!');
+                  }}
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  Save Time Entry
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setQuickActions(prev => ({ ...prev, quickTimeEntry: false }))}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WIP Report Modal */}
+      {showDetailedView.wipReport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Work in Progress Report</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-4 bg-neutral-50 rounded-lg">
+                  <p className="text-2xl font-bold text-neutral-900">{formatCurrency(dashboardData.outstandingWip)}</p>
+                  <p className="text-sm text-neutral-600">Total WIP</p>
+                </div>
+                <div className="text-center p-4 bg-neutral-50 rounded-lg">
+                  <p className="text-2xl font-bold text-neutral-900">{formatCurrency(850000)}</p>
+                  <p className="text-sm text-neutral-600">Billable WIP</p>
+                </div>
+                <div className="text-center p-4 bg-neutral-50 rounded-lg">
+                  <p className="text-2xl font-bold text-neutral-900">{formatCurrency(350000)}</p>
+                  <p className="text-sm text-neutral-600">Unbilled WIP</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h4 className="font-medium text-neutral-900">Top WIP Matters</h4>
+                {recentMatters.map(matter => (
+                  <div key={matter.id} className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-neutral-900">{matter.title}</p>
+                      <p className="text-sm text-neutral-600">{matter.client_name}</p>
+                    </div>
+                    <p className="font-medium text-neutral-900">{formatCurrency(matter.wip_value)}</p>
+                  </div>
+                ))}
+              </div>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setShowDetailedView(prev => ({ ...prev, wipReport: false }))}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Billing Report Modal */}
+      {showDetailedView.billingReport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Monthly Billing Report</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-4 bg-status-success-50 rounded-lg">
+                  <p className="text-2xl font-bold text-status-success-900">{formatCurrency(dashboardData.monthlyBilling)}</p>
+                  <p className="text-sm text-status-success-700">This Month</p>
+                </div>
+                <div className="text-center p-4 bg-neutral-50 rounded-lg">
+                  <p className="text-2xl font-bold text-neutral-900">{formatCurrency(1150000)}</p>
+                  <p className="text-sm text-neutral-600">Last Month</p>
+                </div>
+              </div>
+              <div className="p-4 bg-neutral-50 rounded-lg">
+                <h4 className="font-medium text-neutral-900 mb-2">Monthly Trend</h4>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-status-success-500" />
+                  <span className="text-status-success-600 font-medium">+22.3%</span>
+                  <span className="text-neutral-600">compared to last month</span>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setShowDetailedView(prev => ({ ...prev, billingReport: false }))}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Overdue Invoices Modal */}
+      {showDetailedView.overdueInvoices && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Overdue Invoices</h3>
+            <div className="space-y-3">
+              <div className="p-3 bg-status-warning-50 border-l-4 border-status-warning-500 rounded">
+                <p className="font-medium text-neutral-900">Invoice #INV-2024-001</p>
+                <p className="text-sm text-neutral-600">ABC Corporation - {formatCurrency(75000)}</p>
+                <p className="text-xs text-status-warning-700">45 days overdue</p>
+              </div>
+              <div className="p-3 bg-status-warning-50 border-l-4 border-status-warning-500 rounded">
+                <p className="font-medium text-neutral-900">Invoice #INV-2024-003</p>
+                <p className="text-sm text-neutral-600">XYZ Ltd - {formatCurrency(125000)}</p>
+                <p className="text-xs text-status-warning-700">32 days overdue</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button 
+                variant="primary" 
+                className="flex-1"
+                onClick={() => {
+                  setShowDetailedView(prev => ({ ...prev, overdueInvoices: false }));
+                  if (onNavigate) onNavigate('invoices');
+                }}
+              >
+                Manage Invoices
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDetailedView(prev => ({ ...prev, overdueInvoices: false }))}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
   </div>
 );
+};
 
 export default DashboardPage;

@@ -1,4 +1,4 @@
-export { CourtIntegrationDashboard } from './CourtIntegrationDashboard';
+export { CourtDiaryCard } from './CourtDiaryCard';
 export { JudgeAnalyticsCard } from './JudgeAnalyticsCard';
-export { LanguageAccessibilitySettings } from './LanguageAccessibilitySettings';
-export { AutomatedDiarySync } from './AutomatedDiarySync';
+export { VoiceAssistantPanel } from './VoiceAssistantPanel';
+export { IntegrationsPanel } from './IntegrationsPanel';

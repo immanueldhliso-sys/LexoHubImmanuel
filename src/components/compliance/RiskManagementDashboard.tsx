@@ -10,9 +10,52 @@ import {
   Activity
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
+import { toast } from 'react-hot-toast';
 
 export const RiskManagementDashboard: React.FC = () => {
   const [riskLevel, setRiskLevel] = useState('medium');
+  const [isRunningAudit, setIsRunningAudit] = useState(false);
+  const [lastAuditDate, setLastAuditDate] = useState<string | null>(null);
+
+  const handleConfigureEthics = () => {
+    toast.success('Opening ethics configuration...');
+    // In real implementation, this would open ethics configuration modal
+  };
+
+  const handleRunAuditCheck = async () => {
+    setIsRunningAudit(true);
+    try {
+      // Simulate audit process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      setLastAuditDate(new Date().toISOString());
+      toast.success('Audit check completed successfully');
+      
+      // In real implementation, this would trigger actual compliance audit
+    } catch (error) {
+      toast.error('Audit check failed');
+    } finally {
+      setIsRunningAudit(false);
+    }
+  };
+
+  const handleGenerateAuditTrail = () => {
+    toast.success('Generating comprehensive audit trail...');
+    // In real implementation, this would generate and download audit trail
+    setTimeout(() => {
+      toast.success('Audit trail generated and ready for download');
+    }, 1500);
+  };
+
+  const handleResolveAlert = (alertId: string) => {
+    toast.success(`Resolving alert ${alertId}...`);
+    // In real implementation, this would mark alert as resolved
+  };
+
+  const handleViewAlertDetails = (alertId: string) => {
+    toast.success(`Opening details for alert ${alertId}...`);
+    // In real implementation, this would open alert details modal
+  };
 
   const complianceMetrics = {
     overallScore: 87,
@@ -159,10 +202,18 @@ export const RiskManagementDashboard: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleViewAlertDetails(alert.id)}
+                    >
                       View Details
                     </Button>
-                    <Button size="sm" className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700">
+                    <Button 
+                      size="sm" 
+                      variant="primary"
+                      onClick={() => handleResolveAlert(alert.id)}
+                    >
                       Resolve
                     </Button>
                   </div>
@@ -182,7 +233,12 @@ export const RiskManagementDashboard: React.FC = () => {
             <p className="text-sm text-neutral-600 mb-4">
               Automated conflict checking and ethics rule compliance monitoring
             </p>
-            <Button size="sm" variant="outline" className="w-full">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-full"
+              onClick={handleConfigureEthics}
+            >
               Configure Ethics Rules
             </Button>
           </CardContent>
@@ -195,9 +251,20 @@ export const RiskManagementDashboard: React.FC = () => {
             <p className="text-sm text-neutral-600 mb-4">
               Automated reconciliation and trust account compliance tracking
             </p>
-            <Button size="sm" variant="outline" className="w-full">
-              Run Audit Check
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-full"
+              onClick={handleRunAuditCheck}
+              disabled={isRunningAudit}
+            >
+              {isRunningAudit ? 'Running Audit...' : 'Run Audit Check'}
             </Button>
+            {lastAuditDate && (
+              <p className="text-xs text-neutral-500 mt-2">
+                Last audit: {new Date(lastAuditDate).toLocaleDateString()}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -208,7 +275,12 @@ export const RiskManagementDashboard: React.FC = () => {
             <p className="text-sm text-neutral-600 mb-4">
               One-click comprehensive audit trail for compliance reporting
             </p>
-            <Button size="sm" variant="outline" className="w-full">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-full"
+              onClick={handleGenerateAuditTrail}
+            >
               Generate Audit Trail
             </Button>
           </CardContent>

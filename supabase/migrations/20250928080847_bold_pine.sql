@@ -143,21 +143,9 @@ CREATE TABLE IF NOT EXISTS matters (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   deleted_at TIMESTAMPTZ,
   
-  -- Computed fields
-  days_active INTEGER GENERATED ALWAYS AS (
-    CASE 
-      WHEN date_closed IS NOT NULL THEN EXTRACT(DAY FROM (date_closed - date_instructed))
-      ELSE EXTRACT(DAY FROM (NOW() - date_instructed))
-    END
-  ) STORED,
-  
-  is_overdue BOOLEAN GENERATED ALWAYS AS (
-    CASE 
-      WHEN expected_completion_date IS NOT NULL AND status IN ('active', 'pending') 
-      THEN expected_completion_date < CURRENT_DATE
-      ELSE false
-    END
-  ) STORED
+  -- Computed fields (updated via triggers)
+  days_active INTEGER DEFAULT 0,
+  is_overdue BOOLEAN DEFAULT false
 );
 
 -- Invoices table with Bar-specific rules
@@ -207,22 +195,9 @@ CREATE TABLE IF NOT EXISTS invoices (
   viewed_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ,
   
-  -- Computed fields
-  days_outstanding INTEGER GENERATED ALWAYS AS (
-    CASE 
-      WHEN date_paid IS NOT NULL THEN EXTRACT(DAY FROM (date_paid - invoice_date))
-      WHEN status IN ('sent', 'viewed', 'overdue') THEN EXTRACT(DAY FROM (NOW() - invoice_date))
-      ELSE NULL
-    END
-  ) STORED,
-  
-  is_overdue BOOLEAN GENERATED ALWAYS AS (
-    CASE 
-      WHEN status NOT IN ('paid', 'written_off') AND due_date < CURRENT_DATE 
-      THEN true 
-      ELSE false 
-    END
-  ) STORED
+  -- Computed fields (updated via triggers)
+  days_outstanding INTEGER DEFAULT 0,
+  is_overdue BOOLEAN DEFAULT false
 );
 
 -- Time entries with voice transcription support

@@ -5,20 +5,23 @@ import { toast } from 'react-hot-toast';
 import { InvoiceService } from '@/services/api/invoices.service';
 import { TimeEntryService } from '@/services/api/time-entries.service';
 import { DocumentIntelligenceService } from '@/services/api/document-intelligence.service';
+import { formatRand } from '../../lib/currency';
 import type { Matter, TimeEntry, InvoiceGenerationRequest } from '@/types';
 
 interface InvoiceGenerationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  matter: Matter;
+  matter?: Matter;
   onInvoiceGenerated?: () => void;
+  defaultToProForma?: boolean;
 }
 
 export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   isOpen,
   onClose,
   matter,
-  onInvoiceGenerated
+  onInvoiceGenerated,
+  defaultToProForma = false
 }) => {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
@@ -29,32 +32,78 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   const [useAINarrative, setUseAINarrative] = useState(true);
   const [previewNarrative, setPreviewNarrative] = useState('');
   const [showNarrativePreview, setShowNarrativePreview] = useState(false);
+  const [isProForma, setIsProForma] = useState(defaultToProForma);
+  const [selectedMatter, setSelectedMatter] = useState<Matter | null>(matter || null);
+  const [availableMatters, setAvailableMatters] = useState<Matter[]>([]);
 
-  // Load unbilled time entries
-  useEffect(() => {
-    if (isOpen && matter.id) {
-      loadUnbilledTimeEntries();
+  const loadAvailableMatters = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      // Mock matters for now - in real app this would fetch from API
+      const mockMatters: Matter[] = [
+        {
+          id: '1',
+          title: 'Smith v Jones Commercial Dispute',
+          clientName: 'ABC Corporation',
+          instructingAttorney: 'John Smith',
+          instructingFirm: 'Smith & Associates',
+          wipValue: 125000,
+          estimatedFee: 200000,
+          actualFee: 0,
+          status: 'ACTIVE' as any,
+          dateCreated: '2024-01-15T10:00:00Z',
+          dateModified: '2024-01-20T14:30:00Z',
+          bar: 'johannesburg' as any,
+          briefType: 'Commercial Litigation',
+          description: 'Contract dispute regarding supply agreement breach',
+          conflictCheckCompleted: true,
+          conflictCheckDate: '2024-01-14T09:00:00Z',
+          riskLevel: 'Medium',
+          settlementProbability: 72
+        }
+      ];
+      setAvailableMatters(mockMatters);
+    } catch (error) {
+      console.error('Error loading matters:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [isOpen, matter.id, loadUnbilledTimeEntries]);
+  }, []);
 
   const loadUnbilledTimeEntries = useCallback(async () => {
     try {
       setIsLoading(true);
-      const entries = await TimeEntryService.getTimeEntries({
-        matterId: matter.id,
+      if (!selectedMatter?.id) return;
+      
+      const response = await TimeEntryService.getTimeEntries({
+        matterId: selectedMatter.id,
         billable: true,
         invoiced: false
       });
-      setTimeEntries(entries);
+      setTimeEntries(response.data);
       // Select all entries by default
-      setSelectedEntries(entries.map(e => e.id));
+      setSelectedEntries(response.data.map(e => e.id));
     } catch (error) {
       console.error('Error loading unbilled time entries:', error);
       toast.error('Failed to load unbilled time entries');
     } finally {
       setIsLoading(false);
     }
-  }, [matter.id]);
+  }, [selectedMatter?.id]);
+
+  // Load available matters if no matter provided
+  useEffect(() => {
+    if (isOpen && !matter) {
+      loadAvailableMatters();
+    }
+  }, [isOpen, matter, loadAvailableMatters]);
+
+  // Load unbilled time entries
+  useEffect(() => {
+    if (isOpen && selectedMatter?.id) {
+      loadUnbilledTimeEntries();
+    }
+  }, [isOpen, selectedMatter?.id, loadUnbilledTimeEntries]);
 
   const handleEntryToggle = (entryId: string) => {
     setSelectedEntries(prev => 
@@ -73,7 +122,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
     try {
       setShowNarrativePreview(true);
       const result = await DocumentIntelligenceService.generateFeeNarrative({
-        matterId: matter.id,
+        matterId: selectedMatter?.id || '',
         timeEntryIds: selectedEntries,
         includeValuePropositions: true
       });
@@ -97,8 +146,8 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
       sum + ((entry.duration / 60) * entry.rate), 0
     );
     
-    const disbursements = matter.disbursements || 0;
-    const vatRate = matter.bar === 'Johannesburg' ? 0.15 : 0.15; // 15% VAT for both bars
+    const disbursements = selectedMatter?.disbursements || 0;
+    const vatRate = selectedMatter?.bar === 'johannesburg' ? 0.15 : 0.15; // 15% VAT for both bars
     const vatAmount = totalFees * vatRate;
     const totalAmount = totalFees + vatAmount + disbursements;
 
@@ -121,15 +170,16 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
       setIsGenerating(true);
       
       const request: InvoiceGenerationRequest = {
-        matterId: matter.id,
+        matterId: selectedMatter?.id || '',
         timeEntryIds: selectedEntries,
         customNarrative: customNarrative.trim() || undefined,
-        includeUnbilledTime
+        includeUnbilledTime,
+        isProForma: isProForma
       };
 
       await InvoiceService.generateInvoice(request);
       
-      toast.success('Invoice generated successfully');
+      toast.success(isProForma ? 'Pro forma invoice generated successfully' : 'Invoice generated successfully');
       onInvoiceGenerated?.();
       onClose();
       
@@ -160,7 +210,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
                 Generate Invoice
               </h2>
               <p className="text-sm text-neutral-600">
-                {matter.title} • {matter.clientName}
+                {selectedMatter?.title} • {selectedMatter?.clientName}
               </p>
             </div>
           </div>
@@ -175,6 +225,41 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
         <div className="flex flex-col lg:flex-row h-full max-h-[calc(90vh-80px)]">
           {/* Time Entries Selection */}
           <div className="flex-1 p-6 overflow-y-auto">
+            
+            {/* Matter Selection (if no matter provided) */}
+            {!matter && (
+              <div className="mb-6 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <h3 className="text-lg font-medium text-neutral-900 mb-4">Select Matter</h3>
+                <div className="space-y-3">
+                  {availableMatters.map((availableMatter) => (
+                    <label
+                      key={availableMatter.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        selectedMatter?.id === availableMatter.id
+                          ? 'border-mpondo-gold-500 bg-mpondo-gold-50'
+                          : 'border-neutral-200 hover:border-neutral-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="matter"
+                        checked={selectedMatter?.id === availableMatter.id}
+                        onChange={() => setSelectedMatter(availableMatter)}
+                        className="text-mpondo-gold-600 focus:ring-mpondo-gold-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-neutral-900">{availableMatter.title}</div>
+                        <div className="text-sm text-neutral-600">{availableMatter.clientName}</div>
+                        <div className="text-xs text-neutral-500">
+                          {availableMatter.bar} Bar • WIP: {formatRand(availableMatter.wipValue || 0)}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mb-6">
               <h3 className="text-lg font-medium text-neutral-900 mb-2">
                 Unbilled Time Entries
@@ -184,7 +269,11 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
               </p>
             </div>
 
-            {isLoading ? (
+            {!selectedMatter ? (
+              <div className="text-center py-8">
+                <p className="text-neutral-600">Please select a matter to view unbilled time entries</p>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-mpondo-gold-600"></div>
               </div>
@@ -234,6 +323,46 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
                 ))}
               </div>
             )}
+
+            {/* Invoice Type Selection */}
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-6">
+                <label className="block text-sm font-medium text-neutral-700">
+                  Invoice Type
+                </label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="invoiceType"
+                      checked={!isProForma}
+                      onChange={() => setIsProForma(false)}
+                      className="text-mpondo-gold-600 focus:ring-mpondo-gold-500"
+                    />
+                    <span className="text-sm text-neutral-700">Final Invoice</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="invoiceType"
+                      checked={isProForma}
+                      onChange={() => setIsProForma(true)}
+                      className="text-mpondo-gold-600 focus:ring-mpondo-gold-500"
+                    />
+                    <span className="text-sm text-neutral-700">Pro Forma Invoice</span>
+                  </label>
+                </div>
+              </div>
+              
+              {isProForma && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Pro Forma Invoice:</strong> This will create a preliminary invoice for estimation purposes. 
+                    Time entries will not be marked as billed and can be included in a final invoice later.
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Fee Narrative Section */}
             <div className="mt-6 space-y-4">
@@ -329,11 +458,11 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-2 h-2 bg-judicial-blue-500 rounded-full"></div>
                   <span className="text-sm font-medium text-neutral-700">
-                    {matter.bar} Bar
+                    {selectedMatter?.bar} Bar
                   </span>
                 </div>
                 <p className="text-xs text-neutral-600">
-                  Payment Terms: {matter.bar === 'Johannesburg' ? '60' : '90'} days
+                  Payment Terms: {selectedMatter?.bar === 'johannesburg' ? '60' : '90'} days
                 </p>
               </div>
 

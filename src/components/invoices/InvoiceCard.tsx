@@ -1,7 +1,6 @@
 import React from 'react';
 import { 
   FileText, 
-  DollarSign, 
   Clock, 
   Send, 
   CheckCircle, 
@@ -13,6 +12,8 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays, isAfter } from 'date-fns';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
+import { RandIcon } from '../icons/RandIcon';
+import { formatRand } from '../../lib/currency';
 import type { Invoice, InvoiceStatus } from '@/types';
 
 interface InvoiceCardProps {
@@ -159,7 +160,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
                       onClick={() => onRecordPayment(invoice)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
                     >
-                      <DollarSign className="w-4 h-4" />
+                      <RandIcon size={16} />
                       Record Payment
                     </button>
                   )}
@@ -176,7 +177,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
           <div>
             <p className="text-xs text-neutral-500 mb-1">Total Amount</p>
             <p className="font-semibold text-neutral-900">
-              R{invoice.totalAmount.toFixed(2)}
+              {formatRand(invoice.totalAmount)}
             </p>
           </div>
           
@@ -218,7 +219,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
             <div className="flex justify-between items-center mb-2">
               <p className="text-xs text-neutral-500">Payment Progress</p>
               <p className="text-xs text-neutral-600">
-                R{invoice.amountPaid?.toFixed(2)} / R{invoice.totalAmount.toFixed(2)}
+                {formatRand(invoice.amountPaid || 0)} / {formatRand(invoice.totalAmount)}
               </p>
             </div>
             <div className="w-full bg-neutral-200 rounded-full h-2">
@@ -262,7 +263,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
               onClick={() => onRecordPayment(invoice)}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-success-700 bg-success/10 rounded-lg hover:bg-success/20 transition-colors"
             >
-              <DollarSign className="w-3 h-3" />
+              <RandIcon size={12} />
               Payment
             </button>
           )}

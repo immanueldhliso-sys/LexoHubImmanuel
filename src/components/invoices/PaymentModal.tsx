@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { DollarSign, Calendar, CreditCard, AlertCircle } from 'lucide-react';
+import { Calendar, CreditCard, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
+import { RandIcon } from '../icons/RandIcon';
+import { formatRand } from '../../lib/currency';
 import { Modal, ModalHeader, ModalBody, ModalFooter, Input, Button } from '../../design-system/components';
 import { InvoiceService } from '@/services/api/invoices.service';
 import type { Invoice } from '@/types';
@@ -86,7 +88,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         reference: reference.trim() || undefined
       });
       
-      toast.success(`Payment of R${paymentAmount.toFixed(2)} recorded successfully`);
+      toast.success(`Payment of ${formatRand(paymentAmount)} recorded successfully`);
       onPaymentRecorded?.();
       onClose();
       
@@ -104,7 +106,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       <ModalHeader>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-success/10 rounded-lg">
-            <DollarSign className="w-5 h-5 text-success-600" />
+            <RandIcon size={20} className="text-success-600" />
           </div>
           <div>
             <h2 className="text-xl font-semibold text-neutral-900">
@@ -124,19 +126,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div>
               <p className="text-neutral-500">Total Amount</p>
               <p className="font-semibold text-neutral-900">
-                R{invoice.totalAmount.toFixed(2)}
+                {formatRand(invoice.totalAmount)}
               </p>
             </div>
             <div>
               <p className="text-neutral-500">Amount Paid</p>
               <p className="font-semibold text-neutral-900">
-                R{(invoice.amountPaid || 0).toFixed(2)}
+                {formatRand(invoice.amountPaid || 0)}
               </p>
             </div>
             <div className="col-span-2">
               <p className="text-neutral-500">Outstanding Amount</p>
               <p className="font-bold text-lg text-error-600">
-                R{outstandingAmount.toFixed(2)}
+                {formatRand(outstandingAmount)}
               </p>
             </div>
           </div>
@@ -176,7 +178,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div className="flex items-start gap-2 p-2 bg-warning-50 border border-warning-200 rounded text-xs text-warning-700">
                     <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
                     <span>
-                      This is a partial payment. Remaining balance: R{(outstandingAmount - parseFloat(amount)).toFixed(2)}
+                      This is a partial payment. Remaining balance: {formatRand(outstandingAmount - parseFloat(amount))}
                     </span>
                   </div>
                 )}
@@ -185,7 +187,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div className="flex items-start gap-2 p-2 bg-error-50 border border-error-200 rounded text-xs text-error-700">
                     <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
                     <span>
-                      Payment exceeds outstanding amount by R{(parseFloat(amount) - outstandingAmount).toFixed(2)}
+                      Payment exceeds outstanding amount by {formatRand(parseFloat(amount) - outstandingAmount)}
                     </span>
                   </div>
                 )}
@@ -244,7 +246,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           onClick={handleRecordPayment}
           disabled={!amount || !paymentDate || isRecording}
           loading={isRecording}
-          leftIcon={DollarSign}
+          leftIcon={RandIcon}
         >
           Record Payment
         </Button>
