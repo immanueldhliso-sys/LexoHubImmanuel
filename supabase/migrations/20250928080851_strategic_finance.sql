@@ -320,14 +320,27 @@ RETURNS TABLE(
 DECLARE
   v_matter_record RECORD;
   v_market_data RECORD;
+  v_is_urgent BOOLEAN := FALSE;
 BEGIN
   -- Get matter details
   SELECT * INTO v_matter_record FROM matters WHERE id = p_matter_id;
   
+  -- If no matter found, return empty result
+  IF v_matter_record IS NULL THEN
+    RETURN;
+  END IF;
+  
+  -- Determine urgency based on available fields
+  v_is_urgent := (v_matter_record.next_court_date IS NOT NULL AND 
+                  v_matter_record.next_court_date <= CURRENT_DATE + INTERVAL '30 days') OR
+                 (v_matter_record.prescription_date IS NOT NULL AND 
+                  v_matter_record.prescription_date <= CURRENT_DATE + INTERVAL '60 days') OR
+                 (v_matter_record.risk_level = 'high');
+  
   -- Get market data (simplified - in production would use ML model)
   SELECT 
-    AVG(hourly_rate) as avg_rate,
-    STDDEV(hourly_rate) as rate_stddev
+    COALESCE(AVG(hourly_rate), 2500) as avg_rate,
+    COALESCE(STDDEV(hourly_rate), 500) as rate_stddev
   INTO v_market_data
   FROM advocates
   WHERE bar = v_matter_record.bar;
@@ -337,26 +350,26 @@ BEGIN
   SELECT 
     'standard'::fee_optimization_model,
     v_market_data.avg_rate,
-    v_market_data.avg_rate * v_matter_record.estimated_fee / 1000, -- Simplified calculation
+    COALESCE(v_market_data.avg_rate * COALESCE(v_matter_record.estimated_fee, 10000) / 1000, 25000), -- Simplified calculation
     0.85::DECIMAL;
   
   -- Premium urgency model
-  IF v_matter_record.is_urgent THEN
+  IF v_is_urgent THEN
     RETURN QUERY
     SELECT 
       'premium_urgency'::fee_optimization_model,
       v_market_data.avg_rate * 1.5,
-      v_market_data.avg_rate * 1.5 * v_matter_record.estimated_fee / 1000,
+      COALESCE(v_market_data.avg_rate * 1.5 * COALESCE(v_matter_record.estimated_fee, 10000) / 1000, 37500),
       0.75::DECIMAL;
   END IF;
   
   -- Success-based model for high-value matters
-  IF v_matter_record.estimated_fee > 100000 THEN
+  IF COALESCE(v_matter_record.estimated_fee, 0) > 100000 THEN
     RETURN QUERY
     SELECT 
       'success_based'::fee_optimization_model,
       v_market_data.avg_rate * 0.7,
-      v_matter_record.estimated_fee * 0.25, -- 25% success fee
+      COALESCE(v_matter_record.estimated_fee * 0.25, 25000), -- 25% success fee
       0.65::DECIMAL;
   END IF;
 END;

@@ -1,23 +1,25 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
-import { Scale, Briefcase, FileText, BarChart3, Settings, Menu, X, Users, LogOut, Brain } from 'lucide-react';
+import { Scale, Briefcase, FileText, BarChart3, Settings, Menu, X, Users, LogOut, Brain, Mic, Shield } from 'lucide-react';
 import { Card, CardContent, Button } from './design-system/components';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoadingSpinner } from './components/design-system/components/LoadingSpinner';
-import type { Page } from './types';
+import { GlobalVoiceModal } from './components/voice/GlobalVoiceModal';
+import type { Page, ExtractedTimeEntryData, Matter } from './types';
 import {
   DashboardPage,
   MattersPage,
   InvoicesPage,
-  ProFormaPage,
   ReportsPage,
   SettingsPage,
   ProfilePage,
   PricingManagementPage,
   WorkflowIntegrationsPage,
-  AIAnalyticsDashboard
+  AIAnalyticsDashboard,
+  ProFormaPage,
+  CompliancePage
 } from './pages';
 import { PracticeGrowthPage } from './pages/PracticeGrowthPage';
 import { StrategicFinancePage } from './pages/StrategicFinancePage';
@@ -125,6 +127,7 @@ const Navigation: React.FC<{
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'proforma', label: 'Pro Forma', icon: FileText },
     { id: 'pricing-management', label: 'Pricing', icon: Scale },
+    { id: 'compliance', label: 'Compliance', icon: Shield },
     // Advanced features (will be filtered based on user preferences)
     { id: 'ai-analytics', label: 'AI Analytics', icon: Brain },
     { id: 'strategic-finance', label: 'Finance', icon: Scale },
@@ -156,6 +159,7 @@ const Navigation: React.FC<{
           { id: 'invoices', label: 'Invoices', icon: FileText },
           { id: 'proforma', label: 'Pro Forma', icon: FileText },
           { id: 'pricing-management', label: 'Pricing', icon: Scale },
+          { id: 'compliance', label: 'Compliance', icon: Shield },
           { id: 'settings', label: 'Settings', icon: Settings },
         ]);
       }
@@ -198,7 +202,7 @@ const Navigation: React.FC<{
       } catch (error) {
         console.error('Error validating page access:', error);
         // Fallback to direct navigation for core pages
-        const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'settings', 'profile'];
+        const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'compliance', 'settings', 'profile'];
         if (corePages.includes(pageId)) {
           onPageChange(pageId as Page);
         }
@@ -330,6 +334,7 @@ const AppContent: React.FC = () => {
   type AppUiState = {
     activePage: Page;
     sidebarOpen: boolean;
+    voiceModalOpen: boolean;
     user: {
       id: string;
       name: string;
@@ -342,6 +347,7 @@ const AppContent: React.FC = () => {
   const [appState, setAppState] = useState<AppUiState>({
     activePage: 'dashboard',
     sidebarOpen: false,
+    voiceModalOpen: false,
     user: {
       id: '1',
       name: 'John Advocate',
@@ -350,6 +356,73 @@ const AppContent: React.FC = () => {
       avatar: '/api/placeholder/40/40'
     }
   });
+
+  // Voice capture feature flag
+  const [isVoiceCaptureEnabled, setIsVoiceCaptureEnabled] = useState(false);
+  const [availableMatters, setAvailableMatters] = useState<Matter[]>([]);
+
+  // Check voice capture feature flag
+  useEffect(() => {
+    const checkVoiceFeature = () => {
+      const isEnabled = import.meta.env.VITE_ENABLE_VOICE_CAPTURE === 'true';
+      setIsVoiceCaptureEnabled(isEnabled);
+    };
+
+    checkVoiceFeature();
+  }, []);
+
+  // Load available matters for voice processing
+  useEffect(() => {
+    const loadMatters = async () => {
+      try {
+        // Import matters service dynamically
+        const { mattersService } = await import('./services/api/matters.service');
+        
+        // Check if service is properly loaded
+        if (!mattersService || typeof mattersService.getMatters !== 'function') {
+          throw new Error('Matters service not properly initialized');
+        }
+        
+        const response = await mattersService.getMatters();
+        if (response?.data) {
+          setAvailableMatters(response.data);
+        } else {
+          console.warn('No matters data received from service');
+          setAvailableMatters([]);
+        }
+      } catch (error) {
+        console.error('Error loading matters for voice processing:', error);
+        // Set empty array as fallback to prevent UI issues
+        setAvailableMatters([]);
+      }
+    };
+
+    if (isVoiceCaptureEnabled) {
+      loadMatters();
+    }
+  }, [isVoiceCaptureEnabled]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl/Cmd + Shift + V to open voice modal
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'V') {
+        event.preventDefault();
+        if (isVoiceCaptureEnabled) {
+          setAppState(prev => ({ ...prev, voiceModalOpen: true }));
+        }
+      }
+
+      // Escape to close voice modal
+      if (event.key === 'Escape' && appState.voiceModalOpen) {
+        event.preventDefault();
+        setAppState(prev => ({ ...prev, voiceModalOpen: false }));
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isVoiceCaptureEnabled, appState.voiceModalOpen]);
 
   // Initialize feature system and set up redirect handler
   useEffect(() => {
@@ -412,7 +485,7 @@ const AppContent: React.FC = () => {
     } catch (error) {
       console.error('Error validating page access:', error);
       // Fallback to direct navigation for core pages
-      const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'settings', 'profile'];
+      const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'compliance', 'settings', 'profile'];
       if (corePages.includes(page)) {
         setAppState(prev => ({ ...prev, activePage: page }));
       }
@@ -421,6 +494,53 @@ const AppContent: React.FC = () => {
 
   const handleToggleSidebar = useCallback(() => {
     setAppState(prev => ({ ...prev, sidebarOpen: !prev.sidebarOpen }));
+  }, []);
+
+  const handleOpenVoiceModal = useCallback(() => {
+    if (isVoiceCaptureEnabled) {
+      setAppState(prev => ({ ...prev, voiceModalOpen: true }));
+    }
+  }, [isVoiceCaptureEnabled]);
+
+  const handleCloseVoiceModal = useCallback(() => {
+    setAppState(prev => ({ ...prev, voiceModalOpen: false }));
+  }, []);
+
+  const handleTimeEntryExtracted = useCallback(async (data: ExtractedTimeEntryData) => {
+    try {
+      // Import time entries service dynamically
+      const { timeEntriesService } = await import('./services/api/time-entries.service');
+      
+      // Create time entry from extracted data
+      const timeEntryData = {
+        matter_id: data.matterId || null,
+        description: data.description,
+        duration_minutes: data.duration || 0,
+        work_type: data.workType || 'General',
+        date: data.date || new Date().toISOString().split('T')[0],
+        is_billable: true, // Default to billable
+        rate_per_hour: null, // Will be set based on matter/user defaults
+        total_amount: null, // Will be calculated
+        notes: `Voice captured entry (${Math.round(data.confidence * 100)}% confidence)`
+      };
+
+      const response = await timeEntriesService.createTimeEntry(timeEntryData);
+      
+      if (response.data) {
+        // Show success notification
+        const { toast } = await import('react-hot-toast');
+        toast.success('Time entry created successfully from voice capture!');
+        
+        // Navigate to matters page to show the new entry
+        setAppState(prev => ({ ...prev, activePage: 'matters' }));
+      } else {
+        throw new Error(response.error || 'Failed to create time entry');
+      }
+    } catch (error) {
+      console.error('Error creating time entry from voice:', error);
+      const { toast } = await import('react-hot-toast');
+      toast.error('Failed to create time entry. Please try again.');
+    }
   }, []);
 
   // Close sidebar when clicking outside on mobile
@@ -457,6 +577,8 @@ const AppContent: React.FC = () => {
         return <ProfilePage />;
       case 'pricing-management':
         return <PricingManagementPage />;
+      case 'compliance':
+        return <CompliancePage />;
       case 'settings':
         return <SettingsPage />;
       
@@ -520,6 +642,45 @@ const AppContent: React.FC = () => {
             {renderPage()}
           </Suspense>
         </MainLayout>
+        
+        {/* Global Voice Modal */}
+        {isVoiceCaptureEnabled && (
+          <GlobalVoiceModal
+            isOpen={appState.voiceModalOpen}
+            onClose={handleCloseVoiceModal}
+            onTimeEntryExtracted={handleTimeEntryExtracted}
+            availableMatters={availableMatters}
+          />
+        )}
+
+        {/* Mobile Voice FAB */}
+        {isVoiceCaptureEnabled && (
+          <button
+            onClick={handleOpenVoiceModal}
+            className="fixed bottom-6 right-6 z-40 lg:hidden w-14 h-14 bg-mpondo-gold-600 hover:bg-mpondo-gold-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+            aria-label="Open voice capture"
+            title="Voice Capture (Ctrl+Shift+V)"
+          >
+            <Mic className="w-6 h-6" />
+          </button>
+        )}
+
+        {/* Desktop Voice Shortcut Indicator */}
+        {isVoiceCaptureEnabled && (
+          <div className="hidden lg:block fixed bottom-6 right-6 z-30">
+            <div className="bg-neutral-900 text-white px-3 py-2 rounded-lg text-sm shadow-lg opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+              Press Ctrl+Shift+V for voice capture
+            </div>
+            <button
+              onClick={handleOpenVoiceModal}
+              className="mt-2 w-12 h-12 bg-mpondo-gold-600 hover:bg-mpondo-gold-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+              aria-label="Open voice capture"
+              title="Voice Capture (Ctrl+Shift+V)"
+            >
+              <Mic className="w-5 h-5" />
+            </button>
+          </div>
+        )}
         
         {/* Feature Discovery Notification */}
         <FeatureDiscoveryNotification 

@@ -244,6 +244,60 @@ export interface TimeEntry {
   deleted_at?: string;
 }
 
+// Pro Forma Types
+export enum ProFormaStatus {
+  DRAFT = 'draft',
+  SENT = 'sent',
+  AWAITING_ACCEPTANCE = 'awaiting_acceptance',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+  EXPIRED = 'expired',
+  CONVERTED_TO_INVOICE = 'converted_to_invoice'
+}
+
+export interface ProForma {
+  id: string;
+  matter_id: string;
+  advocate_id: string;
+  quote_number: string;
+  quote_date: string;
+  valid_until: string;
+  fee_narrative: string;
+  total_amount: number;
+  status: ProFormaStatus;
+  created_at: string;
+  updated_at: string;
+  sent_at?: string;
+  accepted_at?: string;
+  declined_at?: string;
+  converted_at?: string;
+  notes?: string;
+}
+
+export interface ProFormaGenerationRequest {
+  matter_id: string;
+  fee_narrative: string;
+  total_amount: number;
+  valid_until: string;
+  quote_date: string;
+  notes?: string;
+}
+
+export interface ProFormaFilters {
+  search: string;
+  status: ProFormaStatus | 'all';
+  dateRange?: { start: string; end: string } | null;
+}
+
+export interface ProFormaSummaryStats {
+  totalCount: number;
+  estimatedValue: number;
+  currentMonthCount: number;
+  conversionRate: number;
+  averageValue: number;
+  pendingAcceptance: number;
+}
+
 // User is now an alias for Advocate for backward compatibility
 export type User = Advocate;
 
@@ -384,22 +438,7 @@ export interface InvoiceFilters {
   paymentMethod?: PaymentMethod[];
 }
 
-export interface ProFormaFilters {
-  search: string;
-  status: 'all' | 'active' | 'converted' | 'expired';
-  dateRange: {
-    start: string;
-    end: string;
-  } | null;
-}
 
-export interface ProFormaSummaryStats {
-  totalCount: number;
-  estimatedValue: number;
-  currentMonthCount: number;
-  conversionRate: number;
-  averageValue: number;
-}
 
 export interface SortConfig<T> {
   field: keyof T;
@@ -949,3 +988,425 @@ export interface CashFlowPrediction {
 
 // Workflow Page Types
 export type WorkflowPage = 'court-diary' | 'judge-analytics' | 'voice-assistant' | 'integrations';
+
+// Enhanced Invoice Generation Types
+export interface InvoiceGenerationOptions {
+  matterId: string;
+  includeTimeEntries: string[]; // time_entry IDs
+  includeExpenses: string[]; // expense IDs
+  feeStructureOverride?: FeeStructure;
+  narrative?: string;
+  discountAmount?: number;
+  discountPercentage?: number;
+}
+
+export interface FeeStructure {
+  id?: string;
+  name: string;
+  type: FeeType;
+  hourlyRate?: number;
+  fixedFee?: number;
+  contingencyPercentage?: number;
+  successFeePercentage?: number;
+  minimumFee?: number;
+  maximumFee?: number;
+  vatRate: number;
+  description?: string;
+  isDefault?: boolean;
+}
+
+export interface Expense {
+  id: string;
+  matter_id: string;
+  advocate_id: string;
+  invoice_id?: string;
+  date: string;
+  description: string;
+  category: ExpenseCategory;
+  amount: number;
+  vat_amount?: number;
+  receipt_url?: string;
+  billable: boolean;
+  billed: boolean;
+  write_off: boolean;
+  write_off_reason?: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export enum ExpenseCategory {
+  TRAVEL = 'travel',
+  ACCOMMODATION = 'accommodation',
+  MEALS = 'meals',
+  COURT_FEES = 'court_fees',
+  FILING_FEES = 'filing_fees',
+  EXPERT_FEES = 'expert_fees',
+  PHOTOCOPYING = 'photocopying',
+  POSTAGE = 'postage',
+  TELEPHONE = 'telephone',
+  RESEARCH = 'research',
+  OTHER = 'other'
+}
+
+// Fee Narrative Generator Types
+export interface NarrativePrompt {
+  litigation: string;
+  advisory: string;
+}
+
+export interface NarrativeGenerationRequest {
+  matterTitle: string;
+  services: string[];
+  totalHours: number;
+  matterType: 'litigation' | 'advisory';
+  complexity?: 'low' | 'medium' | 'high';
+  clientType?: ClientType;
+  customInstructions?: string;
+}
+
+export interface NarrativeGenerationResponse {
+  narrative: string;
+  confidence: number;
+  suggestions: string[];
+  compliance_notes: string[];
+}
+
+// PDF Generation Types
+export interface PDFGenerationOptions {
+  includeHeader?: boolean;
+  includeFirmDetails?: boolean;
+  includeClientDetails?: boolean;
+  includePaymentTerms?: boolean;
+  includeBankingDetails?: boolean;
+  watermark?: string;
+  customFooter?: string;
+  logoUrl?: string;
+}
+
+export interface PDFDocumentInfo {
+  title: string;
+  subject: string;
+  author: string;
+  creator: string;
+  producer: string;
+  keywords?: string[];
+}
+
+export interface FirmDetails {
+  name: string;
+  address: string[];
+  phone: string;
+  email: string;
+  website?: string;
+  vatNumber: string;
+  practiceNumber: string;
+  barAssociation: BarAssociation;
+  logo?: string;
+}
+
+export interface BankingDetails {
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  branchCode: string;
+  swiftCode?: string;
+  reference: string;
+}
+
+export interface PaymentTerms {
+  paymentDays: number;
+  lateFeePercentage?: number;
+  discountDays?: number;
+  discountPercentage?: number;
+  additionalTerms?: string[];
+}
+
+// Email Service Types
+export interface EmailAttachment {
+  filename: string;
+  content: Blob | Buffer | string;
+  contentType: string;
+  encoding?: string;
+}
+
+export interface EmailTemplate {
+  subject: string;
+  body: string;
+  isHtml?: boolean;
+}
+
+export interface EmailSendRequest {
+  to: string | string[];
+  cc?: string | string[];
+  bcc?: string | string[];
+  subject: string;
+  body: string;
+  isHtml?: boolean;
+  attachments?: EmailAttachment[];
+  replyTo?: string;
+  priority?: 'low' | 'normal' | 'high';
+}
+
+export interface EmailSendResponse {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  timestamp: string;
+}
+
+export interface ProFormaEmailOptions {
+  recipientEmail: string;
+  message?: string;
+  includePaymentInstructions?: boolean;
+  customSubject?: string;
+  sendCopy?: boolean;
+}
+
+export interface InvoiceEmailOptions {
+  recipientEmail: string;
+  message?: string;
+  includePaymentReminder?: boolean;
+  customSubject?: string;
+  sendCopy?: boolean;
+  isReminder?: boolean;
+  reminderNumber?: number;
+}
+
+// Line Items for Invoices/Pro Formas
+export interface LineItem {
+  id?: string;
+  description: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+  vatRate?: number;
+  vatAmount?: number;
+  type: 'time_entry' | 'expense' | 'fixed_fee' | 'disbursement';
+  reference_id?: string; // Links to time_entry or expense
+  date?: string;
+}
+
+// Enhanced Invoice interface with line items
+export interface InvoiceWithLineItems extends Invoice {
+  line_items: LineItem[];
+  firm_details?: FirmDetails;
+  banking_details?: BankingDetails;
+  payment_terms?: PaymentTerms;
+  is_pro_forma?: boolean;
+  converted_to_invoice_id?: string;
+  pro_forma_accepted_at?: string;
+}
+
+// Service Response Types
+export interface ServiceResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  timestamp: string;
+}
+
+export interface PDFGenerationResult {
+  blob: Blob;
+  filename: string;
+  size: number;
+  pages: number;
+}
+
+// Bar Council Compliance Types
+export interface BarComplianceCheck {
+  isCompliant: boolean;
+  violations: string[];
+  warnings: string[];
+  recommendations: string[];
+  checkedAt: string;
+}
+
+export interface BarComplianceRules {
+  maxHourlyRate?: number;
+  requiredDisclosures: string[];
+  mandatoryTerms: string[];
+  prohibitedPractices: string[];
+  vatRequirements: {
+    mustShowVatNumber: boolean;
+    mustShowVatBreakdown: boolean;
+    exemptionRules: string[];
+  };
+}
+
+// Advanced Compliance Engine Types
+export enum ComplianceAlertType {
+  TRUST_ACCOUNT = 'trust_account',
+  ETHICS = 'ethics',
+  DEADLINE = 'deadline',
+  FINANCIAL = 'financial',
+  REGULATORY = 'regulatory',
+  CONFLICT = 'conflict',
+  DOCUMENTATION = 'documentation'
+}
+
+export enum ComplianceAlertSeverity {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical'
+}
+
+export enum ComplianceAlertStatus {
+  ACTIVE = 'active',
+  ACKNOWLEDGED = 'acknowledged',
+  RESOLVED = 'resolved',
+  DISMISSED = 'dismissed'
+}
+
+export enum ComplianceRequirementType {
+  TRUST_ACCOUNT_RECONCILIATION = 'trust_account_reconciliation',
+  ANNUAL_RETURN = 'annual_return',
+  CPD_COMPLIANCE = 'cpd_compliance',
+  INSURANCE_RENEWAL = 'insurance_renewal',
+  PRACTICE_CERTIFICATE = 'practice_certificate',
+  ETHICS_DECLARATION = 'ethics_declaration',
+  FINANCIAL_AUDIT = 'financial_audit',
+  REGULATORY_FILING = 'regulatory_filing'
+}
+
+export enum ComplianceViolationType {
+  TRUST_ACCOUNT_SHORTAGE = 'trust_account_shortage',
+  OVERDUE_RECONCILIATION = 'overdue_reconciliation',
+  MISSING_DOCUMENTATION = 'missing_documentation',
+  ETHICS_BREACH = 'ethics_breach',
+  REGULATORY_NON_COMPLIANCE = 'regulatory_non_compliance',
+  FINANCIAL_IRREGULARITY = 'financial_irregularity',
+  DEADLINE_MISSED = 'deadline_missed'
+}
+
+export interface ComplianceAlert {
+  id: string;
+  advocate_id: string;
+  matter_id?: string;
+  alert_type: ComplianceAlertType;
+  severity: ComplianceAlertSeverity;
+  status: ComplianceAlertStatus;
+  title: string;
+  description: string;
+  recommendation?: string;
+  due_date?: string;
+  resolved_at?: string;
+  resolved_by?: string;
+  resolution_notes?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ComplianceDeadline {
+  id: string;
+  requirement_id: string;
+  advocate_id: string;
+  matter_id?: string;
+  requirement_type: ComplianceRequirementType;
+  title: string;
+  description: string;
+  due_date: string;
+  reminder_dates: string[];
+  is_recurring: boolean;
+  recurrence_pattern?: string;
+  completed: boolean;
+  completed_at?: string;
+  completed_by?: string;
+  completion_notes?: string;
+  auto_generated: boolean;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ComplianceViolation {
+  id: string;
+  alert_id?: string;
+  advocate_id: string;
+  matter_id?: string;
+  violation_type: ComplianceViolationType;
+  severity: ComplianceAlertSeverity;
+  title: string;
+  description: string;
+  detected_at: string;
+  resolved_at?: string;
+  resolution_action?: string;
+  financial_impact?: number;
+  regulatory_reference?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ComplianceRequirement {
+  id: string;
+  advocate_id: string;
+  requirement_type: ComplianceRequirementType;
+  title: string;
+  description: string;
+  frequency: 'once' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
+  is_mandatory: boolean;
+  bar_specific: boolean;
+  applicable_bars: BarAssociation[];
+  compliance_criteria?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ComplianceDashboardStats {
+  totalAlerts: number;
+  criticalAlerts: number;
+  upcomingDeadlines: number;
+  overdueDeadlines: number;
+  activeViolations: number;
+  complianceScore: number;
+  lastAuditDate?: string;
+  nextAuditDate?: string;
+  trustAccountBalance?: number;
+  trustAccountLastReconciled?: string;
+}
+
+export interface ComplianceFilters {
+  alertType?: ComplianceAlertType[];
+  severity?: ComplianceAlertSeverity[];
+  status?: ComplianceAlertStatus[];
+  dateRange?: { start: string; end: string };
+  search?: string;
+  matterId?: string;
+  requirementType?: ComplianceRequirementType[];
+  violationType?: ComplianceViolationType[];
+}
+
+export interface ComplianceAuditLog {
+  id: string;
+  advocate_id: string;
+  action: string;
+  entity_type: 'alert' | 'deadline' | 'violation' | 'requirement';
+  entity_id: string;
+  old_values?: Record<string, unknown>;
+  new_values?: Record<string, unknown>;
+  performed_by: string;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+}
+
+// Add compliance page to the Page type
+export type Page =
+  | 'dashboard'
+  | 'ai-analytics'
+  | 'matters'
+  | 'invoices'
+  | 'proforma'
+  | 'reports'
+  | 'practice-growth'
+  | 'strategic-finance'
+  | 'workflow-integrations'
+  | 'compliance'
+  | 'settings'
+  | 'design-system'
+  | 'matter-details'
+  | 'pricing-management'
+  | 'profile';

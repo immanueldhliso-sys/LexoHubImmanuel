@@ -37,6 +37,8 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import LexoHubBGhd from '../Public/Assets/LexoHubBGhd.jpg';
+import { validateEmail, validatePassword, validateName } from '../utils/validation';
+import { authService } from '../services/auth.service';
 
 // --- Global Styles for Advanced Effects ---
 const GlobalStyles = () => (
@@ -119,41 +121,7 @@ const SignupBgImage = LexoHubBGhd;
 type AuthMode = 'signin' | 'signup';
 type UserType = 'junior' | 'senior';
 
-// Smart Form validation utilities
-const validateEmail = (email: string): { isValid: boolean; message?: string; warning?: string } => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email) return { isValid: false, message: 'Email is required' };
-  if (!emailRegex.test(email)) return { isValid: false, message: 'Please enter a valid email address' };
-  
-  const personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com'];
-  const domain = email.split('@')[1];
-  if (personalDomains.includes(domain)) {
-    return { isValid: true, warning: 'For best results, consider using your professional email.' };
-  }
-  
-  return { isValid: true };
-};
-
-const validatePassword = (password: string): { isValid: boolean; message?: string; strength?: number } => {
-  if (!password) return { isValid: false, message: 'Password is required', strength: 0 };
-  if (password.length < 8) return { isValid: false, message: 'Password must be at least 8 characters', strength: 1 };
-  
-  let strength = 0;
-  if (password.length >= 8) strength++;
-  if (/[A-Z]/.test(password)) strength++;
-  if (/[a-z]/.test(password)) strength++;
-  if (/[0-9]/.test(password)) strength++;
-  if (/[^A-Za-z0-9]/.test(password)) strength++;
-  
-  if (strength < 3) return { isValid: false, message: 'Password is too weak', strength };
-  return { isValid: true, strength };
-};
-
-const validateName = (name: string): { isValid: boolean; message?: string } => {
-  if (!name) return { isValid: false, message: 'Full name is required' };
-  if (name.trim().length < 2) return { isValid: false, message: 'Please enter your full name' };
-  return { isValid: true };
-};
+// Smart Form validation utilities are centralized in ../utils/validation
 
 // Form Input Component
 interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -314,7 +282,7 @@ const SkeletonAuthPage = () => (
 
 
 const LoginPage = () => {
-  const { signIn, signUp, loading } = useAuth();
+  const { signIn, signUp, signInWithMagicLink, loading } = useAuth();
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [selectedType, setSelectedType] = useState<UserType | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -369,7 +337,7 @@ const LoginPage = () => {
       if (authMode === 'signin') {
         const { error } = await signIn(formData.email, formData.password);
         if (error) {
-          const message = error.message || 'Failed to sign in';
+          const message = authService.getFriendlyErrorMessage(error);
           setError(message);
           toast.error(message);
         } else {
@@ -382,7 +350,7 @@ const LoginPage = () => {
         const metadata = { user_type: selectedType as 'junior' | 'senior', /* other metadata */ };
         const { error } = await signUp(formData.email, formData.password, metadata);
         if (error) {
-          const message = error.message || 'Failed to create account';
+          const message = authService.getFriendlyErrorMessage(error);
           setError(message);
           toast.error(message);
         } else {
@@ -400,6 +368,34 @@ const LoginPage = () => {
     }
   };
 
+  const handleSendMagicLink = async () => {
+    setShowValidation(true);
+    if (!emailValidation.isValid) {
+      const msg = emailValidation.message || 'Please enter a valid email.';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { error } = await signInWithMagicLink(formData.email);
+      if (error) {
+        const message = authService.getFriendlyErrorMessage(error);
+        setError(message);
+        toast.error(message);
+      } else {
+        setSuccess('Magic link sent. Check your email to sign in.');
+        toast.success('Magic link sent. Check your email.');
+      }
+    } catch (e) {
+      const message = 'Failed to send magic link. Please try again.';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDemoLogin = async (type: UserType) => {
     setIsSubmitting(true);
     setError('');
@@ -408,7 +404,9 @@ const LoginPage = () => {
       // Create demo user data
       const demoUser = {
         id: `demo-${type}-${Date.now()}`,
-        email: type === 'junior' ? 'demo.junior@lexo.co.za' : 'demo.senior@lexo.co.za',
+        email: type === 'junior'
+          ? (import.meta.env.VITE_DEMO_JUNIOR_EMAIL ?? 'demo.junior@lexo.co.za')
+          : (import.meta.env.VITE_DEMO_SENIOR_EMAIL ?? 'demo.senior@lexo.co.za'),
         user_metadata: {
           full_name: type === 'junior' ? 'Demo Junior Advocate' : 'Demo Senior Counsel',
           user_type: type,
@@ -621,7 +619,7 @@ const LoginPage = () => {
                             <input type="checkbox" id="rememberMe-senior" checked={formData.rememberMe} onChange={(e) => handleInputChange('rememberMe', e.target.checked)} className="rounded bg-white/20 border-white/30 text-amber-500 focus:ring-amber-500" />
                             <label htmlFor="rememberMe-senior" className="text-xs text-white/80">Remember me</label>
                           </div>
-                          <a href="#" className="text-xs text-amber-300 hover:underline">Forgot password?</a>
+                          <button type="button" onClick={handleSendMagicLink} className="text-xs text-amber-300 hover:underline">Email me a magic link</button>
                       </div>
                   )}
                   

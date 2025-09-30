@@ -1,218 +1,464 @@
 /**
- * Natural Language Processing Service
- * Extracts structured time entry data from transcribed voice notes
+ * Enhanced Natural Language Processing Service
+ * Integrates AWS Claude with comprehensive fallback to traditional NLP
+ * Includes robust error handling and retry mechanisms
  */
 
-import type { ExtractedTimeEntryData, Matter } from '../types';
+import { awsBedrockService, ExtractedTimeEntry } from './aws-bedrock.service';
 
-export interface MatterReference {
-  type: 'client_name' | 'matter_number' | 'case_name' | 'attorney_name';
-  value: string;
-  confidence: number;
-  position: { start: number; end: number };
+export interface ExtractedTimeEntryData {
+  duration?: {
+    hours?: number;
+    minutes?: number;
+    total_minutes?: number;
+    confidence: number;
+    raw_text?: string;
+  };
+  date?: {
+    date?: string;
+    confidence: number;
+    raw_text?: string;
+  };
+  work_type?: {
+    category?: string;
+    confidence: number;
+    raw_text?: string;
+  };
+  matter_reference?: {
+    reference?: string;
+    confidence: number;
+    raw_text?: string;
+  };
+  description?: {
+    cleaned_text?: string;
+    confidence: number;
+  };
+  overall_confidence: number;
+  extraction_method: 'claude' | 'traditional' | 'hybrid';
+  errors?: string[];
+  warnings?: string[];
 }
 
-export interface WorkTypeCategory {
-  category: string;
-  subcategory?: string;
-  confidence: number;
-  billableRate?: number;
+export interface Matter {
+  id: string;
+  title: string;
+  client_name: string;
+  attorney: string;
+  brief_type?: string;
 }
 
-export class NLPProcessor {
-  private durationPatterns = [
-    // Hours patterns
-    /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/gi,
-    /(\d+)\s*(?:and\s*)?(\d+)\s*(?:minutes?|mins?|m)\s*(?:hours?|hrs?|h)/gi,
-    // Minutes patterns
-    /(\d+)\s*(?:minutes?|mins?|m)\b/gi,
-    // Combined patterns
-    /(\d+)\s*(?:hours?|hrs?|h)\s*(?:and\s*)?(\d+)\s*(?:minutes?|mins?|m)/gi,
-    // Decimal hours
-    /(\d+\.\d+)\s*(?:hours?|hrs?|h)/gi
+export interface ProcessingOptions {
+  forceTraditionalNLP?: boolean;
+  enableFallback?: boolean;
+  confidenceThreshold?: number;
+  maxRetries?: number;
+}
+
+class NLPProcessor {
+  private readonly workTypes = [
+    'research', 'drafting', 'meeting', 'consultation', 'review', 'court', 'filing',
+    'correspondence', 'preparation', 'analysis', 'negotiation', 'administration'
   ];
 
-  private datePatterns = [
-    // Today, yesterday, etc.
-    /\b(?:today|yesterday|this\s+morning|this\s+afternoon|earlier)\b/gi,
-    // Specific dates
-    /\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/g,
-    /\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{2,4})\b/gi,
-    // Days of week
-    /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
-    // Relative dates
-    /\b(\d+)\s+days?\s+ago\b/gi,
-    /\blast\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi
-  ];
-
-  private workTypeKeywords = {
-    'Research': ['research', 'researching', 'looked up', 'investigating', 'studying', 'reviewing case law'],
-    'Drafting': ['draft', 'drafting', 'writing', 'preparing', 'document preparation'],
-    'Client Meeting': ['client meeting', 'consultation', 'client call', 'meeting with client'],
-    'Court Appearance': ['court', 'hearing', 'appearance', 'trial', 'motion hearing'],
-    'Document Review': ['review', 'reviewing', 'analyzed', 'examining documents'],
-    'Correspondence': ['email', 'letter', 'correspondence', 'communication'],
-    'Negotiation': ['negotiation', 'negotiating', 'settlement discussions'],
-    'Travel': ['travel', 'traveling', 'driving to court', 'commute'],
-    'Administrative': ['admin', 'administrative', 'filing', 'organizing']
+  private readonly workTypeKeywords = {
+    research: ['research', 'investigate', 'study', 'analyze', 'examine', 'look into', 'find out'],
+    drafting: ['draft', 'write', 'prepare', 'compose', 'create', 'document'],
+    meeting: ['meeting', 'meet', 'discuss', 'conference', 'call', 'zoom', 'teams'],
+    consultation: ['consult', 'advise', 'counsel', 'guidance', 'opinion'],
+    review: ['review', 'check', 'examine', 'assess', 'evaluate', 'go through'],
+    court: ['court', 'hearing', 'trial', 'appearance', 'proceeding'],
+    filing: ['file', 'submit', 'lodge', 'register'],
+    correspondence: ['email', 'letter', 'correspond', 'communicate', 'reply'],
+    preparation: ['prepare', 'ready', 'organize', 'arrange', 'set up'],
+    analysis: ['analyze', 'breakdown', 'interpret', 'evaluate'],
+    negotiation: ['negotiate', 'bargain', 'discuss terms', 'settlement'],
+    administration: ['admin', 'administrative', 'organize', 'manage', 'coordinate']
   };
 
-  private clientPatterns = [
-    /(?:for|with|regarding)\s+([A-Z][a-zA-Z\s&]+(?:Ltd|Pty|Inc|Corporation|Company|Corp)?)/g,
-    /([A-Z][a-zA-Z\s&]+(?:Ltd|Pty|Inc|Corporation|Company|Corp))\s+(?:matter|case)/gi,
-    /client\s+([A-Z][a-zA-Z\s&]+)/gi
-  ];
-
   /**
-   * Extract structured time entry data from transcribed text
+   * Extract time entry data with Claude as primary method and traditional NLP as fallback
    */
-  async extractTimeEntryData(text: string, availableMatters?: Matter[]): Promise<ExtractedTimeEntryData> {
-    const cleanText = this.preprocessText(text);
-    
-    const duration = this.extractDuration(cleanText);
-    const date = this.extractDate(cleanText);
-    const workType = this.categorizeWorkType(cleanText);
-    const matterReferences = this.identifyMatterReferences(cleanText, availableMatters);
-    
-    // Calculate overall confidence based on extracted fields
-    const confidence = this.calculateConfidence({
-      duration,
-      date,
-      workType,
-      matterReferences,
-      textLength: cleanText.length
-    });
+  async extractTimeEntryData(
+    transcription: string, 
+    availableMatters: Matter[] = [],
+    options: ProcessingOptions = {}
+  ): Promise<ExtractedTimeEntryData> {
+    const {
+      forceTraditionalNLP = false,
+      enableFallback = true,
+      confidenceThreshold = 0.6,
+      maxRetries = 2
+    } = options;
 
-    return {
-      duration: duration?.value,
-      description: this.generateDescription(cleanText, workType),
-      workType: workType?.category,
-      date: date?.value,
-      confidence,
-      matterId: matterReferences.length > 0 ? matterReferences[0].matterId : undefined,
-      clientName: matterReferences.length > 0 ? matterReferences[0].clientName : undefined,
-      extractedFields: {
-        duration: duration ? { value: duration.value, confidence: duration.confidence } : undefined,
-        description: { value: cleanText, confidence: 0.9 },
-        date: date ? { value: date.value, confidence: date.confidence } : undefined,
-        matter: matterReferences.length > 0 ? {
-          value: matterReferences[0].clientName || matterReferences[0].matterId || '',
-          confidence: matterReferences[0].confidence
-        } : undefined
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Force traditional NLP if requested
+    if (forceTraditionalNLP) {
+      console.log('Using traditional NLP processing (forced)');
+      return this.extractWithTraditionalNLP(transcription, availableMatters);
+    }
+
+    // Try Claude extraction first
+    try {
+      const claudeResult = await this.extractWithClaude(transcription, availableMatters, maxRetries);
+      
+      if (claudeResult.success && claudeResult.data) {
+        const convertedData = this.convertClaudeToExtractedData(claudeResult.data, transcription);
+        
+        // Check if Claude result meets confidence threshold
+        if (convertedData.overall_confidence >= confidenceThreshold) {
+          console.log(`Claude extraction successful with confidence: ${convertedData.overall_confidence}`);
+          return {
+            ...convertedData,
+            extraction_method: 'claude'
+          };
+        } else {
+          warnings.push(`Claude confidence (${convertedData.overall_confidence}) below threshold (${confidenceThreshold})`);
+        }
+      } else {
+        errors.push(claudeResult.error || 'Claude extraction failed');
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown Claude error';
+      errors.push(`Claude extraction error: ${errorMessage}`);
+      console.error('Claude extraction failed:', errorMessage);
+    }
+
+    // Fallback to traditional NLP if enabled
+    if (enableFallback) {
+      console.log('Falling back to traditional NLP processing');
+      try {
+        const traditionalResult = this.extractWithTraditionalNLP(transcription, availableMatters);
+        
+        return {
+          ...traditionalResult,
+          extraction_method: errors.length > 0 ? 'traditional' : 'hybrid',
+          errors: errors.length > 0 ? errors : undefined,
+          warnings: warnings.length > 0 ? warnings : undefined
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown traditional NLP error';
+        errors.push(`Traditional NLP error: ${errorMessage}`);
+        console.error('Traditional NLP fallback failed:', errorMessage);
+      }
+    }
+
+    // If all methods fail, return minimal data
+    return {
+      description: {
+        cleaned_text: transcription,
+        confidence: 0.1
+      },
+      overall_confidence: 0.1,
+      extraction_method: 'traditional',
+      errors,
+      warnings: warnings.length > 0 ? warnings : undefined
     };
   }
 
   /**
-   * Extract duration from text
+   * Extract using AWS Claude with retry logic
    */
-  private extractDuration(text: string): { value: number; confidence: number } | null {
-    let bestMatch: { value: number; confidence: number } | null = null;
-    let highestConfidence = 0;
-
-    for (const pattern of this.durationPatterns) {
-      const matches = Array.from(text.matchAll(pattern));
-      
-      for (const match of matches) {
-        let minutes = 0;
-        let confidence = 0.8;
-
-        if (match[0].toLowerCase().includes('hour')) {
-          // Hours pattern
-          const hours = parseFloat(match[1]);
-          minutes = hours * 60;
-          
-          // Check for additional minutes
-          if (match[2]) {
-            minutes += parseInt(match[2]);
-          }
-          
-          confidence = 0.9;
-        } else if (match[0].toLowerCase().includes('minute')) {
-          // Minutes pattern
-          minutes = parseInt(match[1]);
-          confidence = 0.85;
+  private async extractWithClaude(
+    transcription: string, 
+    availableMatters: Matter[],
+    maxRetries: number = 2
+  ): Promise<{ success: boolean; data?: ExtractedTimeEntry; error?: string }> {
+    let lastError: string = '';
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`Retrying Claude extraction (attempt ${attempt + 1}/${maxRetries + 1})`);
+          // Add a small delay between retries
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
 
-        // Validate reasonable duration (5 minutes to 12 hours)
-        if (minutes >= 5 && minutes <= 720) {
-          if (confidence > highestConfidence) {
-            highestConfidence = confidence;
-            bestMatch = { value: minutes, confidence };
-          }
+        const result = await awsBedrockService.extractTimeEntryData(transcription, availableMatters);
+        
+        if (result.success) {
+          return result;
         }
+        
+        lastError = result.error || 'Unknown error';
+        
+        // Don't retry on certain types of errors
+        if (lastError.includes('temporarily unavailable') || 
+            lastError.includes('Transcription text is required') ||
+            lastError.includes('too long')) {
+          break;
+        }
+        
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : 'Network error';
+        console.error(`Claude extraction attempt ${attempt + 1} failed:`, lastError);
       }
     }
 
-    return bestMatch;
+    return {
+      success: false,
+      error: lastError
+    };
   }
 
   /**
-   * Extract date from text
+   * Convert Claude's ExtractedTimeEntry to our ExtractedTimeEntryData format
    */
-  private extractDate(text: string): { value: string; confidence: number } | null {
-    const today = new Date();
+  private convertClaudeToExtractedData(claudeData: ExtractedTimeEntry, originalText: string): ExtractedTimeEntryData {
+    const baseConfidence = claudeData.confidence_score || 0.5;
     
-    // Check for relative dates first
-    if (/\btoday\b/i.test(text)) {
-      return { value: today.toISOString().split('T')[0], confidence: 0.95 };
-    }
-    
-    if (/\byesterday\b/i.test(text)) {
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return { value: yesterday.toISOString().split('T')[0], confidence: 0.95 };
-    }
+    return {
+      duration: claudeData.duration_minutes ? {
+        total_minutes: claudeData.duration_minutes,
+        hours: Math.floor(claudeData.duration_minutes / 60),
+        minutes: claudeData.duration_minutes % 60,
+        confidence: baseConfidence,
+        raw_text: claudeData.extracted_entities?.durations?.[0]
+      } : undefined,
+      
+      date: claudeData.date ? {
+        date: claudeData.date,
+        confidence: baseConfidence,
+        raw_text: claudeData.extracted_entities?.dates?.[0]
+      } : undefined,
+      
+      work_type: claudeData.activity_type ? {
+        category: claudeData.activity_type.toLowerCase(),
+        confidence: baseConfidence,
+        raw_text: claudeData.extracted_entities?.activities?.[0]
+      } : undefined,
+      
+      matter_reference: claudeData.matter_reference || claudeData.client_name ? {
+        reference: claudeData.matter_reference || claudeData.client_name,
+        confidence: baseConfidence,
+        raw_text: claudeData.extracted_entities?.matters?.[0] || claudeData.extracted_entities?.clients?.[0]
+      } : undefined,
+      
+      description: {
+        cleaned_text: claudeData.description || originalText,
+        confidence: claudeData.description ? baseConfidence : 0.3
+      },
+      
+      overall_confidence: baseConfidence,
+      extraction_method: 'claude'
+    };
+  }
 
-    // Check for specific dates
-    const dateMatch = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
-    if (dateMatch) {
-      try {
-        const [, day, month, year] = dateMatch;
-        const fullYear = year.length === 2 ? `20${year}` : year;
-        const date = new Date(`${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
-        
-        if (!isNaN(date.getTime())) {
-          return { value: date.toISOString().split('T')[0], confidence: 0.9 };
+  /**
+   * Traditional NLP extraction as fallback
+   */
+  private extractWithTraditionalNLP(transcription: string, availableMatters: Matter[] = []): ExtractedTimeEntryData {
+    const preprocessedText = this.preprocessText(transcription);
+    
+    const duration = this.extractDuration(preprocessedText);
+    const date = this.extractDate(preprocessedText);
+    const workType = this.categorizeWorkType(preprocessedText);
+    const matterRef = this.identifyMatterReference(preprocessedText, availableMatters);
+    const description = this.generateCleanDescription(preprocessedText);
+    
+    const overallConfidence = this.calculateOverallConfidence({
+      duration,
+      date,
+      workType,
+      matterRef,
+      description,
+      textLength: preprocessedText.length
+    });
+
+    return {
+      duration,
+      date,
+      work_type: workType,
+      matter_reference: matterRef,
+      description,
+      overall_confidence: overallConfidence,
+      extraction_method: 'traditional'
+    };
+  }
+
+  /**
+   * Extract duration information from text
+   */
+  private extractDuration(text: string): ExtractedTimeEntryData['duration'] {
+    const patterns = [
+      // Hours and minutes: "2 hours 30 minutes", "1 hour 15 mins"
+      /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\s*(?:and\s*)?(\d+)?\s*(?:minutes?|mins?|m)?/gi,
+      // Decimal hours: "1.5 hours", "2.25 hrs"
+      /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)(?!\w)/gi,
+      // Minutes only: "45 minutes", "30 mins"
+      /(\d+)\s*(?:minutes?|mins?|m)(?!\w)/gi,
+      // Time format: "2:30", "1:15"
+      /(\d{1,2}):(\d{2})/g
+    ];
+
+    let bestMatch = null;
+    let highestConfidence = 0;
+
+    for (const pattern of patterns) {
+      const matches = Array.from(text.matchAll(pattern));
+      
+      for (const match of matches) {
+        let totalMinutes = 0;
+        let confidence = 0.7;
+
+        if (pattern === patterns[0]) { // Hours and minutes
+          const hours = parseFloat(match[1]) || 0;
+          const minutes = parseInt(match[2]) || 0;
+          totalMinutes = hours * 60 + minutes;
+          confidence = 0.9;
+        } else if (pattern === patterns[1]) { // Decimal hours
+          const hours = parseFloat(match[1]) || 0;
+          totalMinutes = hours * 60;
+          confidence = 0.8;
+        } else if (pattern === patterns[2]) { // Minutes only
+          totalMinutes = parseInt(match[1]) || 0;
+          confidence = 0.7;
+        } else if (pattern === patterns[3]) { // Time format
+          const hours = parseInt(match[1]) || 0;
+          const minutes = parseInt(match[2]) || 0;
+          totalMinutes = hours * 60 + minutes;
+          confidence = 0.6;
         }
-      } catch (error) {
-        // Invalid date format
+
+        if (totalMinutes > 0 && totalMinutes <= 1440 && confidence > highestConfidence) { // Max 24 hours
+          bestMatch = {
+            total_minutes: totalMinutes,
+            hours: Math.floor(totalMinutes / 60),
+            minutes: totalMinutes % 60,
+            confidence,
+            raw_text: match[0]
+          };
+          highestConfidence = confidence;
+        }
       }
     }
 
-    // Default to today with lower confidence
-    return { value: today.toISOString().split('T')[0], confidence: 0.6 };
+    return bestMatch || undefined;
+  }
+
+  /**
+   * Extract date information from text
+   */
+  private extractDate(text: string): ExtractedTimeEntryData['date'] {
+    const today = new Date();
+    const patterns = [
+      // Relative dates
+      { pattern: /\btoday\b/gi, offset: 0, confidence: 0.9 },
+      { pattern: /\byesterday\b/gi, offset: -1, confidence: 0.9 },
+      { pattern: /\btomorrow\b/gi, offset: 1, confidence: 0.8 },
+      // Day names
+      { pattern: /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, offset: null, confidence: 0.7 },
+      // Date formats
+      { pattern: /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g, offset: null, confidence: 0.8 }
+    ];
+
+    for (const { pattern, offset, confidence } of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        let targetDate = new Date(today);
+        
+        if (offset !== null) {
+          targetDate.setDate(today.getDate() + offset);
+        } else if (pattern.source.includes('monday|tuesday')) {
+          // Handle day names (simplified - assumes current week)
+          const dayName = match[0].toLowerCase();
+          const dayIndex = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(dayName);
+          const currentDay = today.getDay();
+          const daysUntil = (dayIndex - currentDay + 7) % 7;
+          targetDate.setDate(today.getDate() + (daysUntil === 0 ? 0 : daysUntil));
+        }
+        
+        return {
+          date: targetDate.toISOString().split('T')[0],
+          confidence,
+          raw_text: match[0]
+        };
+      }
+    }
+
+    // Default to today with low confidence
+    return {
+      date: today.toISOString().split('T')[0],
+      confidence: 0.3,
+      raw_text: 'today (inferred)'
+    };
   }
 
   /**
    * Categorize work type based on keywords
    */
-  private categorizeWorkType(text: string): WorkTypeCategory | null {
+  private categorizeWorkType(text: string): ExtractedTimeEntryData['work_type'] {
     const lowerText = text.toLowerCase();
-    let bestMatch: WorkTypeCategory | null = null;
+    let bestMatch = null;
     let highestScore = 0;
 
     for (const [category, keywords] of Object.entries(this.workTypeKeywords)) {
       let score = 0;
-      let matchCount = 0;
+      let matchedKeywords: string[] = [];
 
       for (const keyword of keywords) {
-        if (lowerText.includes(keyword.toLowerCase())) {
-          score += keyword.length; // Longer keywords get higher scores
-          matchCount++;
+        if (lowerText.includes(keyword)) {
+          score += 1;
+          matchedKeywords.push(keyword);
         }
       }
 
-      if (matchCount > 0) {
-        const confidence = Math.min(0.9, (score / text.length) * 10 + (matchCount * 0.1));
-        
-        if (confidence > highestScore) {
-          highestScore = confidence;
-          bestMatch = {
-            category,
-            confidence
-          };
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = {
+          category,
+          confidence: Math.min(0.9, 0.4 + (score * 0.1)),
+          raw_text: matchedKeywords.join(', ')
+        };
+      }
+    }
+
+    return bestMatch || {
+      category: 'general',
+      confidence: 0.2,
+      raw_text: 'no specific keywords found'
+    };
+  }
+
+  /**
+   * Identify matter reference from available matters
+   */
+  private identifyMatterReference(text: string, availableMatters: Matter[]): ExtractedTimeEntryData['matter_reference'] {
+    if (availableMatters.length === 0) {
+      return undefined;
+    }
+
+    const lowerText = text.toLowerCase();
+    let bestMatch = null;
+    let highestScore = 0;
+
+    for (const matter of availableMatters) {
+      let score = 0;
+      const searchTerms = [
+        matter.title.toLowerCase(),
+        matter.client_name.toLowerCase(),
+        matter.attorney.toLowerCase(),
+        matter.id.toLowerCase()
+      ];
+
+      if (matter.brief_type) {
+        searchTerms.push(matter.brief_type.toLowerCase());
+      }
+
+      for (const term of searchTerms) {
+        if (term.length > 2 && lowerText.includes(term)) {
+          score += term.length; // Longer matches get higher scores
         }
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = {
+          reference: matter.id,
+          confidence: Math.min(0.9, 0.3 + (score * 0.02)),
+          raw_text: matter.title
+        };
       }
     }
 
@@ -220,180 +466,84 @@ export class NLPProcessor {
   }
 
   /**
-   * Identify matter references in text
+   * Generate clean description by removing extracted elements
    */
-  private identifyMatterReferences(text: string, availableMatters?: Matter[]): Array<{
-    matterId?: string;
-    clientName?: string;
-    confidence: number;
-  }> {
-    const references: Array<{ matterId?: string; clientName?: string; confidence: number }> = [];
-
-    if (!availableMatters || availableMatters.length === 0) {
-      // Extract potential client names from text patterns
-      for (const pattern of this.clientPatterns) {
-        const matches = Array.from(text.matchAll(pattern));
-        for (const match of matches) {
-          const clientName = match[1]?.trim();
-          if (clientName && clientName.length > 2) {
-            references.push({
-              clientName,
-              confidence: 0.7
-            });
-          }
-        }
-      }
-      return references;
-    }
-
-    // Match against available matters
-    const lowerText = text.toLowerCase();
+  private generateCleanDescription(text: string): ExtractedTimeEntryData['description'] {
+    let cleanText = text;
     
-    for (const matter of availableMatters) {
-      let confidence = 0;
-      const matchReasons: string[] = [];
-
-      // Check client name match
-      if (matter.clientName) {
-        const clientNameLower = matter.clientName.toLowerCase();
-        if (lowerText.includes(clientNameLower)) {
-          confidence += 0.4;
-          matchReasons.push('client name');
-        }
-        
-        // Check partial client name match
-        const clientWords = clientNameLower.split(' ');
-        const matchingWords = clientWords.filter(word => 
-          word.length > 2 && lowerText.includes(word)
-        );
-        if (matchingWords.length > 0) {
-          confidence += (matchingWords.length / clientWords.length) * 0.3;
-          matchReasons.push('partial client name');
-        }
-      }
-
-      // Check matter title match
-      if (matter.title) {
-        const titleWords = matter.title.toLowerCase().split(' ');
-        const matchingTitleWords = titleWords.filter(word => 
-          word.length > 3 && lowerText.includes(word)
-        );
-        if (matchingTitleWords.length > 0) {
-          confidence += (matchingTitleWords.length / titleWords.length) * 0.2;
-          matchReasons.push('matter title');
-        }
-      }
-
-      // Check instructing attorney match
-      if (matter.instructingAttorney) {
-        const attorneyLower = matter.instructingAttorney.toLowerCase();
-        if (lowerText.includes(attorneyLower)) {
-          confidence += 0.2;
-          matchReasons.push('attorney name');
-        }
-      }
-
-      // Check brief type match
-      if (matter.briefType) {
-        const briefTypeLower = matter.briefType.toLowerCase();
-        if (lowerText.includes(briefTypeLower)) {
-          confidence += 0.1;
-          matchReasons.push('brief type');
-        }
-      }
-
-      if (confidence > 0.3) { // Minimum threshold for consideration
-        references.push({
-          matterId: matter.id,
-          clientName: matter.clientName,
-          confidence: Math.min(0.95, confidence)
-        });
-      }
-    }
-
-    // Sort by confidence and return top matches
-    return references
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 3); // Return top 3 matches
-  }
-
-  /**
-   * Generate clean description from text
-   */
-  private generateDescription(text: string, workType?: WorkTypeCategory): string {
-    let description = text.trim();
-    
-    // Remove duration mentions from description
-    for (const pattern of this.durationPatterns) {
-      description = description.replace(pattern, '').trim();
-    }
+    // Remove duration mentions
+    cleanText = cleanText.replace(/\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b/gi, '');
+    cleanText = cleanText.replace(/\d{1,2}:\d{2}/g, '');
     
     // Remove date mentions
-    description = description.replace(/\b(?:today|yesterday|this\s+morning|this\s+afternoon)\b/gi, '').trim();
+    cleanText = cleanText.replace(/\b(?:today|yesterday|tomorrow)\b/gi, '');
+    cleanText = cleanText.replace(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '');
+    cleanText = cleanText.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, '');
     
-    // Clean up extra spaces
-    description = description.replace(/\s+/g, ' ').trim();
+    // Clean up extra whitespace and punctuation
+    cleanText = cleanText.replace(/\s+/g, ' ').trim();
+    cleanText = cleanText.replace(/^[,\.\-\s]+|[,\.\-\s]+$/g, '');
     
-    // Ensure proper capitalization
-    if (description.length > 0) {
-      description = description.charAt(0).toUpperCase() + description.slice(1);
+    // Ensure first letter is capitalized
+    if (cleanText.length > 0) {
+      cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
     }
-    
-    // If description is too short, enhance with work type
-    if (description.length < 10 && workType) {
-      description = `${workType.category} work: ${description}`;
-    }
-    
-    return description || 'Voice-recorded time entry';
+
+    return {
+      cleaned_text: cleanText || text,
+      confidence: cleanText.length > 10 ? 0.7 : 0.4
+    };
   }
 
   /**
    * Calculate overall confidence score
    */
-  private calculateConfidence(data: {
-    duration: { value: number; confidence: number } | null;
-    date: { value: string; confidence: number } | null;
-    workType: WorkTypeCategory | null;
-    matterReferences: Array<{ matterId?: string; clientName?: string; confidence: number }>;
+  private calculateOverallConfidence(data: {
+    duration?: ExtractedTimeEntryData['duration'];
+    date?: ExtractedTimeEntryData['date'];
+    workType?: ExtractedTimeEntryData['work_type'];
+    matterRef?: ExtractedTimeEntryData['matter_reference'];
+    description?: ExtractedTimeEntryData['description'];
     textLength: number;
   }): number {
-    let totalConfidence = 0;
-    let factorCount = 0;
+    let totalScore = 0;
+    let maxScore = 0;
 
-    // Duration confidence
+    // Duration confidence (weight: 25%)
     if (data.duration) {
-      totalConfidence += data.duration.confidence * 0.3;
-      factorCount += 0.3;
+      totalScore += data.duration.confidence * 0.25;
     }
+    maxScore += 0.25;
 
-    // Date confidence
+    // Date confidence (weight: 15%)
     if (data.date) {
-      totalConfidence += data.date.confidence * 0.2;
-      factorCount += 0.2;
+      totalScore += data.date.confidence * 0.15;
     }
+    maxScore += 0.15;
 
-    // Work type confidence
+    // Work type confidence (weight: 20%)
     if (data.workType) {
-      totalConfidence += data.workType.confidence * 0.2;
-      factorCount += 0.2;
+      totalScore += data.workType.confidence * 0.20;
     }
+    maxScore += 0.20;
 
-    // Matter reference confidence
-    if (data.matterReferences.length > 0) {
-      const avgMatterConfidence = data.matterReferences.reduce((sum, ref) => sum + ref.confidence, 0) / data.matterReferences.length;
-      totalConfidence += avgMatterConfidence * 0.2;
-      factorCount += 0.2;
+    // Matter reference confidence (weight: 25%)
+    if (data.matterRef) {
+      totalScore += data.matterRef.confidence * 0.25;
     }
+    maxScore += 0.25;
 
-    // Text quality confidence
-    const textQuality = Math.min(1, data.textLength / 50); // Longer text generally better
-    totalConfidence += textQuality * 0.1;
-    factorCount += 0.1;
+    // Description confidence (weight: 15%)
+    if (data.description) {
+      totalScore += data.description.confidence * 0.15;
+    }
+    maxScore += 0.15;
 
-    // Normalize confidence
-    const normalizedConfidence = factorCount > 0 ? totalConfidence / factorCount : 0.5;
-    
-    return Math.max(0.1, Math.min(0.95, normalizedConfidence));
+    // Text length bonus/penalty
+    const lengthFactor = Math.min(1, Math.max(0.5, data.textLength / 100));
+    totalScore *= lengthFactor;
+
+    return maxScore > 0 ? Math.min(1, totalScore / maxScore) : 0.1;
   }
 
   /**
@@ -401,44 +551,102 @@ export class NLPProcessor {
    */
   private preprocessText(text: string): string {
     return text
-      .trim()
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .replace(/[^\w\s.,!?;:()\-&]/g, '') // Remove special characters except common punctuation
-      .toLowerCase();
+      .toLowerCase()
+      .replace(/[^\w\s\-:\/]/g, ' ') // Remove special chars except hyphens, colons, slashes
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
-   * Validate extracted data
+   * Validate extracted data quality
    */
-  validateExtractedData(data: ExtractedTimeEntryData): { isValid: boolean; warnings: string[] } {
-    const warnings: string[] = [];
-    let isValid = true;
+  private validateExtractedData(data: ExtractedTimeEntryData): { isValid: boolean; issues: string[] } {
+    const issues: string[] = [];
 
-    // Check duration
+    // Check duration validity
     if (data.duration) {
-      if (data.duration < 5) {
-        warnings.push('Duration seems very short (less than 5 minutes)');
-      } else if (data.duration > 720) {
-        warnings.push('Duration seems very long (more than 12 hours)');
-        isValid = false;
+      if (data.duration.total_minutes && (data.duration.total_minutes <= 0 || data.duration.total_minutes > 1440)) {
+        issues.push('Duration is outside valid range (0-1440 minutes)');
       }
-    } else {
-      warnings.push('No duration found in the recording');
     }
 
-    // Check description
-    if (!data.description || data.description.length < 10) {
-      warnings.push('Description is very short or missing');
+    // Check description length
+    if (data.description && data.description.cleaned_text.length < 5) {
+      issues.push('Description is too short');
     }
 
-    // Check confidence
-    if (data.confidence < 0.5) {
-      warnings.push('Low confidence in extracted data - please review carefully');
+    // Check overall confidence
+    if (data.overall_confidence < 0.2) {
+      issues.push('Overall confidence is very low');
     }
 
-    return { isValid, warnings };
+    return {
+      isValid: issues.length === 0,
+      issues
+    };
+  }
+
+  /**
+   * Test Claude integration
+   */
+  async testClaudeIntegration(): Promise<{ success: boolean; error?: string; status?: any }> {
+    try {
+      const status = awsBedrockService.getServiceStatus();
+      
+      if (!status.isAvailable) {
+        return {
+          success: false,
+          error: status.lastError || 'Service not available',
+          status
+        };
+      }
+
+      const testResult = await awsBedrockService.extractTimeEntryData(
+        'I spent 2 hours researching case law for the Smith matter today',
+        []
+      );
+
+      return {
+        success: testResult.success,
+        error: testResult.error,
+        status
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Get service status including Claude availability
+   */
+  getServiceStatus(): {
+    claudeAvailable: boolean;
+    traditionalNLPAvailable: boolean;
+    lastClaudeError?: string;
+    claudeStatus?: any;
+  } {
+    const claudeStatus = awsBedrockService.getServiceStatus();
+    
+    return {
+      claudeAvailable: claudeStatus.isAvailable,
+      traditionalNLPAvailable: true,
+      lastClaudeError: claudeStatus.lastError,
+      claudeStatus
+    };
+  }
+
+  /**
+   * Force traditional NLP processing only
+   */
+  async extractWithTraditionalNLPOnly(transcription: string, availableMatters: Matter[] = []): Promise<ExtractedTimeEntryData> {
+    return this.extractWithTraditionalNLP(transcription, availableMatters);
   }
 }
 
 // Export singleton instance
 export const nlpProcessor = new NLPProcessor();
+export default nlpProcessor;

@@ -6,10 +6,11 @@ export { default as DocumentIntelligencePage } from './DocumentIntelligencePage'
 export { default as WorkflowIntegrationsPage } from './WorkflowIntegrationsPage';
 export { default as AcademyPage } from './AcademyPage';
 export { default as InvoicesPage } from './InvoicesPage';
-export { default as ProFormaPage } from './ProFormaPage';
 export { default as ReportsPage } from './ReportsPage';
 export { default as SettingsPage } from './SettingsPage';
 export { default as ProfilePage } from './ProfilePage';
 export { default as PricingManagementPage } from './PricingManagementPage';
+export { default as ProFormaPage } from './ProFormaPage';
+export { default as CompliancePage } from './CompliancePage';
 export { StrategicFinancePage } from './StrategicFinancePage';
 export { AIAnalyticsDashboard } from './AIAnalyticsDashboard';

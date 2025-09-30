@@ -341,10 +341,15 @@ const PricingManagementPage: React.FC = () => {
       const recommendations = await StrategicFinanceService.generateFeeOptimizationRecommendations();
       setFeeOptimizationRecommendations(recommendations);
       setShowOptimizationModal(true);
-      toast.success('Fee optimization recommendations generated');
+      
+      if (recommendations.length > 0) {
+        toast.success(`Generated ${recommendations.length} fee optimization recommendations`);
+      } else {
+        toast('No optimization opportunities found at this time', { icon: 'ℹ️' });
+      }
     } catch (error) {
       console.error('Error generating fee optimization:', error);
-      toast.error('Failed to generate optimization recommendations');
+      toast.error('Unable to generate optimization recommendations. Please try again later.');
     } finally {
       setIsLoading(false);
     }

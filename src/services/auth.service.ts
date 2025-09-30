@@ -90,6 +90,9 @@ export class AuthService {
         await this.setCurrentSession(session);
       }
 
+      // Notify listeners of initial state
+      this.notifyAuthStateListeners();
+
       // Listen for auth changes
       supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
@@ -180,6 +183,27 @@ export class AuthService {
       return { 
         data: null, 
         error: error instanceof Error ? error : new Error('Unknown sign in error') 
+      };
+    }
+  }
+
+  /**
+   * Send a magic link to user's email for passwordless sign-in
+   */
+  async signInWithMagicLink(email: string): Promise<AuthServiceResponse<void>> {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/welcome`
+        }
+      });
+
+      return { data: null, error };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error : new Error('Unknown magic link error')
       };
     }
   }
@@ -559,6 +583,27 @@ export class AuthService {
 
     const requiredRoles = permissions[permission] || [];
     return requiredRoles.some(role => roles.includes(role));
+  }
+
+  /**
+   * Map raw auth errors to user-friendly messages
+   */
+  getFriendlyErrorMessage(error: AuthError | Error | null): string {
+    if (!error) return '';
+    const message = (error as AuthError).message || error.message || '';
+
+    if (/Invalid login credentials/i.test(message)) return 'Incorrect email or password.';
+    if (/Email not found/i.test(message)) return 'No account found with this email.';
+    if (/already registered/i.test(message)) return 'An account with this email already exists.';
+    if (/OTP.*expired/i.test(message)) return 'This link has expired. Request a new one.';
+    if (/rate limit/i.test(message)) return 'Too many requests. Please wait and try again.';
+
+    // Network/unreachable
+    if (error instanceof TypeError) {
+      return 'Unable to reach authentication server. Please check your connection.';
+    }
+
+    return message || 'An unexpected authentication error occurred.';
   }
 }
 

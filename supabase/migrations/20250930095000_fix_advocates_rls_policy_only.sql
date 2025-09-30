@@ -5,6 +5,9 @@
 -- Drop existing conflicting policies
 DROP POLICY IF EXISTS "Advocates can manage their own profile" ON advocates;
 DROP POLICY IF EXISTS "Advocates can insert their own profile" ON advocates;
+DROP POLICY IF EXISTS "Advocates can select their own profile" ON advocates;
+DROP POLICY IF EXISTS "Advocates can update their own profile" ON advocates;
+DROP POLICY IF EXISTS "Advocates can delete their own profile" ON advocates;
 
 -- Create separate policies for each operation
 CREATE POLICY "Advocates can select their own profile" ON advocates

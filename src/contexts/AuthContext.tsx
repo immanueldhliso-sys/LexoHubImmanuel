@@ -25,9 +25,10 @@ const createRateLimiter = (maxAttempts: number, windowMs: number) => {
   };
 };
 
-interface AuthContextType {
+export interface AuthContextType {
   user: ExtendedUser | null;
   loading: boolean;
+  isLoading: boolean;
   operationLoading: {
     signIn: boolean;
     signUp: boolean;
@@ -36,6 +37,7 @@ interface AuthContextType {
   };
   sessionError: Error | null;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | Error | null }>;
+  signInWithMagicLink: (email: string) => Promise<{ error: AuthError | Error | null }>;
   signUp: (email: string, password: string, metadata: UserMetadata) => Promise<{ error: AuthError | Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserMetadata>) => Promise<{ error: AuthError | Error | null }>;
@@ -47,7 +49,7 @@ interface AuthContextType {
   hasPermission: (permission: string) => boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -64,9 +66,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   });
   const [sessionError, setSessionError] = useState<Error | null>(null);
 
-  // Rate limiters
-  const signInRateLimiter = createRateLimiter(5, 60000); // 5 attempts per minute
-  const signUpRateLimiter = createRateLimiter(3, 300000); // 3 attempts per 5 minutes
+  // Rate limiters (configurable via environment variables)
+  const signInMaxAttempts = Number(import.meta.env.VITE_AUTH_SIGNIN_MAX_ATTEMPTS ?? 5);
+  const signInWindowMs = Number(import.meta.env.VITE_AUTH_SIGNIN_WINDOW_MS ?? 60_000);
+  const signUpMaxAttempts = Number(import.meta.env.VITE_AUTH_SIGNUP_MAX_ATTEMPTS ?? 3);
+  const signUpWindowMs = Number(import.meta.env.VITE_AUTH_SIGNUP_WINDOW_MS ?? 300_000);
+  const signInRateLimiter = createRateLimiter(signInMaxAttempts, signInWindowMs);
+  const signUpRateLimiter = createRateLimiter(signUpMaxAttempts, signUpWindowMs);
 
   // Initialize auth with retry logic
   const initializeAuth = useCallback(async () => {
@@ -150,28 +156,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     let mounted = true;
     let unsubscribe: (() => void) | undefined;
+    let isInitialized = false;
 
     const initialize = async () => {
-      const cleanup = await initializeAuth();
-      
-      if (mounted) {
-        // Subscribe to auth state changes
-        unsubscribe = authService.onAuthStateChange((user) => {
-          if (mounted) {
-            setUser(user);
-            setLoading(false);
-          }
-        });
-      }
+      try {
+        const cleanup = await initializeAuth();
+        
+        if (mounted) {
+          // Set initial user state from auth service
+          const currentUser = authService.getCurrentUser();
+          setUser(currentUser);
+          isInitialized = true;
+          setLoading(false);
+          
+          // Subscribe to auth state changes
+          unsubscribe = authService.onAuthStateChange((user) => {
+            if (mounted) {
+              setUser(user);
+              // Only set loading to false after initial auth is complete
+              if (isInitialized) {
+                setLoading(false);
+              }
+            }
+          });
+        }
 
-      return cleanup;
+        return cleanup;
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+        if (mounted) {
+          setLoading(false);
+          setSessionError(error as Error);
+        }
+      }
     };
 
     initialize();
 
     // Auto-refresh session every 15 minutes
     const refreshInterval = setInterval(async () => {
-      if (mounted) {
+      if (mounted && isInitialized) {
         try {
           await refreshSession();
         } catch (error) {
@@ -195,6 +219,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setOperationLoading(prev => ({ ...prev, signIn: true }));
     try {
       const { error } = await authService.signIn(email, password);
+      return { error };
+    } finally {
+      setOperationLoading(prev => ({ ...prev, signIn: false }));
+    }
+  };
+
+  const signInWithMagicLink = async (email: string) => {
+    if (!signInRateLimiter(email)) {
+      return { error: new Error('Too many attempts. Please try again later.') };
+    }
+    setOperationLoading(prev => ({ ...prev, signIn: true }));
+    try {
+      const { error } = await authService.signInWithMagicLink(email);
       return { error };
     } finally {
       setOperationLoading(prev => ({ ...prev, signIn: false }));
@@ -257,9 +294,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     user,
     loading,
+    isLoading: loading || operationLoading.signIn || operationLoading.signUp || operationLoading.signOut || operationLoading.updateProfile,
     operationLoading,
     sessionError,
     signIn,
+    signInWithMagicLink,
     signUp,
     signOut,
     updateProfile,
@@ -267,7 +306,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshSession,
     rehydrate,
     clearCache,
-    isAuthenticated: authService.isAuthenticated(),
+    isAuthenticated: user !== null,
     hasPermission,
   };
 
@@ -278,16 +317,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
-export const useAuth = (): AuthContextType => {
+// Export hooks as function declarations for Fast Refresh compatibility
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}
 
-// Hook for protected routes - keeping existing behavior since app doesn't use React Router
-export const useRequireAuth = () => {
+export function useRequireAuth() {
   const { user, loading } = useAuth();
   
   useEffect(() => {
@@ -298,4 +337,4 @@ export const useRequireAuth = () => {
   }, [user, loading]);
 
   return { user, loading };
-};
+}

@@ -10,7 +10,8 @@ import {
   Calendar,
   Target,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Shield
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { 
@@ -25,19 +26,28 @@ import { FinancialHealthCard } from '@/components/strategic-finance/FinancialHea
 import { FactoringMarketplace } from '@/components/strategic-finance/FactoringMarketplace';
 import { SuccessFeeCalculator } from '@/components/strategic-finance/SuccessFeeCalculator';
 import { FeeOptimizationCard } from '@/components/strategic-finance/FeeOptimizationCard';
+import { CashFlowPredictor } from '@/components/strategic-finance/CashFlowPredictor';
+import { FinancialDashboard } from '@/components/strategic-finance/FinancialDashboard';
+import { FeeOptimizationCenter } from '@/components/strategic-finance/FeeOptimizationCenter';
+import { PracticeAnalytics } from '@/components/strategic-finance/PracticeAnalytics';
+import { ComplianceMonitor } from '@/components/strategic-finance/ComplianceMonitor';
+import { MatterService } from '@/services/api/matters.service';
+import type { Matter } from '@/types';
 import { Button, Card, CardHeader, CardContent } from '../design-system/components';
 import { toast } from 'react-hot-toast';
 import type { Invoice, InvoiceStatus } from '../types';
 // import { AdvancedCashFlowChart } from '../components/strategic-finance/AdvancedCashFlowChart';
 
 export const StrategicFinancePage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'cashflow' | 'factoring' | 'optimization' | 'success-fees'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cashflow' | 'factoring' | 'optimization' | 'analytics' | 'compliance'>('overview');
   const [loading, setLoading] = useState(true);
   const [financialHealth, setFinancialHealth] = useState<PracticeFinancialHealth | null>(null);
   const [cashFlowPredictions, setCashFlowPredictions] = useState<CashFlowPrediction[]>([]);
   const [factoringOffers, setFactoringOffers] = useState<FactoringOffer[]>([]);
   const [showSuccessFeeCalculator, setShowSuccessFeeCalculator] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [matters, setMatters] = useState<Matter[]>([]);
+  const [selectedMatterId, setSelectedMatterId] = useState<string | null>(null);
   const [invoiceData, setInvoiceData] = useState<{
     totalOutstanding: number;
     overdueAmount: number;
@@ -75,12 +85,35 @@ export const StrategicFinancePage: React.FC = () => {
       } else if (activeTab === 'factoring') {
         const offers = await StrategicFinanceService.getFactoringOffers();
         setFactoringOffers(offers);
+      } else if (activeTab === 'optimization') {
+        await loadMatters();
       }
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load financial data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMatters = async () => {
+    try {
+      const response = await MatterService.getMatters({ 
+        page: 1, 
+        pageSize: 50,
+        sortBy: 'created_at',
+        sortOrder: 'desc'
+      });
+      setMatters(response.data);
+      
+      // Auto-select the first active matter if none selected
+      if (!selectedMatterId && response.data.length > 0) {
+        const activeMatter = response.data.find(m => m.status !== 'closed') || response.data[0];
+        setSelectedMatterId(activeMatter.id);
+      }
+    } catch (error) {
+      console.error('Error loading matters:', error);
+      toast.error('Failed to load matters');
     }
   };
 
@@ -203,11 +236,16 @@ export const StrategicFinancePage: React.FC = () => {
   const handleFeeOptimization = async (matterId?: string) => {
     try {
       const recommendations = await StrategicFinanceService.generateFeeOptimizationRecommendations(matterId);
-      toast.success('Fee optimization recommendations generated');
-      // This would open a modal with recommendations
+      
+      if (recommendations.length > 0) {
+        toast.success(`Generated ${recommendations.length} fee optimization recommendations`);
+        // This would open a modal with recommendations
+      } else {
+        toast('No optimization opportunities available for this matter', { icon: 'ℹ️' });
+      }
     } catch (error) {
       console.error('Error generating fee optimization:', error);
-      toast.error('Failed to generate fee optimization recommendations');
+      toast.error('Unable to generate fee optimization recommendations. Please check your connection and try again.');
     }
   };
 
@@ -323,6 +361,32 @@ export const StrategicFinancePage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4" />
                 Fee Optimization
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors ${
+                activeTab === 'analytics'
+                  ? 'text-mpondo-gold-600 border-b-2 border-mpondo-gold-600'
+                  : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Practice Analytics
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('compliance')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors ${
+                activeTab === 'compliance'
+                  ? 'text-mpondo-gold-600 border-b-2 border-mpondo-gold-600'
+                  : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Compliance
               </div>
             </button>
           </div>
@@ -511,161 +575,7 @@ export const StrategicFinancePage: React.FC = () => {
             )}
 
             {activeTab === 'cashflow' && (
-              <div className="space-y-6">
-                {/* Cash Flow Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {cashFlowPredictions.slice(0, 3).map((prediction) => (
-                    <div key={prediction.id} className="bg-white rounded-lg border border-neutral-200 p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-medium text-neutral-900">
-                          {format(new Date(prediction.periodStart), 'MMMM yyyy')}
-                        </h3>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCashFlowStatusColor(prediction.cashFlowStatus)}`}>
-                          {prediction.cashFlowStatus}
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600">Expected In:</span>
-                          <span className="font-medium text-success-600">
-                            +R{prediction.expectedCollections.toLocaleString('en-ZA', { minimumFractionDigits: 0 })}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600">Expected Out:</span>
-                          <span className="font-medium text-error-600">
-                            -R{prediction.expectedExpenses.toLocaleString('en-ZA', { minimumFractionDigits: 0 })}
-                          </span>
-                        </div>
-                        <div className="pt-3 border-t border-neutral-200">
-                          <div className="flex justify-between">
-                            <span className="font-medium text-neutral-700">Net Cash Flow:</span>
-                            <span className={`font-bold ${prediction.expectedNetCashFlow >= 0 ? 'text-success-600' : 'text-error-600'}`}>
-                              R{prediction.expectedNetCashFlow.toLocaleString('en-ZA', { minimumFractionDigits: 0 })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Cash Flow Chart */}
-                <CashFlowChart predictions={cashFlowPredictions} />
-
-                {/* Cash Flow Actions */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h3 className="text-lg font-semibold text-neutral-900">Cash Flow Actions</h3>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={handleOptimizeCashFlow}>
-                        <Zap className="w-4 h-4 mr-2" />
-                        Optimize
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => toast('Exporting cash flow forecast...', { icon: 'ℹ️' })}>
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Export Forecast
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-medium text-neutral-900 mb-3">Immediate Actions</h4>
-                        <div className="space-y-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full justify-start"
-                            onClick={() => toast('Sending payment reminders...', { icon: 'ℹ️' })}
-                          >
-                            Send Payment Reminders ({invoiceData.agingAnalysis.find(a => a.range === '31-60 days')?.count || 0})
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full justify-start"
-                            onClick={() => toast('Reviewing overdue accounts...', { icon: 'ℹ️' })}
-                          >
-                            Review Overdue Accounts ({invoiceData.agingAnalysis.find(a => a.range === '90+ days')?.count || 0})
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full justify-start"
-                            onClick={() => {
-                              const eligibleInvoices = invoiceData.recentInvoices
-                                .filter(inv => inv.status !== InvoiceStatus.PAID)
-                                .map(inv => inv.id);
-                              handleFactorInvoices(eligibleInvoices);
-                            }}
-                          >
-                            Consider Invoice Factoring
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <h4 className="font-medium text-neutral-900 mb-3">Strategic Actions</h4>
-                        <div className="space-y-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full justify-start"
-                            onClick={() => handleFeeOptimization()}
-                          >
-                            Optimize Fee Structure
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full justify-start"
-                            onClick={() => toast('Reviewing payment terms...', { icon: 'ℹ️' })}
-                          >
-                            Review Payment Terms
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full justify-start"
-                            onClick={() => setShowSuccessFeeCalculator(true)}
-                          >
-                            Explore Success Fees
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Seasonal Insights */}
-                <Card>
-                  <CardHeader>
-                    <h3 className="text-lg font-semibold text-neutral-900">Seasonal Insights</h3>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {cashFlowPredictions.filter(p => p.seasonalAdjustment && p.seasonalAdjustment !== 0).map(prediction => (
-                        <div key={prediction.id} className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
-                          <div>
-                            <p className="font-medium text-neutral-900">
-                              {format(new Date(prediction.periodStart), 'MMMM')}
-                            </p>
-                            <p className="text-sm text-neutral-600">
-                              Historical adjustment: {prediction.seasonalAdjustment! > 0 ? '+' : ''}{prediction.seasonalAdjustment!.toFixed(0)}%
-                            </p>
-                          </div>
-                          {prediction.seasonalAdjustment! > 0 ? (
-                            <ArrowUpRight className="w-5 h-5 text-success-600" />
-                          ) : (
-                            <ArrowDownRight className="w-5 h-5 text-error-600" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <CashFlowPredictor />
             )}
 
             {activeTab === 'factoring' && (
@@ -735,9 +645,37 @@ export const StrategicFinancePage: React.FC = () => {
 
             {activeTab === 'optimization' && (
               <div className="space-y-6">
+                {/* Matter Selection */}
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-lg font-semibold text-neutral-900">Select Matter for Optimization</h3>
+                    <p className="text-sm text-neutral-600">Choose a matter to generate AI-powered fee optimization recommendations</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="max-w-md">
+                      <label htmlFor="matter-select" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Matter
+                      </label>
+                      <select
+                        id="matter-select"
+                        value={selectedMatterId || ''}
+                        onChange={(e) => setSelectedMatterId(e.target.value || null)}
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-mpondo-gold-500 focus:border-mpondo-gold-500"
+                      >
+                        <option value="">Select a matter...</option>
+                        {matters.map((matter) => (
+                          <option key={matter.id} value={matter.id}>
+                            {matter.title} - {matter.client_name} ({matter.status})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Optimization Actions */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card hoverable className="cursor-pointer" onClick={() => handleFeeOptimization()}>
+                  <Card hoverable className="cursor-pointer" onClick={() => handleFeeOptimization(selectedMatterId)}>
                     <CardContent className="p-6 text-center">
                       <div className="text-mpondo-gold-500 mb-4">
                         <Zap className="w-12 h-12 mx-auto" />
@@ -748,7 +686,7 @@ export const StrategicFinancePage: React.FC = () => {
                       <p className="text-sm text-neutral-600 mb-4">
                         Get AI-powered recommendations to optimize your fee structure based on market data and performance.
                       </p>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" disabled={!selectedMatterId}>
                         Generate Recommendations
                       </Button>
                     </CardContent>
@@ -790,7 +728,25 @@ export const StrategicFinancePage: React.FC = () => {
                 </div>
 
                 {/* Fee Optimization Component */}
-                <FeeOptimizationCard />
+                {selectedMatterId && (
+                  <FeeOptimizationCard matterId={selectedMatterId} />
+                )}
+                
+                {/* Fee Optimization Center */}
+                <FeeOptimizationCenter />
+              </div>
+            )}
+
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                <FinancialDashboard />
+                <PracticeAnalytics />
+              </div>
+            )}
+
+            {activeTab === 'compliance' && (
+              <div className="space-y-6">
+                <ComplianceMonitor />
               </div>
             )}
           </>

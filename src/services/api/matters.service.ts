@@ -361,3 +361,6 @@ export class MatterService {
     }
   }
 }
+
+// Export a singleton instance for convenience
+export const mattersService = MatterService;

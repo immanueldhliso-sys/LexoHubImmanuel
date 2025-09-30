@@ -174,6 +174,7 @@ export type Database = {
           total_collected_ytd: number | null
           total_outstanding: number | null
           updated_at: string | null
+          voice_preferences: Json | null
           year_admitted: number
         }
         Insert: {
@@ -200,6 +201,7 @@ export type Database = {
           total_collected_ytd?: number | null
           total_outstanding?: number | null
           updated_at?: string | null
+          voice_preferences?: Json | null
           year_admitted: number
         }
         Update: {
@@ -226,7 +228,50 @@ export type Database = {
           total_collected_ytd?: number | null
           total_outstanding?: number | null
           updated_at?: string | null
+          voice_preferences?: Json | null
           year_admitted?: number
+        }
+        Relationships: []
+      }
+      audit_entries: {
+        Row: {
+          action_type: string
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string | null
+          description: string
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string | null
+          description: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string | null
+          description?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -507,6 +552,157 @@ export type Database = {
             columns: ["advocate_id"]
             isOneToOne: false
             referencedRelation: "advocates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_alerts: {
+        Row: {
+          created_at: string | null
+          description: string
+          due_date: string | null
+          id: string
+          matter_id: string | null
+          metadata: Json | null
+          resolved: boolean | null
+          severity: string
+          title: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          due_date?: string | null
+          id?: string
+          matter_id?: string | null
+          metadata?: Json | null
+          resolved?: boolean | null
+          severity: string
+          title: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          due_date?: string | null
+          id?: string
+          matter_id?: string | null
+          metadata?: Json | null
+          resolved?: boolean | null
+          severity?: string
+          title?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_alerts_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "active_matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_alerts_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_deadlines: {
+        Row: {
+          completed_at: string | null
+          completion_notes: string | null
+          created_at: string | null
+          due_date: string
+          id: string
+          reminder_schedule: Json | null
+          requirement_id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completion_notes?: string | null
+          created_at?: string | null
+          due_date: string
+          id?: string
+          reminder_schedule?: Json | null
+          requirement_id: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completion_notes?: string | null
+          created_at?: string | null
+          due_date?: string
+          id?: string
+          reminder_schedule?: Json | null
+          requirement_id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_deadlines_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "regulatory_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_violations: {
+        Row: {
+          affected_entities: Json | null
+          alert_id: string
+          can_proceed: boolean | null
+          category: string
+          created_at: string | null
+          id: string
+          recommendation: string
+          requires_disclosure: boolean | null
+          rule_id: string
+        }
+        Insert: {
+          affected_entities?: Json | null
+          alert_id: string
+          can_proceed?: boolean | null
+          category: string
+          created_at?: string | null
+          id?: string
+          recommendation: string
+          requires_disclosure?: boolean | null
+          rule_id: string
+        }
+        Update: {
+          affected_entities?: Json | null
+          alert_id?: string
+          can_proceed?: boolean | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          recommendation?: string
+          requires_disclosure?: boolean | null
+          rule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_violations_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_alerts"
             referencedColumns: ["id"]
           },
         ]
@@ -1606,6 +1802,7 @@ export type Database = {
           amount_paid: number | null
           balance_due: number | null
           bar: Database["public"]["Enums"]["bar_association"]
+          converted_to_invoice_id: string | null
           created_at: string | null
           date_paid: string | null
           days_outstanding: number | null
@@ -1619,11 +1816,13 @@ export type Database = {
           invoice_date: string
           invoice_number: string
           is_overdue: boolean | null
+          is_pro_forma: boolean | null
           last_reminder_date: string | null
           matter_id: string
           next_reminder_date: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           payment_reference: string | null
+          pro_forma_accepted_at: string | null
           reminder_history: Json | null
           reminders_sent: number | null
           sent_at: string | null
@@ -1640,6 +1839,7 @@ export type Database = {
           amount_paid?: number | null
           balance_due?: number | null
           bar: Database["public"]["Enums"]["bar_association"]
+          converted_to_invoice_id?: string | null
           created_at?: string | null
           date_paid?: string | null
           days_outstanding?: number | null
@@ -1653,11 +1853,13 @@ export type Database = {
           invoice_date?: string
           invoice_number: string
           is_overdue?: boolean | null
+          is_pro_forma?: boolean | null
           last_reminder_date?: string | null
           matter_id: string
           next_reminder_date?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payment_reference?: string | null
+          pro_forma_accepted_at?: string | null
           reminder_history?: Json | null
           reminders_sent?: number | null
           sent_at?: string | null
@@ -1674,6 +1876,7 @@ export type Database = {
           amount_paid?: number | null
           balance_due?: number | null
           bar?: Database["public"]["Enums"]["bar_association"]
+          converted_to_invoice_id?: string | null
           created_at?: string | null
           date_paid?: string | null
           days_outstanding?: number | null
@@ -1687,11 +1890,13 @@ export type Database = {
           invoice_date?: string
           invoice_number?: string
           is_overdue?: boolean | null
+          is_pro_forma?: boolean | null
           last_reminder_date?: string | null
           matter_id?: string
           next_reminder_date?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payment_reference?: string | null
+          pro_forma_accepted_at?: string | null
           reminder_history?: Json | null
           reminders_sent?: number | null
           sent_at?: string | null
@@ -1716,6 +1921,20 @@ export type Database = {
             columns: ["advocate_id"]
             isOneToOne: false
             referencedRelation: "advocates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_converted_to_invoice_id_fkey"
+            columns: ["converted_to_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_converted_to_invoice_id_fkey"
+            columns: ["converted_to_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_invoices"
             referencedColumns: ["id"]
           },
           {
@@ -2629,6 +2848,59 @@ export type Database = {
           },
         ]
       }
+      reconciliations: {
+        Row: {
+          bank_statement_data: Json | null
+          closing_balance: number
+          created_at: string | null
+          discrepancy_count: number | null
+          id: string
+          notes: string | null
+          opening_balance: number
+          performed_by: string
+          reconciliation_date: string | null
+          total_deposits: number | null
+          total_withdrawals: number | null
+          trust_account_id: string
+        }
+        Insert: {
+          bank_statement_data?: Json | null
+          closing_balance: number
+          created_at?: string | null
+          discrepancy_count?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance: number
+          performed_by: string
+          reconciliation_date?: string | null
+          total_deposits?: number | null
+          total_withdrawals?: number | null
+          trust_account_id: string
+        }
+        Update: {
+          bank_statement_data?: Json | null
+          closing_balance?: number
+          created_at?: string | null
+          discrepancy_count?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number
+          performed_by?: string
+          reconciliation_date?: string | null
+          total_deposits?: number | null
+          total_withdrawals?: number | null
+          trust_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliations_trust_account_id_fkey"
+            columns: ["trust_account_id"]
+            isOneToOne: false
+            referencedRelation: "trust_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_relationships: {
         Row: {
           advocate_a_id: string
@@ -2797,6 +3069,48 @@ export type Database = {
           },
         ]
       }
+      regulatory_requirements: {
+        Row: {
+          bar_council: string
+          compliance_criteria: Json | null
+          created_at: string | null
+          days_notice: number | null
+          description: string
+          frequency: string
+          id: string
+          mandatory: boolean | null
+          requirement_code: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          bar_council: string
+          compliance_criteria?: Json | null
+          created_at?: string | null
+          days_notice?: number | null
+          description: string
+          frequency: string
+          id?: string
+          mandatory?: boolean | null
+          requirement_code: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          bar_council?: string
+          compliance_criteria?: Json | null
+          created_at?: string | null
+          days_notice?: number | null
+          description?: string
+          frequency?: string
+          id?: string
+          mandatory?: boolean | null
+          requirement_code?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       success_fee_scenarios: {
         Row: {
           advocate_id: string
@@ -2926,6 +3240,7 @@ export type Database = {
           start_time: string | null
           updated_at: string | null
           voice_recording_url: string | null
+          voice_session_id: string | null
           voice_transcription: string | null
           write_off: boolean | null
           write_off_reason: string | null
@@ -2951,6 +3266,7 @@ export type Database = {
           start_time?: string | null
           updated_at?: string | null
           voice_recording_url?: string | null
+          voice_session_id?: string | null
           voice_transcription?: string | null
           write_off?: boolean | null
           write_off_reason?: string | null
@@ -2976,6 +3292,7 @@ export type Database = {
           start_time?: string | null
           updated_at?: string | null
           voice_recording_url?: string | null
+          voice_session_id?: string | null
           voice_transcription?: string | null
           write_off?: boolean | null
           write_off_reason?: string | null
@@ -3023,7 +3340,188 @@ export type Database = {
             referencedRelation: "matters"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "time_entries_voice_session_id_fkey"
+            columns: ["voice_session_id"]
+            isOneToOne: false
+            referencedRelation: "voice_sessions"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      transcriptions: {
+        Row: {
+          confidence_score: number | null
+          created_at: string | null
+          id: string
+          processing_time_ms: number | null
+          provider_used: string
+          raw_response: Json
+          voice_session_id: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string | null
+          id?: string
+          processing_time_ms?: number | null
+          provider_used: string
+          raw_response: Json
+          voice_session_id: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string | null
+          id?: string
+          processing_time_ms?: number | null
+          provider_used?: string
+          raw_response?: Json
+          voice_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcriptions_voice_session_id_fkey"
+            columns: ["voice_session_id"]
+            isOneToOne: false
+            referencedRelation: "voice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trust_accounts: {
+        Row: {
+          account_details: Json | null
+          account_number: string
+          bank_name: string
+          created_at: string | null
+          current_balance: number | null
+          id: string
+          last_reconciliation: string | null
+          reconciled_balance: number | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_details?: Json | null
+          account_number: string
+          bank_name: string
+          created_at?: string | null
+          current_balance?: number | null
+          id?: string
+          last_reconciliation?: string | null
+          reconciled_balance?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_details?: Json | null
+          account_number?: string
+          bank_name?: string
+          created_at?: string | null
+          current_balance?: number | null
+          id?: string
+          last_reconciliation?: string | null
+          reconciled_balance?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      trust_transactions: {
+        Row: {
+          amount: number
+          bank_details: Json | null
+          created_at: string | null
+          description: string
+          id: string
+          matter_id: string | null
+          reference_number: string | null
+          running_balance: number
+          status: string | null
+          transaction_date: string | null
+          transaction_type: string
+          trust_account_id: string
+        }
+        Insert: {
+          amount: number
+          bank_details?: Json | null
+          created_at?: string | null
+          description: string
+          id?: string
+          matter_id?: string | null
+          reference_number?: string | null
+          running_balance: number
+          status?: string | null
+          transaction_date?: string | null
+          transaction_type: string
+          trust_account_id: string
+        }
+        Update: {
+          amount?: number
+          bank_details?: Json | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          matter_id?: string | null
+          reference_number?: string | null
+          running_balance?: number
+          status?: string | null
+          transaction_date?: string | null
+          transaction_type?: string
+          trust_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trust_transactions_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "active_matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trust_transactions_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trust_transactions_trust_account_id_fkey"
+            columns: ["trust_account_id"]
+            isOneToOne: false
+            referencedRelation: "trust_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_preferences: {
+        Row: {
+          advanced_features: Json
+          created_at: string | null
+          feature_discovery: Json
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          advanced_features?: Json
+          created_at?: string | null
+          feature_discovery?: Json
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          advanced_features?: Json
+          created_at?: string | null
+          feature_discovery?: Json
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       voice_queries: {
         Row: {
@@ -3078,6 +3576,110 @@ export type Database = {
             columns: ["advocate_id"]
             isOneToOne: false
             referencedRelation: "advocates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_service_config: {
+        Row: {
+          api_endpoint: string
+          config_data: Json | null
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          priority_order: number | null
+          service_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          api_endpoint: string
+          config_data?: Json | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          priority_order?: number | null
+          service_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          api_endpoint?: string
+          config_data?: Json | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          priority_order?: number | null
+          service_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      voice_sessions: {
+        Row: {
+          advocate_id: string
+          completed_at: string | null
+          created_at: string | null
+          extracted_data: Json | null
+          id: string
+          matched_matter_id: string | null
+          original_audio_url: string | null
+          status: string | null
+          transcription_confidence: number | null
+          transcription_text: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          advocate_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          extracted_data?: Json | null
+          id?: string
+          matched_matter_id?: string | null
+          original_audio_url?: string | null
+          status?: string | null
+          transcription_confidence?: number | null
+          transcription_text?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          advocate_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          extracted_data?: Json | null
+          id?: string
+          matched_matter_id?: string | null
+          original_audio_url?: string | null
+          status?: string | null
+          transcription_confidence?: number | null
+          transcription_text?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_sessions_advocate_id_fkey"
+            columns: ["advocate_id"]
+            isOneToOne: false
+            referencedRelation: "advocate_referral_stats"
+            referencedColumns: ["advocate_id"]
+          },
+          {
+            foreignKeyName: "voice_sessions_advocate_id_fkey"
+            columns: ["advocate_id"]
+            isOneToOne: false
+            referencedRelation: "advocates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_sessions_matched_matter_id_fkey"
+            columns: ["matched_matter_id"]
+            isOneToOne: false
+            referencedRelation: "active_matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_sessions_matched_matter_id_fkey"
+            columns: ["matched_matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
             referencedColumns: ["id"]
           },
         ]
@@ -3712,11 +4314,42 @@ export type Database = {
           },
         ]
       }
+      voice_session_analytics: {
+        Row: {
+          advocate_id: string | null
+          avg_confidence: number | null
+          avg_processing_time_seconds: number | null
+          completed_sessions: number | null
+          failed_sessions: number | null
+          time_entries_created: number | null
+          total_sessions: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_sessions_advocate_id_fkey"
+            columns: ["advocate_id"]
+            isOneToOne: false
+            referencedRelation: "advocate_referral_stats"
+            referencedColumns: ["advocate_id"]
+          },
+          {
+            foreignKeyName: "voice_sessions_advocate_id_fkey"
+            columns: ["advocate_id"]
+            isOneToOne: false
+            referencedRelation: "advocates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       analyze_brief_document: {
         Args: { p_document_id: string }
         Returns: string
+      }
+      calculate_compliance_score: {
+        Args: { user_uuid: string }
+        Returns: number
       }
       calculate_due_date: {
         Args: {
@@ -3749,6 +4382,22 @@ export type Database = {
           conflicting_matters: string[]
           has_conflict: boolean
         }[]
+      }
+      create_audit_entry: {
+        Args: {
+          p_action_type: string
+          p_after_state?: Json
+          p_before_state?: Json
+          p_description: string
+          p_entity_id: string
+          p_entity_type: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      generate_compliance_deadlines: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       generate_fee_narrative: {
         Args: {
@@ -3840,6 +4489,9 @@ export type Database = {
         | "overdue"
         | "disputed"
         | "written_off"
+        | "pro_forma"
+        | "pro_forma_accepted"
+        | "pro_forma_declined"
       matter_status: "active" | "pending" | "settled" | "closed" | "on_hold"
       payment_method: "eft" | "cheque" | "cash" | "card" | "debit_order"
       precedent_type:
@@ -4047,6 +4699,9 @@ export const Constants = {
         "overdue",
         "disputed",
         "written_off",
+        "pro_forma",
+        "pro_forma_accepted",
+        "pro_forma_declined",
       ],
       matter_status: ["active", "pending", "settled", "closed", "on_hold"],
       payment_method: ["eft", "cheque", "cash", "card", "debit_order"],

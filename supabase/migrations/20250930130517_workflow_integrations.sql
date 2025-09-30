@@ -2,7 +2,7 @@
 -- Features: Court Integration, Automated Court Diary Sync, Judge Analytics, Voice-Activated Queries, Language Accessibility
 
 -- Court Registry Integration
-CREATE TABLE court_registries (
+CREATE TABLE IF NOT EXISTS court_registries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   code TEXT UNIQUE NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE court_registries (
 );
 
 -- Court Cases and Diary Management
-CREATE TABLE court_cases (
+CREATE TABLE IF NOT EXISTS court_cases (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   matter_id UUID REFERENCES matters(id) ON DELETE CASCADE,
   court_registry_id UUID REFERENCES court_registries(id),
@@ -35,7 +35,7 @@ CREATE TABLE court_cases (
 );
 
 -- Court Diary Entries
-CREATE TABLE court_diary_entries (
+CREATE TABLE IF NOT EXISTS court_diary_entries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   court_case_id UUID REFERENCES court_cases(id) ON DELETE CASCADE,
   advocate_id UUID REFERENCES advocates(id),
@@ -53,7 +53,7 @@ CREATE TABLE court_diary_entries (
 );
 
 -- Judge Information and Analytics
-CREATE TABLE judges (
+CREATE TABLE IF NOT EXISTS judges (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   title TEXT,
@@ -68,7 +68,7 @@ CREATE TABLE judges (
 );
 
 -- Judge Analytics and Performance Metrics
-CREATE TABLE judge_analytics (
+CREATE TABLE IF NOT EXISTS judge_analytics (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   judge_id UUID REFERENCES judges(id) ON DELETE CASCADE,
   period_start DATE NOT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE judge_analytics (
 );
 
 -- Voice Query Processing
-CREATE TABLE voice_queries (
+CREATE TABLE IF NOT EXISTS voice_queries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   advocate_id UUID REFERENCES advocates(id),
   query_text TEXT NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE voice_queries (
 );
 
 -- Language Support and Translations
-CREATE TABLE language_translations (
+CREATE TABLE IF NOT EXISTS language_translations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   key TEXT NOT NULL,
   language_code TEXT NOT NULL CHECK (language_code IN ('en', 'af', 'zu', 'xh', 'st', 'tn', 'ss', 've', 'ts', 'nr', 'nd')),
@@ -114,7 +114,7 @@ CREATE TABLE language_translations (
 );
 
 -- Court Integration Logs
-CREATE TABLE court_integration_logs (
+CREATE TABLE IF NOT EXISTS court_integration_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   court_registry_id UUID REFERENCES court_registries(id),
   sync_type TEXT NOT NULL CHECK (sync_type IN ('diary_sync', 'case_update', 'judge_info', 'full_sync')),
@@ -128,14 +128,14 @@ CREATE TABLE court_integration_logs (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_court_cases_matter_id ON court_cases(matter_id);
-CREATE INDEX idx_court_cases_case_number ON court_cases(case_number);
-CREATE INDEX idx_court_diary_hearing_date ON court_diary_entries(hearing_date);
-CREATE INDEX idx_court_diary_advocate_id ON court_diary_entries(advocate_id);
-CREATE INDEX idx_judges_court_registry ON judges(court_registry_id);
-CREATE INDEX idx_judge_analytics_judge_period ON judge_analytics(judge_id, period_start, period_end);
-CREATE INDEX idx_voice_queries_advocate_created ON voice_queries(advocate_id, created_at);
-CREATE INDEX idx_language_translations_key_lang ON language_translations(key, language_code);
+CREATE INDEX IF NOT EXISTS idx_court_cases_matter_id ON court_cases(matter_id);
+CREATE INDEX IF NOT EXISTS idx_court_cases_case_number ON court_cases(case_number);
+CREATE INDEX IF NOT EXISTS idx_court_diary_hearing_date ON court_diary_entries(hearing_date);
+CREATE INDEX IF NOT EXISTS idx_court_diary_advocate_id ON court_diary_entries(advocate_id);
+CREATE INDEX IF NOT EXISTS idx_judges_court_registry ON judges(court_registry_id);
+CREATE INDEX IF NOT EXISTS idx_judge_analytics_judge_period ON judge_analytics(judge_id, period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_voice_queries_advocate_created ON voice_queries(advocate_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_language_translations_key_lang ON language_translations(key, language_code);
 
 -- RLS Policies
 ALTER TABLE court_registries ENABLE ROW LEVEL SECURITY;
@@ -148,10 +148,12 @@ ALTER TABLE language_translations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE court_integration_logs ENABLE ROW LEVEL SECURITY;
 
 -- Court registries are visible to all authenticated users
+DROP POLICY IF EXISTS "Court registries are visible to authenticated users" ON court_registries;
 CREATE POLICY "Court registries are visible to authenticated users" ON court_registries
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Court cases are visible to advocates involved in the matter
+DROP POLICY IF EXISTS "Court cases visible to matter advocates" ON court_cases;
 CREATE POLICY "Court cases visible to matter advocates" ON court_cases
   FOR ALL USING (
     EXISTS (
@@ -162,26 +164,32 @@ CREATE POLICY "Court cases visible to matter advocates" ON court_cases
   );
 
 -- Court diary entries are visible to the assigned advocate
+DROP POLICY IF EXISTS "Court diary visible to assigned advocate" ON court_diary_entries;
 CREATE POLICY "Court diary visible to assigned advocate" ON court_diary_entries
   FOR ALL USING (advocate_id = auth.uid());
 
 -- Judges are visible to all authenticated users
+DROP POLICY IF EXISTS "Judges are visible to authenticated users" ON judges;
 CREATE POLICY "Judges are visible to authenticated users" ON judges
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Judge analytics are visible to all authenticated users
+DROP POLICY IF EXISTS "Judge analytics visible to authenticated users" ON judge_analytics;
 CREATE POLICY "Judge analytics visible to authenticated users" ON judge_analytics
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Voice queries belong to the creating advocate
+DROP POLICY IF EXISTS "Voice queries belong to advocate" ON voice_queries;
 CREATE POLICY "Voice queries belong to advocate" ON voice_queries
   FOR ALL USING (advocate_id = auth.uid());
 
 -- Language translations are visible to all authenticated users
+DROP POLICY IF EXISTS "Language translations visible to authenticated users" ON language_translations;
 CREATE POLICY "Language translations visible to authenticated users" ON language_translations
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Court integration logs are visible to all authenticated users
+DROP POLICY IF EXISTS "Court integration logs visible to authenticated users" ON court_integration_logs;
 CREATE POLICY "Court integration logs visible to authenticated users" ON court_integration_logs
   FOR SELECT USING (auth.role() = 'authenticated');
 
@@ -336,13 +344,21 @@ INSERT INTO court_registries (name, code, jurisdiction, address) VALUES
 ('Johannesburg High Court', 'JHB_HC', 'Gauteng', '1 Pritchard Street, Johannesburg, 2001'),
 ('Cape Town High Court', 'CPT_HC', 'Western Cape', '1 Keerom Street, Cape Town, 8001'),
 ('Durban High Court', 'DBN_HC', 'KwaZulu-Natal', '323 Anton Lembede Street, Durban, 4001'),
-('Pretoria High Court', 'PTA_HC', 'Gauteng', '320 Thabo Sehume Street, Pretoria, 0002');
+('Pretoria High Court', 'PTA_HC', 'Gauteng', '320 Thabo Sehume Street, Pretoria, 0002')
+ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO judges (name, title, court_registry_id, specializations) VALUES
-('Justice M. Mogoeng', 'Acting Judge', (SELECT id FROM court_registries WHERE code = 'JHB_HC'), ARRAY['Commercial Law', 'Constitutional Law']),
-('Justice S. Makgoka', 'Judge', (SELECT id FROM court_registries WHERE code = 'CPT_HC'), ARRAY['Criminal Law', 'Family Law']),
-('Justice T. Mbha', 'Judge President', (SELECT id FROM court_registries WHERE code = 'DBN_HC'), ARRAY['Labour Law', 'Administrative Law']),
-('Justice R. Davis', 'Deputy Judge President', (SELECT id FROM court_registries WHERE code = 'PTA_HC'), ARRAY['Tax Law', 'Commercial Law']);
+INSERT INTO judges (name, title, court_registry_id, specializations) 
+SELECT 'Justice M. Mogoeng', 'Acting Judge', cr.id, ARRAY['Commercial Law', 'Constitutional Law']
+FROM court_registries cr WHERE cr.code = 'JHB_HC' AND NOT EXISTS (SELECT 1 FROM judges WHERE name = 'Justice M. Mogoeng')
+UNION ALL
+SELECT 'Justice S. Makgoka', 'Judge', cr.id, ARRAY['Criminal Law', 'Family Law']
+FROM court_registries cr WHERE cr.code = 'CPT_HC' AND NOT EXISTS (SELECT 1 FROM judges WHERE name = 'Justice S. Makgoka')
+UNION ALL
+SELECT 'Justice T. Mbha', 'Judge President', cr.id, ARRAY['Labour Law', 'Administrative Law']
+FROM court_registries cr WHERE cr.code = 'DBN_HC' AND NOT EXISTS (SELECT 1 FROM judges WHERE name = 'Justice T. Mbha')
+UNION ALL
+SELECT 'Justice R. Davis', 'Deputy Judge President', cr.id, ARRAY['Tax Law', 'Commercial Law']
+FROM court_registries cr WHERE cr.code = 'PTA_HC' AND NOT EXISTS (SELECT 1 FROM judges WHERE name = 'Justice R. Davis');
 
 -- Sample language translations for key UI elements
 INSERT INTO language_translations (key, language_code, translation) VALUES
@@ -360,4 +376,5 @@ INSERT INTO language_translations (key, language_code, translation) VALUES
 ('hearing_date', 'xh', 'Umhla Wokuxoxwa'),
 ('judge', 'af', 'Regter'),
 ('judge', 'zu', 'IJaji'),
-('judge', 'xh', 'IJaji');
+('judge', 'xh', 'IJaji')
+ON CONFLICT (key, language_code) DO NOTHING;

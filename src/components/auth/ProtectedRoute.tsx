@@ -20,7 +20,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredPermission,
   fallback 
 }) => {
-  const { user, loading, hasPermission } = useAuth();
+  const { user, loading, isAuthenticated, hasPermission } = useAuth();
   const pathname = window.location.pathname;
 
   // Show loading spinner while checking auth
@@ -38,7 +38,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Redirect to login if not authenticated
-  if (!user) {
+  // Use both user and isAuthenticated for consistency
+  if (!user || !isAuthenticated) {
     return <LoginPage />;
   }
 

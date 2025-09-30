@@ -1,9 +1,10 @@
 /**
  * Enhanced Fee Narrative Generator Service
  * AI-powered generation of detailed, justifiable fee descriptions
+ * Bar Council compliant narratives for South African legal practice
  */
 
-import type { TimeEntry, Matter } from '../types';
+import type { TimeEntry, Matter, NarrativePrompt, NarrativeGenerationRequest, NarrativeGenerationResponse } from '../types';
 
 export interface FeeNarrativeOptions {
   includeTimeBreakdown?: boolean;
@@ -11,6 +12,9 @@ export interface FeeNarrativeOptions {
   formalTone?: boolean;
   includeOutcomes?: boolean;
   groupByWorkType?: boolean;
+  narrativeType?: 'litigation' | 'advisory' | 'general';
+  includeComplexityJustification?: boolean;
+  includeValueDelivered?: boolean;
 }
 
 export interface GeneratedNarrative {
@@ -22,6 +26,107 @@ export interface GeneratedNarrative {
 }
 
 export class FeeNarrativeGenerator {
+  // Bar Council compliant narrative prompts
+  private readonly NARRATIVE_PROMPTS: Record<string, NarrativePrompt> = {
+    litigation: {
+      type: 'litigation',
+      prompt: `Generate a professional fee narrative for a South African litigation matter.
+Include:
+- Brief case overview
+- Services rendered
+- Professional opinion on complexity
+- Justification for fees
+Matter: {matterTitle}
+Services: {services}
+Hours: {totalHours}
+Tone: Professional, formal, Bar-compliant`,
+      template: `Professional services rendered in connection with the {matterType} matter of {clientName} v {opposingParty}.
+
+The matter involved {complexityDescription} requiring extensive {serviceTypes}. Our services included:
+
+{detailedServices}
+
+The complexity of this matter necessitated {justification} which is reflected in the time allocated to ensure proper representation and adherence to professional standards.
+
+Total professional time: {totalHours} hours at the prescribed rates in accordance with the Legal Practice Act and Bar Council guidelines.`,
+      keywords: ['litigation', 'court', 'trial', 'hearing', 'pleadings', 'motion', 'application', 'judgment']
+    },
+    advisory: {
+      type: 'advisory',
+      prompt: `Generate a professional fee narrative for advisory legal services.
+Include:
+- Scope of advisory work
+- Research and analysis performed
+- Value delivered to client
+Matter: {matterTitle}
+Services: {services}
+Hours: {totalHours}
+Tone: Professional, consultative`,
+      template: `Professional advisory services provided to {clientName} in connection with {matterDescription}.
+
+The scope of work encompassed {scopeOfWork} requiring comprehensive legal analysis and strategic advice. Our services included:
+
+{detailedServices}
+
+The advisory work delivered significant value through {valueDelivered} and ensured compliance with applicable legal requirements and best practices.
+
+Total professional time: {totalHours} hours reflecting the complexity and importance of the advisory services provided.`,
+      keywords: ['advisory', 'consultation', 'advice', 'opinion', 'compliance', 'review', 'analysis', 'strategy']
+    },
+    general: {
+      type: 'general',
+      prompt: `Generate a professional fee narrative for general legal services.
+Include:
+- Description of services rendered
+- Professional standards maintained
+- Time allocation justification
+Matter: {matterTitle}
+Services: {services}
+Hours: {totalHours}
+Tone: Professional, comprehensive`,
+      template: `Professional legal services rendered in connection with the {matterTitle} matter for {clientName}.
+
+Our services encompassed {serviceDescription} conducted in accordance with professional standards and ethical requirements. The work included:
+
+{detailedServices}
+
+The time allocated reflects the professional care and attention required to ensure quality service delivery and compliance with applicable legal and professional standards.
+
+Total professional time: {totalHours} hours at the applicable professional rates.`,
+      keywords: ['legal services', 'professional', 'consultation', 'assistance', 'representation']
+    }
+  };
+
+  // Bar Council compliance guidelines
+  private readonly BAR_COMPLIANCE_RULES = {
+    feeJustification: [
+      'complexity of the matter',
+      'time and labour required',
+      'skill and specialized knowledge required',
+      'responsibility assumed',
+      'importance of the matter to the client',
+      'results achieved',
+      'urgency of the matter',
+      'experience and reputation of the practitioner'
+    ],
+    professionalStandards: [
+      'Legal Practice Act compliance',
+      'Bar Council guidelines adherence',
+      'Professional conduct rules',
+      'Ethical requirements',
+      'Quality service delivery',
+      'Client care standards'
+    ],
+    narrativeRequirements: [
+      'Clear description of services',
+      'Justification for time spent',
+      'Professional language and tone',
+      'Compliance with billing guidelines',
+      'Transparency in fee structure',
+      'Value proposition articulation'
+    ]
+  };
+
   private workTypeTemplates = {
     'Research': {
       verbs: ['researched', 'investigated', 'analyzed', 'reviewed', 'examined'],
@@ -75,6 +180,52 @@ export class FeeNarrativeGenerator {
     'obtaining',
     'facilitating'
   ];
+
+  /**
+   * Generate Bar-compliant fee narrative using AI prompts
+   */
+  async generateBarCompliantNarrative(
+    request: NarrativeGenerationRequest
+  ): Promise<NarrativeGenerationResponse> {
+    const { timeEntries, matter, options = {} } = request;
+    const narrativeType = options.narrativeType || this.detectNarrativeType(timeEntries, matter);
+    
+    try {
+      // Get the appropriate prompt template
+      const promptTemplate = this.NARRATIVE_PROMPTS[narrativeType];
+      
+      // Prepare context data
+      const context = this.prepareNarrativeContext(timeEntries, matter, options);
+      
+      // Generate the narrative using the template
+      const narrative = this.generateFromTemplate(promptTemplate, context, options);
+      
+      // Validate Bar Council compliance
+      const complianceCheck = this.validateBarCompliance(narrative, timeEntries, matter);
+      
+      // Generate alternatives
+      const alternatives = await this.generateAlternativeVersions(narrative, options);
+      
+      // Generate improvement suggestions
+      const suggestions = this.generateBarCompliantSuggestions(narrative, timeEntries, complianceCheck);
+      
+      return {
+        narrative: this.formatNarrative(narrative, true),
+        wordCount: narrative.split(' ').length,
+        confidence: this.calculateNarrativeConfidence(timeEntries, narrative),
+        suggestions,
+        alternativeVersions: alternatives,
+        complianceCheck,
+        narrativeType,
+        isEditable: true,
+        barCompliant: complianceCheck.isCompliant
+      };
+      
+    } catch (error) {
+      console.error('Bar-compliant narrative generation failed:', error);
+      throw new Error('Failed to generate Bar-compliant fee narrative');
+    }
+  }
 
   /**
    * Generate enhanced fee narrative from time entries
@@ -512,6 +663,333 @@ export class FeeNarrativeGenerator {
     }
     
     return suggestions;
+  }
+
+  /**
+   * Detect narrative type based on time entries and matter
+   */
+  private detectNarrativeType(timeEntries: TimeEntry[], matter: Matter): 'litigation' | 'advisory' | 'general' {
+    const descriptions = timeEntries.map(e => e.description.toLowerCase()).join(' ');
+    const matterTitle = matter.title?.toLowerCase() || '';
+    const matterDescription = matter.description?.toLowerCase() || '';
+    
+    const allText = `${descriptions} ${matterTitle} ${matterDescription}`;
+    
+    // Check for litigation keywords
+    const litigationKeywords = this.NARRATIVE_PROMPTS.litigation.keywords;
+    const litigationMatches = litigationKeywords.filter(keyword => allText.includes(keyword)).length;
+    
+    // Check for advisory keywords
+    const advisoryKeywords = this.NARRATIVE_PROMPTS.advisory.keywords;
+    const advisoryMatches = advisoryKeywords.filter(keyword => allText.includes(keyword)).length;
+    
+    if (litigationMatches > advisoryMatches && litigationMatches > 0) {
+      return 'litigation';
+    } else if (advisoryMatches > 0) {
+      return 'advisory';
+    }
+    
+    return 'general';
+  }
+
+  /**
+   * Prepare narrative context for template generation
+   */
+  private prepareNarrativeContext(
+    timeEntries: TimeEntry[],
+    matter: Matter,
+    options: FeeNarrativeOptions
+  ): Record<string, string> {
+    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.duration, 0) / 60;
+    const services = this.extractServices(timeEntries);
+    const serviceTypes = this.extractServiceTypes(timeEntries);
+    
+    return {
+      matterTitle: matter.title || 'Legal Matter',
+      matterType: matter.matterType || 'Legal',
+      matterDescription: matter.description || 'Legal services matter',
+      clientName: matter.clientName || 'Client',
+      opposingParty: this.extractOpposingParty(matter) || 'Opposing Party',
+      totalHours: totalHours.toFixed(1),
+      services: services.join(', '),
+      serviceTypes: serviceTypes.join(', '),
+      detailedServices: this.generateDetailedServicesList(timeEntries),
+      complexityDescription: this.generateComplexityDescription(timeEntries, matter),
+      justification: this.generateFeeJustification(timeEntries, matter, options),
+      scopeOfWork: this.generateScopeOfWork(timeEntries),
+      valueDelivered: this.generateValueDelivered(timeEntries, matter, options),
+      serviceDescription: this.generateServiceDescription(timeEntries)
+    };
+  }
+
+  /**
+   * Generate narrative from template
+   */
+  private generateFromTemplate(
+    promptTemplate: NarrativePrompt,
+    context: Record<string, string>,
+    options: FeeNarrativeOptions
+  ): string {
+    let narrative = promptTemplate.template;
+    
+    // Replace template variables
+    Object.entries(context).forEach(([key, value]) => {
+      const placeholder = `{${key}}`;
+      narrative = narrative.replace(new RegExp(placeholder, 'g'), value);
+    });
+    
+    // Add complexity justification if requested
+    if (options.includeComplexityJustification) {
+      narrative += `\n\nThe complexity of this matter is justified by ${context.complexityDescription}.`;
+    }
+    
+    // Add value delivered if requested
+    if (options.includeValueDelivered && context.valueDelivered) {
+      narrative += `\n\nValue delivered: ${context.valueDelivered}.`;
+    }
+    
+    return narrative;
+  }
+
+  /**
+   * Validate Bar Council compliance
+   */
+  private validateBarCompliance(
+    narrative: string,
+    timeEntries: TimeEntry[],
+    matter: Matter
+  ): any {
+    const issues: string[] = [];
+    const recommendations: string[] = [];
+    
+    // Check for required elements
+    if (!narrative.includes('professional')) {
+      issues.push('Narrative should emphasize professional service delivery');
+      recommendations.push('Include references to professional standards');
+    }
+    
+    if (!narrative.includes('time') && !narrative.includes('hours')) {
+      issues.push('Narrative should include time allocation details');
+      recommendations.push('Add clear time breakdown and justification');
+    }
+    
+    // Check for fee justification elements
+    const hasJustification = this.BAR_COMPLIANCE_RULES.feeJustification.some(
+      element => narrative.toLowerCase().includes(element.toLowerCase())
+    );
+    
+    if (!hasJustification) {
+      issues.push('Narrative lacks proper fee justification');
+      recommendations.push('Include justification based on complexity, skill required, or results achieved');
+    }
+    
+    // Check professional language
+    const unprofessionalWords = ['cheap', 'quick', 'easy', 'simple'];
+    const hasUnprofessionalLanguage = unprofessionalWords.some(
+      word => narrative.toLowerCase().includes(word)
+    );
+    
+    if (hasUnprofessionalLanguage) {
+      issues.push('Narrative contains unprofessional language');
+      recommendations.push('Use formal, professional terminology throughout');
+    }
+    
+    return {
+      isCompliant: issues.length === 0,
+      issues,
+      recommendations,
+      complianceScore: Math.max(0, 100 - (issues.length * 20))
+    };
+  }
+
+  /**
+   * Generate Bar-compliant suggestions
+   */
+  private generateBarCompliantSuggestions(
+    narrative: string,
+    timeEntries: TimeEntry[],
+    complianceCheck: any
+  ): string[] {
+    const suggestions: string[] = [...complianceCheck.recommendations];
+    
+    // Add general improvement suggestions
+    if (narrative.length < 100) {
+      suggestions.push('Consider expanding the narrative to provide more comprehensive service description');
+    }
+    
+    if (!narrative.includes('Legal Practice Act') && !narrative.includes('Bar Council')) {
+      suggestions.push('Consider referencing applicable professional standards or guidelines');
+    }
+    
+    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.duration, 0) / 60;
+    if (totalHours > 10 && !narrative.includes('complexity')) {
+      suggestions.push('For matters requiring significant time, emphasize complexity and skill required');
+    }
+    
+    return suggestions;
+  }
+
+  /**
+   * Extract services from time entries
+   */
+  private extractServices(timeEntries: TimeEntry[]): string[] {
+    const services = new Set<string>();
+    
+    timeEntries.forEach(entry => {
+      const workType = this.detectWorkType(entry.description);
+      services.add(workType.toLowerCase());
+    });
+    
+    return Array.from(services);
+  }
+
+  /**
+   * Extract service types for narrative
+   */
+  private extractServiceTypes(timeEntries: TimeEntry[]): string[] {
+    const types = new Set<string>();
+    
+    timeEntries.forEach(entry => {
+      const desc = entry.description.toLowerCase();
+      if (desc.includes('research')) types.add('legal research');
+      if (desc.includes('draft')) types.add('document drafting');
+      if (desc.includes('review')) types.add('document review');
+      if (desc.includes('court') || desc.includes('hearing')) types.add('court representation');
+      if (desc.includes('client') || desc.includes('meeting')) types.add('client consultation');
+      if (desc.includes('correspondence')) types.add('professional correspondence');
+    });
+    
+    return Array.from(types);
+  }
+
+  /**
+   * Extract opposing party from matter
+   */
+  private extractOpposingParty(matter: Matter): string | null {
+    const title = matter.title?.toLowerCase() || '';
+    const description = matter.description?.toLowerCase() || '';
+    
+    // Look for common patterns like "vs", "v", "against"
+    const vsMatch = title.match(/\sv\s(.+?)(?:\s|$)/);
+    if (vsMatch) return vsMatch[1];
+    
+    const againstMatch = description.match(/against\s(.+?)(?:\s|$)/);
+    if (againstMatch) return againstMatch[1];
+    
+    return null;
+  }
+
+  /**
+   * Generate detailed services list
+   */
+  private generateDetailedServicesList(timeEntries: TimeEntry[]): string {
+    const groupedEntries = this.groupEntriesByWorkType(timeEntries);
+    const servicesList: string[] = [];
+    
+    groupedEntries.forEach((entries, workType) => {
+      const totalTime = entries.reduce((sum, entry) => sum + entry.duration, 0);
+      const hours = (totalTime / 60).toFixed(1);
+      servicesList.push(`• ${workType}: ${hours} hours`);
+    });
+    
+    return servicesList.join('\n');
+  }
+
+  /**
+   * Generate complexity description
+   */
+  private generateComplexityDescription(timeEntries: TimeEntry[], matter: Matter): string {
+    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.duration, 0) / 60;
+    const uniqueWorkTypes = new Set(timeEntries.map(e => this.detectWorkType(e.description))).size;
+    
+    if (totalHours > 20 || uniqueWorkTypes > 4) {
+      return 'complex legal issues requiring extensive analysis and multiple areas of expertise';
+    } else if (totalHours > 10 || uniqueWorkTypes > 2) {
+      return 'multifaceted legal matters requiring careful consideration and professional expertise';
+    } else {
+      return 'legal matters requiring professional attention and specialized knowledge';
+    }
+  }
+
+  /**
+   * Generate fee justification
+   */
+  private generateFeeJustification(
+    timeEntries: TimeEntry[],
+    matter: Matter,
+    options: FeeNarrativeOptions
+  ): string {
+    const justifications: string[] = [];
+    
+    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.duration, 0) / 60;
+    if (totalHours > 10) {
+      justifications.push('the substantial time and labour required');
+    }
+    
+    const uniqueWorkTypes = new Set(timeEntries.map(e => this.detectWorkType(e.description))).size;
+    if (uniqueWorkTypes > 3) {
+      justifications.push('the diverse skill set and specialized knowledge required');
+    }
+    
+    if (matter.riskLevel === 'high') {
+      justifications.push('the significant responsibility and risk assumed');
+    }
+    
+    if (justifications.length === 0) {
+      justifications.push('the professional care and attention required');
+    }
+    
+    return justifications.join(', ');
+  }
+
+  /**
+   * Generate scope of work description
+   */
+  private generateScopeOfWork(timeEntries: TimeEntry[]): string {
+    const workTypes = this.extractServiceTypes(timeEntries);
+    return workTypes.join(', ');
+  }
+
+  /**
+   * Generate value delivered description
+   */
+  private generateValueDelivered(
+    timeEntries: TimeEntry[],
+    matter: Matter,
+    options: FeeNarrativeOptions
+  ): string {
+    const values: string[] = [];
+    
+    if (timeEntries.some(e => e.description.toLowerCase().includes('research'))) {
+      values.push('comprehensive legal analysis and research');
+    }
+    
+    if (timeEntries.some(e => e.description.toLowerCase().includes('draft'))) {
+      values.push('professionally drafted documentation');
+    }
+    
+    if (timeEntries.some(e => e.description.toLowerCase().includes('advice'))) {
+      values.push('strategic legal advice and guidance');
+    }
+    
+    if (values.length === 0) {
+      values.push('professional legal services and expertise');
+    }
+    
+    return values.join(', ');
+  }
+
+  /**
+   * Generate service description
+   */
+  private generateServiceDescription(timeEntries: TimeEntry[]): string {
+    const descriptions = timeEntries.map(entry => {
+      const workType = this.detectWorkType(entry.description);
+      return workType.toLowerCase();
+    });
+    
+    const uniqueDescriptions = [...new Set(descriptions)];
+    return uniqueDescriptions.join(', ');
   }
 
   /**

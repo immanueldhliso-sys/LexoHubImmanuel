@@ -1,24 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, FileText, Calendar, Building, Search, Filter, RefreshCw } from 'lucide-react';
+import { Plus, FileText, Calendar, Building, Search, Filter, RefreshCw, Send, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Button, Card, CardHeader, CardContent, Input, Modal, ModalBody, ModalFooter } from '../design-system/components';
 import { LoadingSpinner } from '../components/design-system/components/LoadingSpinner';
-import { InvoiceService } from '../services/api/invoices.service';
-import { InvoiceGenerationModal } from '../components/invoices/InvoiceGenerationModal';
-import { debugSupabaseConnection } from '../utils/debug-supabase';
+import { ProFormaCreationModal } from '../components/proforma/ProFormaCreationModal';
+import { proformaService } from '../services/api/proforma.service';
 import { toast } from 'react-hot-toast';
+import { formatRand } from '../lib/currency';
 import type { 
-  Invoice, 
+  ProForma, 
   ProFormaFilters, 
   ProFormaSummaryStats,
   Matter,
-  InvoiceGenerationRequest 
+  ProFormaGenerationRequest,
+  ProFormaStatus 
 } from '../types';
-import { InvoiceStatus } from '../types';
 
 interface ProFormaPageState {
   // Data
-  proFormas: Invoice[];
-  filteredProFormas: Invoice[];
+  proformas: ProForma[];
+  filteredProFormas: ProForma[];
   matters: Matter[];
   
   // UI State
@@ -41,7 +41,7 @@ interface ProFormaPageState {
 
 const ProFormaPage: React.FC = () => {
   const [state, setState] = useState<ProFormaPageState>({
-    proFormas: [],
+    proformas: [],
     filteredProFormas: [],
     matters: [],
     isLoading: true,
@@ -61,595 +61,515 @@ const ProFormaPage: React.FC = () => {
       estimatedValue: 0,
       currentMonthCount: 0,
       conversionRate: 0,
-      averageValue: 0
+      averageValue: 0,
+      pendingAcceptance: 0
     }
   });
 
   // Apply filters to pro formas
-  const applyFilters = useCallback((proFormas: Invoice[], filters: ProFormaFilters): Invoice[] => {
-    return proFormas.filter(proForma => {
+  const applyFilters = useCallback((proformas: ProForma[], filters: ProFormaFilters): ProForma[] => {
+    return proformas.filter(proforma => {
       // Search filter
       if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const matchesSearch = 
-          proForma.invoice_number.toLowerCase().includes(searchLower) ||
-          (proForma.matter_id && proForma.matter_id.toLowerCase().includes(searchLower)) ||
-          (proForma.fee_narrative && proForma.fee_narrative.toLowerCase().includes(searchLower));
+        const searchTerm = filters.search.toLowerCase();
+        const matter = state.matters.find(m => m.id === proforma.matter_id);
+        const searchableText = [
+          proforma.quote_number,
+          proforma.fee_narrative,
+          matter?.title,
+          matter?.client_name,
+          matter?.reference_number
+        ].join(' ').toLowerCase();
         
-        if (!matchesSearch) return false;
-      }
-      
-      // Status filter
-      if (filters.status !== 'all') {
-        switch (filters.status) {
-          case 'active':
-            return proForma.status === InvoiceStatus.PRO_FORMA;
-          case 'converted':
-            return proForma.status === InvoiceStatus.CONVERTED;
-          case 'expired':
-            // Consider pro formas older than 30 days as expired
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            return new Date(proForma.created_at) < thirtyDaysAgo && proForma.status === InvoiceStatus.PRO_FORMA;
-          default:
-            return true;
-        }
-      }
-      
-      // Date range filter
-      if (filters.dateRange) {
-        const proFormaDate = new Date(proForma.created_at);
-        const startDate = new Date(filters.dateRange.start);
-        const endDate = new Date(filters.dateRange.end);
-        
-        if (proFormaDate < startDate || proFormaDate > endDate) {
+        if (!searchableText.includes(searchTerm)) {
           return false;
         }
       }
-      
+
+      // Status filter
+      if (filters.status !== 'all') {
+        if (proforma.status !== filters.status) {
+          return false;
+        }
+      }
+
+      // Date range filter
+      if (filters.dateRange) {
+        const proformaDate = new Date(proforma.quote_date);
+        const startDate = new Date(filters.dateRange.start);
+        const endDate = new Date(filters.dateRange.end);
+        
+        if (proformaDate < startDate || proformaDate > endDate) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, []);
+  }, [state.matters]);
 
   // Calculate summary statistics
-  const calculateSummaryStats = useCallback((proFormas: Invoice[]): ProFormaSummaryStats => {
+  const calculateSummaryStats = useCallback((proformas: ProForma[]): ProFormaSummaryStats => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
-    const currentMonthProFormas = proFormas.filter(pf => {
-      const pfDate = new Date(pf.created_at);
-      return pfDate.getMonth() === currentMonth && pfDate.getFullYear() === currentYear;
+    const currentMonthProFormas = proformas.filter(proforma => {
+      const proformaDate = new Date(proforma.quote_date);
+      return proformaDate.getMonth() === currentMonth && proformaDate.getFullYear() === currentYear;
     });
-    
-    const convertedProFormas = proFormas.filter(pf => pf.status === InvoiceStatus.CONVERTED);
-    const totalValue = proFormas.reduce((sum, pf) => sum + pf.total_amount, 0);
-    
+
+    const convertedProFormas = proformas.filter(proforma => proforma.status === 'converted_to_invoice');
+    const pendingProFormas = proformas.filter(proforma => proforma.status === 'awaiting_acceptance');
+
     return {
-      totalCount: proFormas.length,
-      estimatedValue: totalValue,
+      totalCount: proformas.length,
+      estimatedValue: proformas.reduce((sum, proforma) => sum + proforma.total_amount, 0),
       currentMonthCount: currentMonthProFormas.length,
-      conversionRate: proFormas.length > 0 ? (convertedProFormas.length / proFormas.length) * 100 : 0,
-      averageValue: proFormas.length > 0 ? totalValue / proFormas.length : 0
+      conversionRate: proformas.length > 0 ? (convertedProFormas.length / proformas.length) * 100 : 0,
+      averageValue: proformas.length > 0 ? proformas.reduce((sum, proforma) => sum + proforma.total_amount, 0) / proformas.length : 0,
+      pendingAcceptance: pendingProFormas.length
     };
   }, []);
 
-  // Fetch pro forma invoices
-  const fetchProFormas = useCallback(async () => {
+  // Load pro formas and matters
+  const loadData = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // Debug Supabase connection first
-      console.log('🔍 Running Supabase connection debug...');
-      const debugResult = await debugSupabaseConnection();
-      console.log('Debug result:', debugResult);
-      
-      const response = await InvoiceService.getInvoices({
-        status: [InvoiceStatus.PRO_FORMA],
-        page: 1,
-        pageSize: 100 // Get all pro formas for now
-      });
-      
-      const proFormas = response.data;
-      const filteredProFormas = applyFilters(proFormas, state.filters);
-      const summaryStats = calculateSummaryStats(proFormas);
-      
+      // Load pro formas and matters from API
+      const [proformasData, mattersData] = await Promise.all([
+        proformaService.getProFormas(),
+        // MattersService.getMatters() // Assuming this exists
+      ]);
+
       setState(prev => ({
         ...prev,
-        proFormas,
-        filteredProFormas,
-        summaryStats,
+        proformas: proformasData,
+        matters: mattersData || [],
         isLoading: false
       }));
-      
     } catch (error) {
-      console.error('Error fetching pro formas:', error);
-      // Report error and surface to UI without fallback mock data
-      toast.error('Failed to fetch pro forma invoices');
+      console.error('Error loading pro formas:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: 'Failed to fetch pro forma invoices'
+        error: 'Failed to fetch pro formas'
       }));
     }
-  }, [state.filters, applyFilters, calculateSummaryStats]);
-
-  // Handle pro forma creation
-  const handleCreateProForma = useCallback(async (data: InvoiceGenerationRequest) => {
-    try {
-      await InvoiceService.generateInvoice({ ...data, isProForma: true });
-      setState(prev => ({ ...prev, showCreationModal: false }));
-      await fetchProFormas();
-      toast.success('Pro forma invoice created successfully');
-    } catch (error) {
-      console.error('Error creating pro forma:', error);
-      toast.error('Failed to create pro forma invoice');
-    }
-  }, [fetchProFormas]);
-
-  // Handle conversion to final invoice
-  const handleConvertToFinal = useCallback(async (proFormaId: string) => {
-    try {
-      await InvoiceService.convertProFormaToFinal(proFormaId);
-      setState(prev => ({ ...prev, showConversionModal: false, selectedProFormaId: null }));
-      await fetchProFormas();
-    } catch (error) {
-      console.error('Error converting pro forma:', error);
-    }
-  }, [fetchProFormas]);
-
-  // Handle filter changes
-  const handleFiltersChange = useCallback((newFilters: Partial<ProFormaFilters>) => {
-    setState(prev => {
-      const updatedFilters = { ...prev.filters, ...newFilters };
-      const filteredProFormas = applyFilters(prev.proFormas, updatedFilters);
-      
-      return {
-        ...prev,
-        filters: updatedFilters,
-        filteredProFormas
-      };
-    });
-  }, [applyFilters]);
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchProFormas();
   }, []);
 
-  // Update filtered results when filters change
+  // Handle pro forma creation
+  const handleCreateProForma = useCallback(async (data: ProFormaGenerationRequest) => {
+    try {
+      setState(prev => ({ ...prev, showCreationModal: false }));
+      
+      const newProForma = await proformaService.generateProForma(data);
+      
+      toast.success('Pro Forma created successfully');
+      
+      // Reload data to include the new pro forma
+      await loadData();
+    } catch (error) {
+      console.error('Error creating pro forma:', error);
+      toast.error('Failed to create pro forma');
+    }
+  }, [loadData]);
+
+  // Handle pro forma conversion to invoice
+  const handleConvertToInvoice = useCallback(async (proformaId: string) => {
+    try {
+      setState(prev => ({ ...prev, showConversionModal: false }));
+      
+      const invoice = await proformaService.convertToInvoice(proformaId);
+      
+      toast.success('Pro Forma converted to invoice successfully');
+      
+      setState(prev => ({
+        ...prev,
+        selectedProFormaId: null,
+        showConversionModal: false
+      }));
+      
+      // Reload data to reflect the status change
+      await loadData();
+    } catch (error) {
+      console.error('Error converting pro forma:', error);
+      toast.error('Failed to convert pro forma to invoice');
+    }
+  }, [loadData]);
+
+  // Handle filter changes
+  const handleFilterChange = useCallback((newFilters: Partial<ProFormaFilters>) => {
+    setState(prev => ({
+      ...prev,
+      filters: { ...prev.filters, ...newFilters }
+    }));
+  }, []);
+
+  // Load data on component mount
   useEffect(() => {
-    const filteredProFormas = applyFilters(state.proFormas, state.filters);
-    setState(prev => ({ ...prev, filteredProFormas }));
-  }, [state.proFormas, state.filters, applyFilters]);
+    loadData();
+  }, [loadData]);
 
-  if (state.isLoading) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-center py-12">
-          <LoadingSpinner />
-        </div>
-      </div>
-    );
-  }
+  // Update filtered data and summary stats when proformas or filters change
+  useEffect(() => {
+    if (state.proformas.length > 0) {
+      const filteredProFormas = applyFilters(state.proformas, state.filters);
+      const summaryStats = calculateSummaryStats(state.proformas);
+      
+      setState(prev => ({
+        ...prev,
+        filteredProFormas,
+        summaryStats
+      }));
+    }
+  }, [state.proformas, state.filters, applyFilters, calculateSummaryStats]);
 
-  if (state.error) {
+  const getStatusBadgeColor = (status: ProFormaStatus): string => {
+    switch (status) {
+      case 'draft':
+        return 'bg-neutral-100 text-neutral-800';
+      case 'sent':
+        return 'bg-blue-100 text-blue-800';
+      case 'awaiting_acceptance':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'accepted':
+        return 'bg-green-100 text-green-800';
+      case 'declined':
+        return 'bg-red-100 text-red-800';
+      case 'expired':
+        return 'bg-neutral-100 text-neutral-600';
+      case 'converted_to_invoice':
+        return 'bg-mpondo-gold-100 text-mpondo-gold-800';
+      default:
+        return 'bg-neutral-100 text-neutral-800';
+    }
+  };
+
+  const getStatusIcon = (status: ProFormaStatus) => {
+    switch (status) {
+      case 'awaiting_acceptance':
+        return <Clock className="h-3 w-3" />;
+      case 'accepted':
+        return <CheckCircle className="h-3 w-3" />;
+      case 'declined':
+        return <AlertCircle className="h-3 w-3" />;
+      case 'converted_to_invoice':
+        return <CheckCircle className="h-3 w-3" />;
+      default:
+        return null;
+    }
+  };
+
+  // Loading state
+  if (state.isLoading && state.proformas.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto space-y-6">
-        <Card variant="outlined">
-          <CardContent className="text-center py-12">
-            <div className="text-status-error-500 mb-4">
-              <FileText className="w-16 h-16 mx-auto" />
-            </div>
-            <h3 className="text-lg font-medium text-neutral-900 mb-2">Error Loading Pro Formas</h3>
-            <p className="text-neutral-600 mb-6">{state.error}</p>
-            <Button variant="primary" onClick={fetchProFormas}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900">Pro Forma Invoices</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">Pro Forma Management</h1>
           <p className="text-neutral-600 mt-1">
-            Create and manage preliminary invoices for estimation purposes
+            Create and manage client pro formas with seamless invoice conversion
           </p>
         </div>
-        <Button 
-          variant="primary" 
+        <Button
+          variant="primary"
           onClick={() => setState(prev => ({ ...prev, showCreationModal: true }))}
-          data-testid="create-pro-forma-button"
+          className="bg-judicial-blue-600 hover:bg-judicial-blue-700"
+          data-testid="create-proforma-button"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="h-4 w-4 mr-2" />
           Create Pro Forma
         </Button>
       </div>
 
-      {/* Info Banner */}
-      <Card variant="outlined" className="border-judicial-blue-200 bg-judicial-blue-50">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <FileText className="w-5 h-5 text-judicial-blue-600 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-judicial-blue-900">About Pro Forma Invoices</h3>
-              <p className="text-sm text-judicial-blue-800 mt-1">
-                Pro forma invoices are preliminary bills used for estimation purposes. They don't affect billing status 
-                or matter WIP values, and can later be converted to final invoices.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card variant="default">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8 text-judicial-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-neutral-600">Total Pro Formas</p>
                 <p className="text-2xl font-bold text-neutral-900">{state.summaryStats.totalCount}</p>
               </div>
+              <FileText className="h-8 w-8 text-judicial-blue-500" />
             </div>
           </CardContent>
         </Card>
-        
-        <Card variant="default">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 flex items-center justify-center bg-status-success-100 rounded-lg">
-                <span className="text-status-success-600 font-bold">R</span>
-              </div>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-neutral-600">Estimated Value</p>
-                <p className="text-2xl font-bold text-neutral-900">
-                  R{state.summaryStats.estimatedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                </p>
+                <p className="text-2xl font-bold text-neutral-900">{formatRand(state.summaryStats.estimatedValue)}</p>
               </div>
+              <Building className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
-        
-        <Card variant="default">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-8 h-8 text-status-warning-600" />
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-neutral-600">This Month</p>
                 <p className="text-2xl font-bold text-neutral-900">{state.summaryStats.currentMonthCount}</p>
               </div>
+              <Calendar className="h-8 w-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-600">Conversion Rate</p>
+                <p className="text-2xl font-bold text-neutral-900">{state.summaryStats.conversionRate.toFixed(1)}%</p>
+              </div>
+              <RefreshCw className="h-8 w-8 text-mpondo-gold-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-600">Average Value</p>
+                <p className="text-2xl font-bold text-neutral-900">{formatRand(state.summaryStats.averageValue)}</p>
+              </div>
+              <Building className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-600">Pending</p>
+                <p className="text-2xl font-bold text-neutral-900">{state.summaryStats.pendingAcceptance}</p>
+              </div>
+              <Clock className="h-8 w-8 text-yellow-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card variant="default">
+      <Card>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <Input
-                placeholder="Search pro formas..."
-                value={state.filters.search}
-                onChange={(e) => handleFiltersChange({ search: e.target.value })}
-                className="w-full"
-                data-testid="search-input"
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 h-4 w-4" />
+                <Input
+                  type="text"
+                  placeholder="Search pro formas, matters, or clients..."
+                  value={state.filters.search}
+                  onChange={(e) => handleFilterChange({ search: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
             </div>
             <div className="flex gap-2">
               <select
                 value={state.filters.status}
-                onChange={(e) => handleFiltersChange({ status: e.target.value as ProFormaFilters['status'] })}
-                className="px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mpondo-gold-500"
-                data-testid="status-filter"
+                onChange={(e) => handleFilterChange({ status: e.target.value as any })}
+                className="px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-judicial-blue-500 focus:border-transparent"
               >
                 <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="converted">Converted</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="awaiting_acceptance">Awaiting Acceptance</option>
+                <option value="accepted">Accepted</option>
+                <option value="declined">Declined</option>
                 <option value="expired">Expired</option>
+                <option value="converted_to_invoice">Converted</option>
               </select>
-              <Button variant="outline" onClick={() => handleFiltersChange({ search: '', status: 'all', dateRange: null })}>
-                Clear Filters
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                More Filters
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Pro Forma List */}
-      <Card variant="default">
-        <CardHeader className="p-6 border-b border-neutral-200">
-          <h2 className="text-lg font-semibold text-neutral-900">
-            Pro Forma Invoices ({state.filteredProFormas.length})
-          </h2>
-        </CardHeader>
-        
-        {state.filteredProFormas.length === 0 ? (
-          <CardContent className="text-center py-12">
-            <FileText className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-neutral-900 mb-2">
-              {state.proFormas.length === 0 ? 'No Pro Forma Invoices' : 'No Results Found'}
-            </h3>
-            <p className="text-neutral-600 mb-6">
-              {state.proFormas.length === 0 
-                ? 'Create your first pro forma invoice to get started with preliminary billing.'
-                : 'No pro formas match your current filters. Try adjusting your search criteria.'
+      {/* Pro Formas List */}
+      {state.filteredProFormas.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <FileText className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-neutral-900 mb-2">No pro formas found</h3>
+            <p className="text-neutral-600 mb-4">
+              {state.filters.search || state.filters.status !== 'all'
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Create your first pro forma to get started with the simplified workflow.'
               }
             </p>
-            {state.proFormas.length === 0 ? (
-              <Button variant="primary" onClick={() => setState(prev => ({ ...prev, showCreationModal: true }))}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create First Pro Forma
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={() => handleFiltersChange({ search: '', status: 'all', dateRange: null })}>
-                Clear Filters
-              </Button>
-            )}
+            <Button
+              variant="primary"
+              onClick={() => setState(prev => ({ ...prev, showCreationModal: true }))}
+              className="bg-judicial-blue-600 hover:bg-judicial-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Pro Forma
+            </Button>
           </CardContent>
-        ) : (
-          <div className="divide-y divide-neutral-200">
-            {state.filteredProFormas.map((proForma) => (
-              <div key={proForma.id} className="p-6 hover:bg-neutral-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-neutral-900">{proForma.invoice_number}</h3>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        proForma.status === InvoiceStatus.PRO_FORMA 
-                          ? 'bg-judicial-blue-100 text-judicial-blue-800'
-                          : proForma.status === InvoiceStatus.CONVERTED
-                          ? 'bg-status-success-100 text-status-success-800'
-                          : 'bg-neutral-100 text-neutral-800'
-                      }`}>
-                        {proForma.status === InvoiceStatus.PRO_FORMA ? 'Pro Forma' : 
-                         proForma.status === InvoiceStatus.CONVERTED ? 'Converted' : proForma.status}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Building className="w-4 h-4 text-neutral-400" />
-                        <span className="text-neutral-600">Matter: {proForma.matter_id}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-neutral-400" />
-                        <span className="text-neutral-600">
-                          {proForma.fee_narrative ? proForma.fee_narrative.substring(0, 50) + '...' : 'No description'}
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {state.filteredProFormas.map((proforma) => {
+            const matter = state.matters.find(m => m.id === proforma.matter_id);
+            
+            return (
+              <Card key={proforma.id} variant="default" hoverable>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-neutral-900">
+                          {proforma.quote_number}
+                        </h3>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(proforma.status)}`}>
+                          {getStatusIcon(proforma.status)}
+                          {proforma.status === 'awaiting_acceptance' ? 'Awaiting Acceptance' :
+                           proforma.status === 'converted_to_invoice' ? 'Converted' :
+                           proforma.status.charAt(0).toUpperCase() + proforma.status.slice(1)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 flex items-center justify-center text-neutral-400 font-bold">R</span>
-                        <span className="text-neutral-600">
-                          R{proForma.total_amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-neutral-400" />
-                        <span className="text-neutral-600">
-                          {new Date(proForma.created_at).toLocaleDateString('en-ZA')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {proForma.status === InvoiceStatus.PRO_FORMA && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => setState(prev => ({ 
-                          ...prev, 
-                          showConversionModal: true, 
-                          selectedProFormaId: proForma.id 
-                        }))}
-                        className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
-                        data-testid={`convert-button-${proForma.id}`}
-                      >
-                        Convert to Final
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setState(prev => ({ 
-                        ...prev, 
-                        showDetailsModal: true, 
-                        selectedProFormaId: proForma.id 
-                      }))}
-                      data-testid={`details-button-${proForma.id}`}
-                    >
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Conversion Confirmation Modal */}
-      {state.showConversionModal && state.selectedProFormaId && (
-        <Modal 
-          isOpen={state.showConversionModal} 
-          onClose={() => setState(prev => ({ ...prev, showConversionModal: false, selectedProFormaId: null }))}
-          size="md"
-        >
-          <ModalBody>
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-mpondo-gold-100 mb-4">
-                <FileText className="h-6 w-6 text-mpondo-gold-600" />
-              </div>
-              <h3 className="text-lg font-medium text-neutral-900 mb-2">Convert Pro Forma to Final Invoice</h3>
-              <p className="text-sm text-neutral-600 mb-4">
-                This will create a final invoice based on this pro forma and mark the time entries as billed. 
-                This action cannot be undone.
-              </p>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setState(prev => ({ ...prev, showConversionModal: false, selectedProFormaId: null }))}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="primary" 
-              onClick={() => handleConvertToFinal(state.selectedProFormaId!)}
-              className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
-            >
-              Convert to Final Invoice
-            </Button>
-          </ModalFooter>
-        </Modal>
-      )}
-
-      {/* Pro Forma Details Modal */}
-      {state.showDetailsModal && state.selectedProFormaId && (
-        <Modal 
-          isOpen={state.showDetailsModal} 
-          onClose={() => setState(prev => ({ ...prev, showDetailsModal: false, selectedProFormaId: null }))}
-          size="lg"
-        >
-          <ModalBody>
-            {(() => {
-              const selectedProForma = state.proFormas.find(pf => pf.id === state.selectedProFormaId);
-              if (!selectedProForma) return <div>Pro forma not found</div>;
-              
-              return (
-                <div className="space-y-6">
-                  <div className="text-center border-b border-neutral-200 pb-4">
-                    <h3 className="text-xl font-semibold text-neutral-900">{selectedProForma.invoice_number}</h3>
-                    <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full mt-2 ${
-                      selectedProForma.status === InvoiceStatus.PRO_FORMA 
-                        ? 'bg-judicial-blue-100 text-judicial-blue-800'
-                        : selectedProForma.status === InvoiceStatus.CONVERTED
-                        ? 'bg-status-success-100 text-status-success-800'
-                        : 'bg-neutral-100 text-neutral-800'
-                    }`}>
-                      {selectedProForma.status === InvoiceStatus.PRO_FORMA ? 'Pro Forma' : 
-                       selectedProForma.status === InvoiceStatus.CONVERTED ? 'Converted' : selectedProForma.status}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="font-medium text-neutral-900 mb-3">Invoice Details</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-neutral-600">Matter ID:</span>
-                          <span className="text-neutral-900">{selectedProForma.matter_id}</span>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                          <span className="text-sm text-neutral-600">Matter:</span>
+                          <p className="font-medium text-neutral-900">{matter?.title || 'Unknown Matter'}</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-neutral-600">Created:</span>
-                          <span className="text-neutral-900">
-                            {new Date(selectedProForma.created_at).toLocaleDateString('en-ZA')}
-                          </span>
+                        <div>
+                          <span className="text-sm text-neutral-600">Client:</span>
+                          <p className="font-medium text-neutral-900">{matter?.client_name || 'Unknown Client'}</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-neutral-600">Due Date:</span>
-                          <span className="text-neutral-900">
-                            {new Date(selectedProForma.due_date).toLocaleDateString('en-ZA')}
-                          </span>
+                        <div>
+                          <span className="text-neutral-600">Pro Forma Date:</span>
+                          <p className="font-medium text-neutral-900">
+                            {new Date(proforma.quote_date).toLocaleDateString('en-ZA')}
+                          </p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-neutral-600">Bar:</span>
-                          <span className="text-neutral-900 capitalize">{selectedProForma.bar}</span>
+                        <div>
+                          <span className="text-sm text-neutral-600">Valid Until:</span>
+                          <p className="font-medium text-neutral-900">
+                            {new Date(proforma.valid_until).toLocaleDateString('en-ZA')}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-sm text-neutral-600">Amount:</span>
+                          <p className="font-bold text-lg text-neutral-900">
+                            {formatRand(proforma.total_amount)}
+                          </p>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium text-neutral-900 mb-3">Financial Summary</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-neutral-600">Fees:</span>
-                          <span className="text-neutral-900">
-                            R{selectedProForma.fees_amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-neutral-600">Disbursements:</span>
-                          <span className="text-neutral-900">
-                            R{selectedProForma.disbursements_amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-neutral-600">VAT ({(selectedProForma.vat_rate * 100).toFixed(0)}%):</span>
-                          <span className="text-neutral-900">
-                            R{selectedProForma.vat_amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="flex justify-between font-semibold text-base border-t border-neutral-200 pt-2">
-                          <span className="text-neutral-900">Total:</span>
-                          <span className="text-neutral-900">
-                            R{selectedProForma.total_amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setState(prev => ({ ...prev, showDetailsModal: true, selectedProFormaId: proforma.id }))}
+                        >
+                          View Details
+                        </Button>
+                        {proforma.status === 'accepted' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => setState(prev => ({ ...prev, showConversionModal: true, selectedProFormaId: proforma.id }))}
+                            className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
+                          >
+                            <Send className="h-4 w-4 mr-1" />
+                            Convert to Invoice
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
-                  
-                  {selectedProForma.fee_narrative && (
-                    <div>
-                      <h4 className="font-medium text-neutral-900 mb-3">Fee Narrative</h4>
-                      <div className="bg-neutral-50 p-4 rounded-lg">
-                        <p className="text-sm text-neutral-700 whitespace-pre-wrap">
-                          {selectedProForma.fee_narrative}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </ModalBody>
-          <ModalFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setState(prev => ({ ...prev, showDetailsModal: false, selectedProFormaId: null }))}
-            >
-              Close
-            </Button>
-            {(() => {
-              const selectedProForma = state.proFormas.find(pf => pf.id === state.selectedProFormaId);
-              return selectedProForma?.status === InvoiceStatus.PRO_FORMA && (
-                <Button 
-                  variant="primary" 
-                  onClick={() => {
-                    setState(prev => ({ 
-                      ...prev, 
-                      showDetailsModal: false,
-                      showConversionModal: true 
-                    }));
-                  }}
-                  className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
-                >
-                  Convert to Final Invoice
-                </Button>
-              );
-            })()}
-          </ModalFooter>
-        </Modal>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
       {/* Pro Forma Creation Modal */}
-      {state.showCreationModal && (
-        <InvoiceGenerationModal
-          isOpen={state.showCreationModal}
-          onClose={() => setState(prev => ({ ...prev, showCreationModal: false }))}
-          onInvoiceGenerated={fetchProFormas}
-          defaultToProForma={true}
-        />
-      )}
+      <ProFormaCreationModal
+        isOpen={state.showCreationModal}
+        onClose={() => setState(prev => ({ ...prev, showCreationModal: false }))}
+        onSubmit={handleCreateProForma}
+        onProFormaCreated={handleCreateProForma}
+      />
+
+      {/* Pro Forma Details Modal */}
+      <Modal
+        isOpen={state.showDetailsModal}
+        onClose={() => setState(prev => ({ ...prev, showDetailsModal: false, selectedProFormaId: null }))}
+      >
+        <ModalBody>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-neutral-900">Pro Forma Details</h3>
+            {/* Pro forma details content will be implemented */}
+            <p className="text-neutral-600">Pro forma details will be displayed here.</p>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button 
+            variant="outline" 
+            onClick={() => setState(prev => ({ ...prev, showDetailsModal: false, selectedProFormaId: null }))}
+          >
+            Close
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Conversion Confirmation Modal */}
+      <Modal
+        isOpen={state.showConversionModal}
+        onClose={() => setState(prev => ({ ...prev, showConversionModal: false, selectedProFormaId: null }))}
+      >
+        <ModalBody>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <CheckCircle className="h-6 w-6 text-mpondo-gold-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Convert Pro Forma to Invoice</h3>
+            <p className="text-neutral-600">
+              This will create a new invoice based on the accepted pro forma. The pro forma status will be updated to "Converted".
+            </p>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button 
+            variant="outline" 
+            onClick={() => setState(prev => ({ ...prev, showConversionModal: false, selectedProFormaId: null }))}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="primary"
+            onClick={() => state.selectedProFormaId && handleConvertToInvoice(state.selectedProFormaId)}
+            className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
+          >
+            Convert to Invoice
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 };

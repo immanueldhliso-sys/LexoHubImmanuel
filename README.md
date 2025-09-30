@@ -30,6 +30,19 @@ Before contributing to this codebase, please read and follow the [LexoHub Develo
 3. Review the constitution before making changes:
    - [LEXO_CONSTITUTION.md](./LEXO_CONSTITUTION.md)
 
+### Environment Variables
+
+Configure a `.env` file based on `.env.example`.
+
+- `VITE_DEMO_JUNIOR_EMAIL` and `VITE_DEMO_SENIOR_EMAIL` for demo users
+- `VITE_AUTH_SIGNIN_MAX_ATTEMPTS` and `VITE_AUTH_SIGNIN_WINDOW_MS` to tune sign-in rate limiting
+- `VITE_AUTH_SIGNUP_MAX_ATTEMPTS` and `VITE_AUTH_SIGNUP_WINDOW_MS` to tune sign-up rate limiting
+
+### Authentication
+
+- Supports standard email/password and passwordless “magic link” sign-in
+- Error messages are mapped to user-friendly text for common scenarios
+
 ### Architecture Overview
 
 - **Components**: All UI components are defined in `src/App.tsx`

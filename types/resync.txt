@@ -1,1 +1,1 @@
-ecaamkrcsjrcjmcjshlusupabase gen types typescript --project-id ecaamkrcsjrcjmcjshlu > types/database.ts
+supabase gen types typescript --project-id ecaamkrcsjrcjmcjshlu > types/database.ts
