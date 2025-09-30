@@ -163,76 +163,13 @@ const ProFormaPage: React.FC = () => {
       
     } catch (error) {
       console.error('Error fetching pro formas:', error);
-      
-      // Use mock data when backend is unavailable
-      const mockProFormas: Invoice[] = [
-        {
-          id: 'pf-001',
-          matter_id: 'MAT-2024-001',
-          advocate_id: 'adv-001',
-          invoice_number: 'PF-2024-001',
-          invoice_date: '2024-09-15',
-          due_date: '2024-10-15',
-          bar: BarAssociation.JOHANNESBURG,
-          fees_amount: 25000,
-          disbursements_amount: 2500,
-          subtotal: 27500,
-          vat_rate: 0.15,
-          vat_amount: 4125,
-          total_amount: 31625,
-          status: InvoiceStatus.PRO_FORMA,
-          amount_paid: 0,
-          balance_due: 31625,
-          fee_narrative: 'Professional services rendered in respect of commercial litigation matter involving breach of contract claim.',
-          internal_notes: 'Initial pro forma for client approval',
-          reminders_sent: 0,
-          reminder_history: [],
-          created_at: '2024-09-15T10:00:00Z',
-          updated_at: '2024-09-15T10:00:00Z',
-          days_outstanding: 14,
-          is_overdue: false
-        },
-        {
-          id: 'pf-002',
-          matter_id: 'MAT-2024-002',
-          advocate_id: 'adv-001',
-          invoice_number: 'PF-2024-002',
-          invoice_date: '2024-09-20',
-          due_date: '2024-10-20',
-          bar: BarAssociation.CAPE_TOWN,
-          fees_amount: 18000,
-          disbursements_amount: 1200,
-          subtotal: 19200,
-          vat_rate: 0.15,
-          vat_amount: 2880,
-          total_amount: 22080,
-          status: InvoiceStatus.CONVERTED,
-          amount_paid: 22080,
-          balance_due: 0,
-          fee_narrative: 'Legal opinion on property transfer and related due diligence work.',
-          internal_notes: 'Converted to final invoice INV-2024-045',
-          reminders_sent: 0,
-          reminder_history: [],
-          created_at: '2024-09-20T14:30:00Z',
-          updated_at: '2024-09-25T09:15:00Z',
-          days_outstanding: 0,
-          is_overdue: false
-        }
-      ];
-      
-      const filteredProFormas = applyFilters(mockProFormas, state.filters);
-      const summaryStats = calculateSummaryStats(mockProFormas);
-      
+      // Report error and surface to UI without fallback mock data
+      toast.error('Failed to fetch pro forma invoices');
       setState(prev => ({
         ...prev,
-        proFormas: mockProFormas,
-        filteredProFormas,
-        summaryStats,
         isLoading: false,
-        error: null // Clear error since we're using mock data
+        error: 'Failed to fetch pro forma invoices'
       }));
-      
-      toast.success('Using demo data - Supabase backend not available');
     }
   }, [state.filters, applyFilters, calculateSummaryStats]);
 

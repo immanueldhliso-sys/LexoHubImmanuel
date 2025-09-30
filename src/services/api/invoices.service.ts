@@ -400,6 +400,13 @@ export class InvoiceService {
       const { data, error, count } = await query;
       
       if (error) {
+        // Log detailed Postgrest error information to aid RLS/schema debugging
+        console.warn('[InvoicesService] Postgrest error fetching invoices', {
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+          message: error.message
+        });
         throw new Error(`Failed to fetch invoices: ${error.message}`);
       }
       
