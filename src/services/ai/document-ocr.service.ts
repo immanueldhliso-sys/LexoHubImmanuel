@@ -205,7 +205,7 @@ export class AdvancedOCRService {
    */
   private static async extractTextWithOCR(preprocessedData: any): Promise<OCRResult> {
     // No mock OCR output. Return an empty result until a provider is configured.
-    toast.info('OCR provider not configured. Returning empty extraction.');
+      toast('OCR provider not configured. Returning empty extraction.', { icon: 'ℹ️' });
     return {
       id: `ocr-${Date.now()}`,
       text: '',

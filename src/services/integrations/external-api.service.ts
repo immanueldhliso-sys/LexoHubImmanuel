@@ -244,7 +244,7 @@ export class ExternalAPIService {
       }
 
       // No mock responses: require real integration
-      toast.info(`Court diary sync requires configured integration for ${courtAPI.name}`);
+      toast(`Court diary sync requires configured integration for ${courtAPI.name}`, { icon: 'ℹ️' });
       return [];
     } catch (error) {
       console.error('Error syncing court diary:', error);
@@ -278,7 +278,7 @@ export class ExternalAPIService {
       }
 
       // No mock tracking: require real integration
-      toast.info(`Case tracking requires configured integration for ${courtAPI.name}`);
+      toast(`Case tracking requires configured integration for ${courtAPI.name}`, { icon: 'ℹ️' });
       return null;
     } catch (error) {
       console.error('Error tracking case status:', error);
@@ -307,7 +307,7 @@ export class ExternalAPIService {
       await this.authenticateWithBank(bankAPI, credentials);
 
       // No mock accounts: return empty until integration configured
-      toast.info(`Connected to ${bankAPI.bankName}, no accounts until integration is configured`);
+      toast(`Connected to ${bankAPI.bankName}, no accounts until integration is configured`, { icon: 'ℹ️' });
       return [];
     } catch (error) {
       console.error('Error connecting bank account:', error);

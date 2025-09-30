@@ -179,7 +179,7 @@ export class StrategicFinanceService {
 
         if (!matters || matters.length === 0) {
           // No active matters, return empty recommendations in production
-          toast.info('No active matters found for fee optimization');
+          toast('No active matters found for fee optimization', { icon: 'ℹ️' });
           return [];
         }
 

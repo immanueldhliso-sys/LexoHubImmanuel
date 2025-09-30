@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, AlertTriangle, Save, FileText } from 'lucide-react';
 import { Button, Card, CardContent, Input, Modal, ModalBody, ModalFooter } from '../../design-system/components';
 import { matterApiService } from '../../services/api';
+import { authService } from '../../services/auth.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { BarAssociation, FeeType, RiskLevel, ClientType, MatterStatus } from '../../types';
@@ -139,21 +140,61 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
   };
 
   const handlePrevious = () => {
+    console.debug('[NewMatterModal] Previous clicked', { currentStep });
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) return;
+    console.debug('[NewMatterModal] Create Matter clicked', { currentStep, isLoading, formData });
+    // Validate all steps, focusing the first step with errors for clearer feedback
+    const v1 = validateStep(1);
+    console.debug('[NewMatterModal] Validation step 1', { valid: v1, errors });
+    if (!v1) {
+      setCurrentStep(1);
+      toast.error('Please complete required fields on Step 1');
+      return;
+    }
+    const v2 = validateStep(2);
+    console.debug('[NewMatterModal] Validation step 2', { valid: v2, errors });
+    if (!v2) {
+      setCurrentStep(2);
+      toast.error('Please correct contact details on Step 2');
+      return;
+    }
+    const v3 = validateStep(3);
+    console.debug('[NewMatterModal] Validation step 3', { valid: v3, errors });
+    if (!v3) {
+      setCurrentStep(3);
+      toast.error('Please fix fee/risk inputs on Step 3');
+      return;
+    }
     
     if (!user?.id) {
       toast.error('User not authenticated');
+      console.warn('[NewMatterModal] No user ID, blocking submit');
       return;
     }
 
-    // Check if user has advocate profile
-    if (!user.user_metadata?.practice_number) {
-      toast.error('Please complete your advocate profile setup first');
-      return;
+    // Check if user has advocate profile (prefer DB profile, fallback to auth metadata)
+    let practiceNumber = user.advocate_profile?.practice_number ?? user.user_metadata?.practice_number;
+    console.debug('[NewMatterModal] Initial practice number check', { practiceNumber, from: practiceNumber ? (user.advocate_profile?.practice_number ? 'advocate_profile' : 'user_metadata') : 'none' });
+    if (!practiceNumber) {
+      // Attempt a quick auth refresh to capture any recent profile updates
+      try {
+        await authService.refreshSession();
+        const refreshed = authService.getCurrentUser();
+        practiceNumber = refreshed?.advocate_profile?.practice_number ?? refreshed?.user_metadata?.practice_number;
+        console.debug('[NewMatterModal] Practice number after refresh', { practiceNumber });
+      } catch (e) {
+        // Non-blocking: proceed to show the error below if still missing
+        console.warn('Auth refresh failed when validating advocate profile:', e);
+      }
+
+      if (!practiceNumber) {
+        toast.error('Please complete your advocate profile setup first');
+        console.warn('[NewMatterModal] Missing practice number, blocking submit');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -205,8 +246,11 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
         tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : []
       };
 
+      console.debug('[NewMatterModal] Submitting new matter form', { newMatterForm });
+
       // Create matter using API service
       const response = await matterApiService.createFromForm(newMatterForm);
+      console.debug('[NewMatterModal] API response from createFromForm', { response });
       
       if (response.error) {
         console.error('API Error Details:', response.error);
@@ -221,6 +265,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
 
       if (response.data) {
         toast.success('Matter created successfully');
+        console.debug('[NewMatterModal] Matter created successfully', { matter: response.data });
         onMatterCreated?.(response.data);
         onClose();
       }
@@ -258,9 +303,14 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
       console.error('Error creating matter:', error);
       toast.error('Failed to create matter');
     } finally {
+      console.debug('[NewMatterModal] Submit finished, resetting loading state');
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    console.debug('[NewMatterModal] isOpen changed', { isOpen });
+  }, [isOpen]);
 
   const renderStep1 = () => (
     <div className="space-y-4">
@@ -683,7 +733,16 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
             ) : (
               <Button
                 variant="primary"
-                onClick={handleSubmit}
+                type="button"
+                onClickCapture={(e) => {
+                  console.debug('[NewMatterModal] onClickCapture fired for Create Matter', { eventPhase: e.eventPhase, isLoading, currentStep });
+                }}
+                onClick={(e) => {
+                  console.debug('[NewMatterModal] Create Matter button clicked - event:', e);
+                  console.debug('[NewMatterModal] Button state:', { isLoading, currentStep });
+                  console.debug('[NewMatterModal] Form data at click:', formData);
+                  handleSubmit();
+                }}
                 disabled={isLoading}
                 className="flex items-center space-x-2"
               >

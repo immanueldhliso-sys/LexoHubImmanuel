@@ -55,7 +55,7 @@ interface PracticeMetrics {
 
 export const AIAnalyticsDashboard: React.FC = () => {
   // Core state
-  const { user } = useAuth();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'predictions' | 'optimizations' | 'insights' | 'integrations'>('overview');
@@ -80,8 +80,10 @@ export const AIAnalyticsDashboard: React.FC = () => {
   const [integrationStatus, setIntegrationStatus] = useState<any>(null);
 
   useEffect(() => {
-    loadAIAnalytics();
-  }, []);
+    if (!authLoading && isAuthenticated) {
+      loadAIAnalytics();
+    }
+  }, [authLoading, isAuthenticated]);
 
   const loadAIAnalytics = async () => {
     setLoading(true);

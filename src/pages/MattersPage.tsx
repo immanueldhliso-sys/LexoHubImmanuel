@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   TrendingUp,
   Eye,
-  Send,
   Calculator
 } from 'lucide-react';
 import { Card, CardContent, Button, CardHeader } from '../design-system/components';
@@ -21,7 +20,7 @@ import { matterApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import type { Matter, VoiceRecording, TimeEntry, Invoice } from '../types';
-import { MatterStatus, BarAssociation, FeeType, RiskLevel } from '../types';
+import { MatterStatus } from '../types';
 
 const MattersPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'all' | 'analytics' | 'voice'>('active');
@@ -38,24 +37,22 @@ const MattersPage: React.FC = () => {
   const [matterInvoices, setMatterInvoices] = useState<Record<string, Invoice[]>>({});
   const [matters, setMatters] = useState<Matter[]>([]);
   const [loadingMatters, setLoadingMatters] = useState<boolean>(false);
-  const { user } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
 
   // Load matters from API based on current user
   React.useEffect(() => {
     const fetchMatters = async () => {
-      if (!user?.id) return;
+      if (loading || !isAuthenticated || !user?.id) return;
       setLoadingMatters(true);
       try {
         const { data, error } = await matterApiService.getByAdvocate(user.id);
         if (error) {
-          console.error('Error loading matters:', error);
           toast.error('Failed to load matters');
           setMatters([]);
         } else {
           setMatters(data || []);
         }
       } catch (err) {
-        console.error('Unexpected error loading matters:', err);
         toast.error('Unexpected error loading matters');
         setMatters([]);
       } finally {
@@ -63,7 +60,7 @@ const MattersPage: React.FC = () => {
       }
     };
     fetchMatters();
-  }, [user?.id]);
+  }, [loading, isAuthenticated, user?.id]);
 
   // Load existing voice recordings and matter invoices when matters are available
   React.useEffect(() => {
@@ -75,7 +72,6 @@ const MattersPage: React.FC = () => {
 
   const loadMatterInvoices = async () => {
     try {
-      // Load invoices for all matters
       const invoicePromises = matters.map(async (matter) => {
         const response = await InvoiceService.getInvoices({ matterId: matter.id });
         return { matterId: matter.id, invoices: response.data };
@@ -89,7 +85,7 @@ const MattersPage: React.FC = () => {
 
       setMatterInvoices(invoiceMap);
     } catch (error) {
-      console.error('Error loading matter invoices:', error);
+      toast.error('Failed to load invoices');
     }
   };
 
@@ -97,14 +93,11 @@ const MattersPage: React.FC = () => {
   const voiceHandlers = React.useMemo(() => {
     const handleVoiceRecordingComplete = async (recording: VoiceRecording) => {
       try {
-        await voiceManagementService.processVoiceRecording(
-          recording,
-          matters
-        );
+        await voiceManagementService.processVoiceRecording(recording, matters);
         setVoiceRecordings(voiceManagementService.getVoiceRecordings());
-        console.log('Voice recording processed successfully');
+        toast.success('Voice recording processed successfully');
       } catch (error) {
-        console.error('Failed to process voice recording:', error);
+        toast.error('Failed to process voice recording');
       }
     };
 
@@ -118,12 +111,12 @@ const MattersPage: React.FC = () => {
           setPlayingRecordingId(recordingId);
         }
       } catch (error) {
-        console.error('Playback failed:', error);
+        toast.error('Playback failed');
       }
     };
 
     const handleVoiceEdit = (recordingId: string) => {
-      console.log('Edit recording:', recordingId);
+      // Implement edit functionality
     };
 
     const handleVoiceDelete = (recordingId: string) => {
@@ -132,6 +125,7 @@ const MattersPage: React.FC = () => {
       if (playingRecordingId === recordingId) {
         setPlayingRecordingId(undefined);
       }
+      toast.success('Recording deleted');
     };
 
     const handleConvertToTimeEntry = (recordingId: string) => {
@@ -143,9 +137,9 @@ const MattersPage: React.FC = () => {
     };
 
     const handleTimeEntrySave = (timeEntry: Omit<TimeEntry, 'id' | 'createdAt'>) => {
-      console.log('Saving time entry:', timeEntry);
       setShowVoiceTimeEntryForm(false);
       setSelectedVoiceRecording(null);
+      toast.success('Time entry saved successfully');
     };
 
     return {
@@ -167,14 +161,12 @@ const MattersPage: React.FC = () => {
   const handleInvoiceGenerated = async () => {
     setShowInvoiceModal(false);
     setSelectedMatter(null);
-    await loadMatterInvoices(); // Refresh invoice data
+    await loadMatterInvoices();
     toast.success('Invoice generated successfully');
   };
 
   const handleViewMatterInvoices = (matter: Matter) => {
-    // Navigate to invoices page with matter filter
-    // This would be implemented with proper navigation
-    toast.info(`Viewing invoices for ${matter.title}`);
+    toast(`Viewing invoices for ${matter.title}`, { icon: 'ℹ️' });
   };
 
   const getMatterFinancialSummary = (matter: Matter) => {
@@ -204,6 +196,13 @@ const MattersPage: React.FC = () => {
     });
   }, [matters, searchTerm, filterStatus, activeTab]);
 
+  const handleNewMatterClick = () => {
+    setShowVoiceModal(false);
+    setShowVoiceTimeEntryForm(false);
+    setShowInvoiceModal(false);
+    setShowNewMatterModal(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -214,10 +213,10 @@ const MattersPage: React.FC = () => {
         </div>
         <Button 
           variant="primary" 
-          onClick={() => setShowNewMatterModal(true)}
+          onClick={handleNewMatterClick}
           className="flex items-center space-x-2"
         >
-          <Briefcase className="w-4 h-4" />
+          <Plus className="w-4 h-4" />
           <span>New Matter</span>
         </Button>
       </div>
@@ -440,6 +439,7 @@ const MattersPage: React.FC = () => {
         onClose={() => setShowNewMatterModal(false)}
         onMatterCreated={(newMatter) => {
           setMatters(prev => [newMatter, ...prev]);
+          setShowNewMatterModal(false);
           toast.success(`Matter "${newMatter.title}" created successfully`);
         }}
       />

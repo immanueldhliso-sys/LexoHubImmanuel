@@ -185,7 +185,7 @@ export const StrategicFinancePage: React.FC = () => {
 
   const handleInvoiceAging = () => {
     // Navigate to detailed invoice aging report
-    toast.info('Opening detailed invoice aging analysis...');
+    toast('Opening detailed invoice aging analysis...', { icon: 'ℹ️' });
     // This would open a modal or navigate to a detailed aging report
   };
 
@@ -562,7 +562,7 @@ export const StrategicFinancePage: React.FC = () => {
                         <Zap className="w-4 h-4 mr-2" />
                         Optimize
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => toast.info('Exporting cash flow forecast...')}>
+                      <Button variant="outline" size="sm" onClick={() => toast('Exporting cash flow forecast...', { icon: 'ℹ️' })}>
                         <Calendar className="w-4 h-4 mr-2" />
                         Export Forecast
                       </Button>
@@ -577,7 +577,7 @@ export const StrategicFinancePage: React.FC = () => {
                             variant="outline" 
                             size="sm" 
                             className="w-full justify-start"
-                            onClick={() => toast.info('Sending payment reminders...')}
+                            onClick={() => toast('Sending payment reminders...', { icon: 'ℹ️' })}
                           >
                             Send Payment Reminders ({invoiceData.agingAnalysis.find(a => a.range === '31-60 days')?.count || 0})
                           </Button>
@@ -585,7 +585,7 @@ export const StrategicFinancePage: React.FC = () => {
                             variant="outline" 
                             size="sm" 
                             className="w-full justify-start"
-                            onClick={() => toast.info('Reviewing overdue accounts...')}
+                            onClick={() => toast('Reviewing overdue accounts...', { icon: 'ℹ️' })}
                           >
                             Review Overdue Accounts ({invoiceData.agingAnalysis.find(a => a.range === '90+ days')?.count || 0})
                           </Button>
@@ -620,7 +620,7 @@ export const StrategicFinancePage: React.FC = () => {
                             variant="outline" 
                             size="sm" 
                             className="w-full justify-start"
-                            onClick={() => toast.info('Reviewing payment terms...')}
+                            onClick={() => toast('Reviewing payment terms...', { icon: 'ℹ️' })}
                           >
                             Review Payment Terms
                           </Button>

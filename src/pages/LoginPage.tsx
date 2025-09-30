@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import LexoHubBGhd from '../Public/Assets/LexoHubBGhd.jpg';
 
 // --- Global Styles for Advanced Effects ---
 const GlobalStyles = () => (
@@ -113,7 +114,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ size = 'md', className 
 };
 
 
-const SignupBgImage = 'https://placehold.co/1920x1080/0f172a/334155?text=Legal+Tech+Background';
+const SignupBgImage = LexoHubBGhd;
 
 type AuthMode = 'signin' | 'signup';
 type UserType = 'junior' | 'senior';
@@ -249,7 +250,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ userType, title, subtitle, Icon, 
                 isAnotherSelected && "opacity-70 scale-98 hover:opacity-85 hover:scale-100 md:opacity-50",
                 "flex flex-col min-h-0 overflow-x-hidden overflow-y-auto w-full"
             )}>
-            <div className={`absolute inset-0 bg-gradient-to-br from-${color}-500/10 to-transparent opacity-50`}></div>
+            <div className={`absolute inset-0 bg-gradient-to-br from-${color}-500/5 to-transparent opacity-40`}></div>
             <Icon className={`w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-32 lg:h-32 absolute top-1 right-1 sm:top-2 sm:right-2 md:top-4 md:right-4 text-${color}-400/20 transform-gpu transition-transform duration-500 ${isSelected ? 'rotate-6' : '-rotate-12'}`} />
 
             <div className="relative z-10 flex flex-col h-full min-h-0">
@@ -276,7 +277,11 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ userType, title, subtitle, Icon, 
                         onClick={(e) => { e.stopPropagation(); setSelectedType(null); }} aria-label="Go back to role selection"> ← </button>
                 )}
 
-                <div className={`flex-1 flex flex-col justify-center mt-1 sm:mt-2 transition-opacity duration-500 overflow-y-auto min-h-0 ${isSelected ? 'opacity-100 delay-200' : 'opacity-0 pointer-events-none'}`}>
+                <div className={cn(
+                    "flex-1 flex flex-col justify-center mt-1 sm:mt-2 overflow-y-auto min-h-0",
+                    "transition-all duration-700 ease-out transform-gpu will-change-transform",
+                    isSelected ? "opacity-100 delay-200 translate-x-0" : "opacity-0 pointer-events-none translate-x-4"
+                )}>
                      {children}
                 </div>
             </div>
@@ -286,7 +291,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ userType, title, subtitle, Icon, 
 
 // --- Skeleton Loading Component ---
 const SkeletonAuthPage = () => (
-    <div className="h-screen w-screen overflow-hidden flex flex-col bg-slate-900 font-sans">
+    <div className="min-h-[100svh] w-screen overflow-hidden flex flex-col bg-slate-900 font-sans">
         <div className="absolute inset-0 bg-black/70"></div>
         <div className="relative z-10 w-full h-full flex flex-col p-4">
             <header className="text-center mb-6 flex-shrink-0">
@@ -348,6 +353,8 @@ const LoginPage = () => {
 
   const handleInputBlur = (field: string) => { setTouchedFields(prev => new Set(prev).add(field)); setShowValidation(true); };
 
+  const [redirecting, setRedirecting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); setShowValidation(true); setTouchedFields(new Set(['email', 'password', 'fullName']));
@@ -367,8 +374,9 @@ const LoginPage = () => {
           toast.error(message);
         } else {
           setSuccess('Signed in successfully');
-          toast.success('Signed in successfully');
-          window.location.href = '/';
+          toast.success('Welcome back');
+          setRedirecting(true);
+          setTimeout(() => { window.location.href = '/'; }, 300);
         }
       } else {
         const metadata = { user_type: selectedType as 'junior' | 'senior', /* other metadata */ };
@@ -461,11 +469,18 @@ const LoginPage = () => {
   if (loading) return <SkeletonAuthPage />;
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex flex-col bg-slate-900 font-sans"
-      style={{ backgroundImage: `url(${SignupBgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}
+    <div className="min-h-[100svh] w-screen overflow-hidden flex flex-col bg-slate-900 font-sans"
+      style={{ 
+        backgroundImage: `url(${SignupBgImage})`, 
+        backgroundSize: 'cover', 
+        backgroundPosition: 'center', 
+        backgroundAttachment: 'scroll',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)'
+      }}
     >
       <GlobalStyles />
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/45"></div>
       
       <div className="relative z-10 w-full h-full flex flex-col overflow-x-hidden overflow-y-auto px-1 sm:px-2 md:px-4 py-1 sm:py-2 md:py-4">
         <header className="text-center mb-2 sm:mb-3 md:mb-6 animate-in fade-in slide-in-from-top-4 duration-1000 flex-shrink-0">
@@ -473,10 +488,10 @@ const LoginPage = () => {
                 <Scale className="w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 text-yellow-400 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110 drop-shadow-sm" />
                 <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white tracking-wider drop-shadow-sm">lexo</h1>
             </div>
-            <p className="text-sm md:text-base text-slate-200 leading-tight px-2 font-medium hidden sm:block">Your Practice, Amplified. The Advocate's Intelligence Platform.</p>
+            <p className="text-sm md:text-base text-slate-200 leading-tight px-2 font-medium hidden sm:block">Where Strategy Meets Practice.</p>
         </header>
 
-        <main className={cn("bg-black/40 backdrop-blur-xl rounded-lg sm:rounded-xl border border-white/30 shadow-2xl flex flex-col md:flex-row transition-all duration-700 ease-in-out flex-1 overflow-hidden w-full max-w-6xl mx-auto min-h-0")}
+        <main className={cn("bg-black/25 backdrop-blur-lg rounded-lg sm:rounded-xl border border-white/30 shadow-2xl flex flex-col md:flex-row transition-all duration-700 ease-in-out flex-1 overflow-hidden w-full max-w-6xl mx-auto min-h-0")}
               onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
             {!selectedType && (
                 <>
@@ -499,11 +514,24 @@ const LoginPage = () => {
           badge={ <div className="flex items-center gap-2 p-2 bg-white/15 rounded-lg border border-white/30 w-fit mt-auto shadow-sm"><span className="text-white text-sm font-medium">South Africa</span></div> }
           color="blue" selectedType={selectedType} setSelectedType={setSelectedType}
         >
-          <div className="bg-white/10 rounded-lg border border-white/20 p-2 sm:p-3 md:p-4 shadow-lg overflow-visible">
-              <div className="flex bg-black/30 rounded-lg p-1 mb-2 sm:mb-3">
+          <div className="bg-white/5 rounded-lg border border-white/15 p-2 sm:p-3 md:p-4 shadow-lg overflow-visible">
+              <div className="flex bg-black/30 rounded-lg p-1 mb-2 sm:mb-3 relative">
+                  <div
+                    className={cn(
+                      "absolute inset-y-1 w-[calc(50%-4px)] rounded-md transition-all duration-300 ease-out shadow-lg",
+                      authMode === 'signin' ? "left-1" : "left-[calc(50%+2px)]",
+                      selectedType === 'junior' ? "bg-blue-600" : "bg-amber-600"
+                    )}
+                  />
                   {['signin', 'signup'].map((mode) => (
-                      <button key={mode} onClick={() => setAuthMode(mode as AuthMode)}
-                          className={cn("flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-md text-sm font-medium transition-all duration-200", authMode === mode ? "bg-blue-600 text-white shadow-sm" : "text-white/80 hover:text-white hover:bg-white/10")}>
+                      <button
+                        key={mode}
+                        onClick={() => setAuthMode(mode as AuthMode)}
+                        className={cn(
+                          "relative z-10 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-md text-sm font-medium transition-all duration-200",
+                          authMode === mode ? "text-white" : "text-white/80 hover:text-white"
+                        )}
+                      >
                           {mode.charAt(0).toUpperCase() + mode.slice(1)}
                       </button>
                   ))}
@@ -538,7 +566,7 @@ const LoginPage = () => {
                       </div>
                   )}
 
-                  <Button type="submit" disabled={isSubmitting || (showValidation && !isFormValid)} className={cn("w-full py-2.5 sm:py-3 text-sm font-medium text-white transition-all duration-300 group", isFormValid && !isSubmitting ? "bg-blue-600 hover:bg-blue-700 hover:scale-[1.02] hover:shadow-lg" : "bg-blue-600/50 cursor-not-allowed")}>
+                  <Button type="submit" disabled={isSubmitting || (showValidation && !isFormValid)} className={cn("w-full py-2.5 sm:py-3 text-sm font-medium text-white transition-all duration-300 group", isFormValid && !isSubmitting ? "bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/30" : "bg-blue-600/50 cursor-not-allowed")}> 
                       {isSubmitting ? <><LoadingSpinner size="sm" className="mr-2" />{authMode === 'signin' ? 'Signing In...' : 'Creating...'}</> : <div className="flex items-center justify-center gap-2"><span>{authMode === 'signin' ? 'Sign In' : 'Create Account'}</span><ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" /></div>}
                   </Button>
                   {authMode === 'signin' && <div className="text-center"><button type="button" onClick={() => handleDemoLogin('junior')} disabled={isSubmitting} className={cn("text-xs transition-colors flex items-center justify-center gap-1 mx-auto", isSubmitting ? "text-blue-300/50 cursor-not-allowed" : "text-blue-300 hover:text-blue-200 hover:underline")}>{isSubmitting ? <><LoadingSpinner size="sm" className="w-3 h-3" /><span>Signing in...</span></> : 'Try Junior Demo Account'}</button></div>}
@@ -550,10 +578,26 @@ const LoginPage = () => {
           badge={ <div className="flex items-center gap-2 p-2 bg-white/15 rounded-lg border border-white/30 w-fit mt-auto shadow-sm"><Shield className="w-4 h-4 text-amber-300" /><span className="text-white text-sm font-medium">SC</span></div> }
           color="amber" selectedType={selectedType} setSelectedType={setSelectedType}
         >
-          <div className="bg-white/10 rounded-lg border border-white/20 p-2 sm:p-3 md:p-4 shadow-lg overflow-visible">
-               <div className="flex bg-black/30 rounded-lg p-1 mb-2 sm:mb-3">
+          <div className="bg-white/5 rounded-lg border border-white/15 p-2 sm:p-3 md:p-4 shadow-lg overflow-visible">
+               <div className="flex bg-black/30 rounded-lg p-1 mb-2 sm:mb-3 relative">
+                  <div
+                    className={cn(
+                      "absolute inset-y-1 w-[calc(50%-4px)] rounded-md transition-all duration-300 ease-out shadow-lg",
+                      authMode === 'signin' ? "left-1" : "left-[calc(50%+2px)]",
+                      selectedType === 'junior' ? "bg-blue-600" : "bg-amber-600"
+                    )}
+                  />
                   {['signin', 'signup'].map((mode) => (
-                      <button key={mode} onClick={() => setAuthMode(mode as AuthMode)} className={cn("flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-md text-sm font-medium transition-all duration-200", authMode === mode ? "bg-amber-600 text-white shadow-sm" : "text-white/80 hover:text-white hover:bg-white/10")}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</button>
+                      <button
+                        key={mode}
+                        onClick={() => setAuthMode(mode as AuthMode)}
+                        className={cn(
+                          "relative z-10 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-md text-sm font-medium transition-all duration-200",
+                          authMode === mode ? "text-white" : "text-white/80 hover:text-white"
+                        )}
+                      >
+                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                      </button>
                   ))}
               </div>
               <form id="auth-form-senior" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
@@ -604,8 +648,37 @@ const LoginPage = () => {
             <p className="text-slate-400 text-xs">&copy; {new Date().getFullYear()} lexo. All rights reserved. Data stored in South Africa.</p>
         </footer>
 
+        {redirecting && (
+          <>
+            <div role="alert" aria-live="polite" className="sr-only">Redirecting...</div>
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+              <div className="bg-black/50 border border-white/30 rounded-lg px-4 py-3 text-white flex items-center gap-3 shadow-xl">
+                <LoadingSpinner size="md" />
+                <span className="text-sm">Redirecting…</span>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Floating Chat/Support Button */}
-        <button className="fixed bottom-4 right-4 bg-yellow-500 text-white p-3 rounded-full shadow-lg hover:bg-yellow-600 transition-all active:scale-95 z-30">
+        <button
+          onClick={() => {
+            const number = import.meta.env.VITE_WHATSAPP_SUPPORT_NUMBER;
+            const text = encodeURIComponent('Hi Lexo Support — I need help with login.');
+            if (!number) {
+              toast.error('WhatsApp support number not configured. Set VITE_WHATSAPP_SUPPORT_NUMBER');
+              return;
+            }
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const url = isMobile
+              ? `whatsapp://send?phone=${number}&text=${text}`
+              : `https://wa.me/${number}?text=${text}`;
+            window.open(url, '_blank');
+          }}
+          aria-label="Open WhatsApp support"
+          title="WhatsApp Support"
+          className="fixed bottom-4 right-4 bg-yellow-500 text-white p-3 rounded-full shadow-lg hover:bg-yellow-600 transition-all active:scale-95 z-30"
+        >
             <MessageSquare size={24} />
         </button>
       </div>

@@ -31,7 +31,20 @@ export const FeatureDiscoveryNotification: React.FC<FeatureDiscoveryNotification
       const response = await userPreferencesService.shouldShowFeatureNotification();
       
       if (response.error) {
-        console.error('Error checking feature notification:', response.error);
+        const code = response.error.code;
+        const type = response.error.type as any;
+        const message = response.error.message?.toLowerCase?.() ?? '';
+        const isBenign = 
+          type === 'AUTHENTICATION_ERROR' ||
+          type === 'NOT_FOUND_ERROR' ||
+          code === 'PGRST205' ||
+          message.includes('not found');
+
+        if (!isBenign) {
+          console.error('Error checking feature notification:', response.error);
+        }
+        // Do not show the notification on benign errors
+        setVisible(false);
         setLoading(false);
         return;
       }
@@ -159,7 +172,20 @@ export const useFeatureDiscoveryNotification = () => {
     try {
       const response = await userPreferencesService.shouldShowFeatureNotification();
       
-      if (response.data) {
+      if (response.error) {
+        const code = response.error.code;
+        const type = response.error.type as any;
+        const message = response.error.message?.toLowerCase?.() ?? '';
+        const isBenign = 
+          type === 'AUTHENTICATION_ERROR' ||
+          type === 'NOT_FOUND_ERROR' ||
+          code === 'PGRST205' ||
+          message.includes('not found');
+        if (!isBenign) {
+          console.error('Error checking notification status:', response.error);
+        }
+        setShouldShow(false);
+      } else if (response.data) {
         setShouldShow(true);
       }
       // Silence expected missing-table state

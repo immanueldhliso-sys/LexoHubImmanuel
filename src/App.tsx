@@ -14,6 +14,7 @@ import {
   ProFormaPage,
   ReportsPage,
   SettingsPage,
+  ProfilePage,
   PricingManagementPage,
   WorkflowIntegrationsPage,
   AIAnalyticsDashboard
@@ -197,7 +198,7 @@ const Navigation: React.FC<{
       } catch (error) {
         console.error('Error validating page access:', error);
         // Fallback to direct navigation for core pages
-        const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'settings'];
+        const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'settings', 'profile'];
         if (corePages.includes(pageId)) {
           onPageChange(pageId as Page);
         }
@@ -253,7 +254,10 @@ const Navigation: React.FC<{
 
       {/* User Profile & Sign Out */}
       <div className="px-3 py-4 border-t border-neutral-200">
-        <div className="flex items-center gap-3 px-3 py-2 text-sm text-neutral-700">
+        <button
+          onClick={() => handlePageChange('profile')}
+          className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 rounded-lg transition-colors"
+        >
           <div className="w-10 h-10 bg-neutral-100 rounded-full flex items-center justify-center">
             <span className="text-mpondo-gold-600 font-medium text-lg">
               {user?.advocate_profile?.full_name?.charAt(0)?.toLowerCase() || user?.email?.charAt(0)?.toLowerCase() || 'n'}
@@ -267,7 +271,7 @@ const Navigation: React.FC<{
               {user?.email || 'nkosinathi.dhliso@gmail.com'}
             </p>
           </div>
-        </div>
+        </button>
         <button
           onClick={signOut}
           className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 rounded-lg transition-colors mt-2"
@@ -408,7 +412,7 @@ const AppContent: React.FC = () => {
     } catch (error) {
       console.error('Error validating page access:', error);
       // Fallback to direct navigation for core pages
-      const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'settings'];
+      const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'settings', 'profile'];
       if (corePages.includes(page)) {
         setAppState(prev => ({ ...prev, activePage: page }));
       }
@@ -449,6 +453,8 @@ const AppContent: React.FC = () => {
         return <InvoicesPage />;
       case 'proforma':
         return <ProFormaPage />;
+      case 'profile':
+        return <ProfilePage />;
       case 'pricing-management':
         return <PricingManagementPage />;
       case 'settings':

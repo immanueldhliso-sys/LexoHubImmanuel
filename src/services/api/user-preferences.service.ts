@@ -21,6 +21,10 @@ export interface UserPreferencesUpdate {
 }
 
 class UserPreferencesService extends BaseApiService<UserPreferences> {
+  // When the preferences table is missing in the Supabase project (404/PGRST205),
+  // set this flag to avoid repeated noisy requests and gracefully fall back.
+  private schemaUnavailable = false;
+
   constructor() {
     super('user_preferences', `
       id,
@@ -36,32 +40,69 @@ class UserPreferencesService extends BaseApiService<UserPreferences> {
    * Get user preferences by user ID
    */
   async getByUserId(userId: string): Promise<ApiResponse<UserPreferences>> {
-    return this.executeQuery(async () => {
+    // If we already detected the table is unavailable, return a benign response
+    if (this.schemaUnavailable) {
+      return { data: null, error: null };
+    }
+
+    const result = await this.executeQuery(async () => {
       return supabase
         .from(this.tableName)
         .select(this.selectFields)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
     });
+
+    // Suppress errors when the table doesn't exist on the remote project
+    if (result.error && (result.error.code === 'PGRST205' ||
+      (result.error.message?.toLowerCase?.().includes('not found') ?? false))) {
+      this.schemaUnavailable = true;
+      return { data: null, error: null };
+    }
+
+    return result;
   }
 
   /**
    * Get current user's preferences
    */
   async getCurrentUserPreferences(): Promise<ApiResponse<UserPreferences>> {
-    return this.executeQuery(async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
+    // If we already detected the table is unavailable, return a benign response
+    if (this.schemaUnavailable) {
+      return { data: null, error: null };
+    }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // Return a standardized error via BaseApiService to keep contracts consistent
+      return { 
+        data: null, 
+        error: {
+          type: ErrorType.AUTHENTICATION_ERROR,
+          message: 'User not authenticated',
+          timestamp: new Date(),
+          requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2)}`
+        }
+      };
+    }
+
+    const result = await this.executeQuery(async () => {
       return supabase
         .from(this.tableName)
         .select(this.selectFields)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
     });
+
+    // Suppress errors when the table doesn't exist on the remote project
+    if (result.error && (result.error.code === 'PGRST205' ||
+      (result.error.message?.toLowerCase?.().includes('not found') ?? false))) {
+      this.schemaUnavailable = true;
+      return { data: null, error: null };
+    }
+
+    return result;
   }
 
   /**
@@ -192,11 +233,21 @@ class UserPreferencesService extends BaseApiService<UserPreferences> {
     const response = await this.getCurrentUserPreferences();
     
     if (response.error) {
-      // Suppress noisy errors when the table is missing or not yet migrated
-      // PostgREST error code PGRST205: "Could not find the table in the schema cache"
-      if (response.error.code === 'PGRST205') {
+      // Suppress noisy errors for unauthenticated users, first-time users (no row yet),
+      // or when the table is missing/not yet migrated.
+      // - AUTHENTICATION_ERROR: user not signed in during early app mount
+      // - NOT_FOUND_ERROR / PGRST116: `.single()` requested but no row exists yet
+      // - PGRST205: table not found in schema cache (migrations not applied)
+      const isBenignError = (
+        response.error.type === ErrorType.AUTHENTICATION_ERROR ||
+        response.error.type === ErrorType.NOT_FOUND_ERROR ||
+        response.error.code === 'PGRST205'
+      );
+
+      if (isBenignError) {
         return { data: false, error: null };
       }
+
       return { data: false, error: response.error };
     }
 

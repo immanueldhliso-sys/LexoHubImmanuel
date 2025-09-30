@@ -73,7 +73,7 @@ const PerformanceBasedPricingCard: React.FC<{
               Edit
             </Button>
             <Button
-              onClick={() => toast.info(`Viewing detailed analytics for ${pricing.pricingModel} plan...`)}
+              onClick={() => toast(`Viewing detailed analytics for ${pricing.pricingModel} plan...`, { icon: 'ℹ️' })}
               variant="ghost"
               size="sm"
               aria-label={`View analytics for ${pricing.pricingModel} pricing plan`}
@@ -159,11 +159,11 @@ const SuccessFeeCalculationTable: React.FC<{
               <Calculator className="w-4 h-4" />
               <span>{scenarios.length} scenarios</span>
             </div>
-            <Button variant="outline" size="sm" onClick={() => toast.info('Exporting success fee calculations...')}>
+            <Button variant="outline" size="sm" onClick={() => toast('Exporting success fee calculations...', { icon: 'ℹ️' })}>
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
-            <Button variant="outline" size="sm" onClick={() => toast.info('Opening success fee calculator...')}>
+            <Button variant="outline" size="sm" onClick={() => toast('Opening success fee calculator...', { icon: 'ℹ️' })}>
               <Calculator className="w-4 h-4 mr-2" />
               Calculate
             </Button>
@@ -326,13 +326,13 @@ const PricingManagementPage: React.FC = () => {
   };
 
   const handleEditPricing = (pricing: PerformanceBasedPricing) => {
-    toast.info(`Opening pricing editor for ${pricing.pricingModel} plan...`);
+    toast(`Opening pricing editor for ${pricing.pricingModel} plan...`, { icon: 'ℹ️' });
     // This would open a modal to edit the pricing plan
   };
 
   const handleCreateNewPricing = () => {
     setShowNewPricingModal(true);
-    toast.info('Opening new pricing plan creator...');
+    toast('Opening new pricing plan creator...', { icon: 'ℹ️' });
   };
 
   const handleOptimizeFees = async () => {
@@ -351,13 +351,13 @@ const PricingManagementPage: React.FC = () => {
   };
 
   const handleViewPerformanceAnalysis = () => {
-    toast.info('Opening detailed performance analysis...');
+    toast('Opening detailed performance analysis...', { icon: 'ℹ️' });
     // This would navigate to or open a detailed performance analysis view
   };
 
   const handleExportPricingReport = async () => {
     try {
-      toast.info('Generating pricing performance report...');
+      toast('Generating pricing performance report...', { icon: 'ℹ️' });
       // This would generate and download a comprehensive pricing report
       setTimeout(() => {
         toast.success('Pricing report exported successfully');
@@ -695,7 +695,7 @@ const PricingManagementPage: React.FC = () => {
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
-                onClick={() => toast.info('Opening success fee calculator...')}
+                onClick={() => toast('Opening success fee calculator...', { icon: 'ℹ️' })}
               >
                 <Calculator className="w-4 h-4 mr-3" />
                 Calculate Success Fees
@@ -704,7 +704,7 @@ const PricingManagementPage: React.FC = () => {
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
-                onClick={() => toast.info('Opening pricing settings...')}
+                onClick={() => toast('Opening pricing settings...', { icon: 'ℹ️' })}
               >
                 <Settings className="w-4 h-4 mr-3" />
                 Pricing Settings

@@ -300,7 +300,7 @@ const ReportsPage: React.FC = () => {
 
   const handleExportReport = async (reportType: string) => {
     try {
-      toast.info(`Exporting ${reportType} report...`);
+      toast(`Exporting ${reportType} report...`, { icon: 'ℹ️' });
       // This would generate and download the report
       setTimeout(() => {
         toast.success(`${reportType} report exported successfully`);
@@ -312,7 +312,7 @@ const ReportsPage: React.FC = () => {
   };
 
   const handleViewDetailedReport = (reportType: string) => {
-    toast.info(`Opening detailed ${reportType} report...`);
+    toast(`Opening detailed ${reportType} report...`, { icon: 'ℹ️' });
     // This would navigate to a detailed report view
   };
 

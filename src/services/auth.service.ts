@@ -169,6 +169,12 @@ export class AuthService {
         await this.ensureAdvocateProfileExists(data.user);
       }
 
+      // Immediately hydrate local session/user to avoid relying solely on async auth events
+      if (data.session) {
+        await this.setCurrentSession(data.session);
+        this.notifyAuthStateListeners();
+      }
+
       return { data, error: null };
     } catch (error) {
       return { 
@@ -442,6 +448,22 @@ export class AuthService {
         const profile = await this.loadAdvocateProfile(this.currentUser.id);
         if (this.currentUser) {
           this.currentUser.advocate_profile = profile;
+          // Also sync Supabase auth user metadata for consistency across checks
+          try {
+            const { error: metaError } = await supabase.auth.updateUser({ data: updates as any });
+            if (metaError) {
+              console.warn('Failed to sync auth metadata:', metaError);
+            } else {
+              // Merge metadata locally and notify listeners so UI refreshes
+              this.currentUser.user_metadata = {
+                ...(this.currentUser.user_metadata || {}),
+                ...updates
+              } as any;
+              this.notifyAuthStateListeners();
+            }
+          } catch (e) {
+            console.warn('Error updating auth metadata:', e);
+          }
         }
       }
 

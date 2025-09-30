@@ -28,7 +28,7 @@ interface DashboardPageProps {
 }
 
 const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
   const [dashboardData, setDashboardData] = useState({
     activeMatters: 0,
     outstandingWip: 0,
@@ -73,9 +73,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   });
 
   useEffect(() => {
-    loadDashboardData();
-    loadInvoiceMetrics();
-  }, []);
+    if (!loading && isAuthenticated) {
+      loadDashboardData();
+      loadInvoiceMetrics();
+    }
+  }, [loading, isAuthenticated]);
 
   const loadInvoiceMetrics = async () => {
     setInvoiceMetrics(prev => ({ ...prev, isLoading: true }));

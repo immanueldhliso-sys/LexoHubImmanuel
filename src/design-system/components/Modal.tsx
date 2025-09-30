@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { clsx } from 'clsx';
 import { X } from 'lucide-react';
 
 export interface ModalProps {
@@ -33,8 +32,10 @@ const Modal: React.FC<ModalProps> = ({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   children,
-  className,
+  className = '',
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
   // Handle escape key
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
@@ -62,7 +63,9 @@ const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const sizeClasses = {
     sm: 'max-w-md',
@@ -73,6 +76,7 @@ const Modal: React.FC<ModalProps> = ({
   };
 
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    // Only close if clicking directly on the overlay, not on the modal content
     if (closeOnOverlayClick && event.target === event.currentTarget) {
       onClose();
     }
@@ -80,50 +84,45 @@ const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
       onClick={handleOverlayClick}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      
       {/* Modal */}
       <div
-        className={clsx(
-          'relative w-full bg-white rounded-lg shadow-xl',
-          'max-h-[90vh] overflow-hidden',
-          'animate-in fade-in-0 zoom-in-95 duration-200',
-          sizeClasses[size],
-          className
-        )}
+        ref={modalRef}
+        className={`relative w-full bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col ${sizeClasses[size]} ${className}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-6 border-b border-neutral-200">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
             {title && (
               <h2
                 id="modal-title"
-                className="text-lg font-semibold text-neutral-900"
+                className="text-lg font-semibold text-gray-900"
               >
                 {title}
               </h2>
             )}
-            {showCloseButton && (
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
-                aria-label="Close modal"
-              >
-                <X className="w-5 h-5 text-neutral-500" />
-              </button>
-            )}
+            <div className={!title ? 'ml-auto' : ''}>
+              {showCloseButton && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Close modal"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-8rem)]">
+        <div className="overflow-y-auto flex-1 p-6">
           {children}
         </div>
       </div>
@@ -139,8 +138,8 @@ export interface ModalHeaderProps {
   className?: string;
 }
 
-export const ModalHeader: React.FC<ModalHeaderProps> = ({ children, className }) => (
-  <div className={clsx('p-6 border-b border-neutral-200', className)}>
+export const ModalHeader: React.FC<ModalHeaderProps> = ({ children, className = '' }) => (
+  <div className={`p-6 border-b border-gray-200 ${className}`}>
     {children}
   </div>
 );
@@ -150,8 +149,8 @@ export interface ModalBodyProps {
   className?: string;
 }
 
-export const ModalBody: React.FC<ModalBodyProps> = ({ children, className }) => (
-  <div className={clsx('p-6', className)}>
+export const ModalBody: React.FC<ModalBodyProps> = ({ children, className = '' }) => (
+  <div className={`p-6 ${className}`}>
     {children}
   </div>
 );
@@ -161,8 +160,8 @@ export interface ModalFooterProps {
   className?: string;
 }
 
-export const ModalFooter: React.FC<ModalFooterProps> = ({ children, className }) => (
-  <div className={clsx('flex items-center justify-end gap-3 p-6 border-t border-neutral-200 bg-neutral-50', className)}>
+export const ModalFooter: React.FC<ModalFooterProps> = ({ children, className = '' }) => (
+  <div className={`flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0 ${className}`}>
     {children}
   </div>
 );
