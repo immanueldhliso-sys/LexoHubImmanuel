@@ -5,6 +5,7 @@
  */
 
 import { BaseApiService, type ApiResponse, type FilterOptions, type PaginationOptions } from './base-api.service';
+import { supabase } from '@/lib/supabase';
 import type { Matter, MatterStatus, NewMatterForm } from '../../types';
 
 export interface MatterFilters extends FilterOptions {
@@ -98,11 +99,24 @@ export class MatterApiService extends BaseApiService<Matter> {
 
   /**
    * Create new matter from form data
-   */
+  */
   async createFromForm(formData: NewMatterForm): Promise<ApiResponse<Matter>> {
     // Transform form data to match database schema
+    // Ensure advocate_id matches authenticated user to satisfy RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) {
+      return {
+        data: null,
+        error: {
+          code: 'AUTHENTICATION_ERROR',
+          message: 'User not authenticated',
+          details: null
+        }
+      };
+    }
+
     const matterData: Partial<Matter> = {
-      advocate_id: formData.advocateId,
+      advocate_id: user.id,
       reference_number: formData.referenceNumber,
       title: formData.title,
       description: formData.description,

@@ -12,7 +12,7 @@ interface FeeNarrativeGeneratorModalProps {
 }
 
 export const FeeNarrativeGeneratorModal: React.FC<FeeNarrativeGeneratorModalProps> = ({ onClose }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [matters, setMatters] = useState<Matter[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [selectedMatter, setSelectedMatter] = useState('');
@@ -25,7 +25,7 @@ export const FeeNarrativeGeneratorModal: React.FC<FeeNarrativeGeneratorModalProp
   useEffect(() => {
     const loadMatters = async () => {
       try {
-        if (!user?.id) return;
+        if (authLoading || !isAuthenticated || !user?.id) return;
         const { data } = await matterApiService.getByAdvocate(user.id, {
           filters: { status: ['active', 'pending'] },
         });
@@ -36,7 +36,7 @@ export const FeeNarrativeGeneratorModal: React.FC<FeeNarrativeGeneratorModalProp
       }
     };
     loadMatters();
-  }, [user?.id]);
+  }, [authLoading, isAuthenticated, user?.id]);
 
   // Load unbilled, billable time entries for selected matter
   useEffect(() => {

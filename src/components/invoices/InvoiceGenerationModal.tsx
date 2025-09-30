@@ -25,7 +25,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   onInvoiceGenerated,
   defaultToProForma = false
 }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
   const [customNarrative, setCustomNarrative] = useState('');
@@ -43,7 +43,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
     try {
       setIsLoading(true);
       // Load real matters for the current advocate
-      if (!user?.id) {
+      if (authLoading || !isAuthenticated || !user?.id) {
         setAvailableMatters([]);
       } else {
         const { data } = await matterApiService.getByAdvocate(user.id);
@@ -54,7 +54,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [authLoading, isAuthenticated, user?.id]);
 
   const loadUnbilledTimeEntries = useCallback(async () => {
     try {
@@ -79,10 +79,10 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
 
   // Load available matters if no matter provided
   useEffect(() => {
-    if (isOpen && !matter) {
+    if (isOpen && !matter && !authLoading && isAuthenticated) {
       loadAvailableMatters();
     }
-  }, [isOpen, matter, loadAvailableMatters]);
+  }, [isOpen, matter, authLoading, isAuthenticated, loadAvailableMatters]);
 
   // Load unbilled time entries
   useEffect(() => {

@@ -15,7 +15,7 @@ import { matterApiService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
 export const RiskManagementDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [riskLevel, setRiskLevel] = useState('medium');
   const [isRunningAudit, setIsRunningAudit] = useState(false);
   const [lastAuditDate, setLastAuditDate] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export const RiskManagementDashboard: React.FC = () => {
 
   React.useEffect(() => {
     const loadComplianceData = async () => {
-      if (!user?.id) return;
+      if (authLoading || !isAuthenticated || !user?.id) return;
       try {
         const res = await matterApiService.getByAdvocate(user.id, {
           pagination: { page: 1, limit: 100 }
@@ -112,7 +112,7 @@ export const RiskManagementDashboard: React.FC = () => {
       }
     };
     loadComplianceData();
-  }, [user?.id]);
+  }, [authLoading, isAuthenticated, user?.id]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
