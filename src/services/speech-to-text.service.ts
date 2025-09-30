@@ -88,7 +88,7 @@ export class SpeechToTextService {
       let finalTranscript = '';
       let confidence = 0;
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           if (result.isFinal) {
@@ -107,7 +107,7 @@ export class SpeechToTextService {
         });
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         reject(new Error(`Speech recognition error: ${event.error}`));
       };
 
@@ -156,7 +156,7 @@ export class SpeechToTextService {
   /**
    * Play audio for Web Speech API recognition
    */
-  private async playAudioForRecognition(audioBlob: Blob, recognition: any): Promise<void> {
+  private async playAudioForRecognition(audioBlob: Blob, recognition: SpeechRecognition): Promise<void> {
     try {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);

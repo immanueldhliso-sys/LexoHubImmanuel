@@ -1,0 +1,895 @@
+LexoHub Navigation System - AI Development Prompts
+Here are comprehensive prompts for each phase. Use these sequentially with your AI coding assistant (Claude, Cursor, etc.):
+
+PHASE 1: Foundation & Core Workflow
+Prompt 1.1: Design System & Wireframes
+I'm building a sophisticated navigation system for LexoHub, a legal practice management platform. 
+
+CONTEXT:
+- Modern React/TypeScript application
+- Using Tailwind CSS for styling
+- Target users: Advocates (lawyers) in South Africa
+- Must work on desktop, tablet, and mobile
+
+DESIGN REQUIREMENTS:
+Create a comprehensive design system and component structure for a hybrid navigation bar that includes:
+
+1. TOP-LEVEL NAVIGATION CATEGORIES:
+   - Dashboard
+   - Matters
+   - Finance
+   - Growth
+   - Intelligence
+   - The Academy
+
+2. DESIGN SPECIFICATIONS:
+   - Primary color: Professional blue (#1E40AF or similar legal tech palette)
+   - Typography: Clean, readable sans-serif
+   - Spacing: Generous padding for professional feel
+   - States needed: default, hover, active, focus, disabled
+
+3. RESPONSIVE BREAKPOINTS:
+   - Desktop: Full mega menu (1024px+)
+   - Tablet: Condensed mega menu (768px-1023px)
+   - Mobile: Hamburger menu (<768px)
+
+Please provide:
+1. Tailwind config extensions needed
+2. TypeScript interfaces for navigation structure
+3. Component hierarchy diagram
+4. Responsive behavior specifications
+
+Start with the design tokens and base component structure.
+
+Prompt 1.2: Main Navigation Bar Component
+Build the foundational navigation bar component for LexoHub.
+
+REQUIREMENTS:
+
+1. CREATE NAVIGATION DATA STRUCTURE:
+```typescript
+// Navigation items organized by category
+interface NavCategory {
+  id: string;
+  label: string;
+  href?: string;
+  megaMenu?: MegaMenuSection[];
+}
+
+interface MegaMenuSection {
+  heading: string;
+  items: NavItem[];
+  badge?: 'new' | 'coming-soon' | 'beta';
+}
+
+interface NavItem {
+  label: string;
+  href: string;
+  description?: string;
+  icon?: string;
+  badge?: string;
+}
+
+INITIAL CATEGORIES STRUCTURE:
+
+Finance Category Example:
+
+Column 1: Financial Operations (Pro Forma Management, Invoice Management, Automated Reminders)
+Column 2: Strategic Finance (AI Analytics Dashboard, Cash Flow Management)
+Column 3: Financial Tools - Roadmap (Invoice Factoring Marketplace, Success Fee Calculator)
+
+Matters Category Example:
+
+Column 1: Matter Management (Matter Dashboard, Create New Matter, Matter Templates)
+Column 2: Matter Intelligence (Budget vs Actual, Matter Analytics, Document Management)
+
+
+BUILD COMPONENTS:
+
+
+<NavigationBar /> - Main container
+<NavCategory /> - Top-level nav item with hover trigger
+<MegaMenu /> - Dropdown panel
+<MegaMenuColumn /> - Column within mega menu
+
+
+FEATURES:
+
+
+Keyboard navigation support (Tab, Arrow keys, Escape)
+Hover delay (300ms) before opening mega menu
+Click outside to close
+Active state highlighting based on current route
+
+Use React 18, TypeScript, Tailwind CSS. Make it accessible (ARIA labels, focus management).
+
+---
+
+### **Prompt 1.3: Responsive Mega Menu System**
+Implement the responsive behavior for the LexoHub navigation mega menus.
+DESKTOP (1024px+):
+
+Full multi-column mega menus
+Hover to open, click to navigate
+3-4 columns per mega menu
+Fixed position below nav bar
+
+TABLET (768px-1023px):
+
+Condensed 2-column mega menus
+Touch-optimized tap targets (minimum 44px)
+Slide-down animation
+
+MOBILE (<768px):
+
+Convert to hamburger menu
+Full-screen drawer navigation
+Accordion-style category expansion
+Swipe to close gesture support
+
+IMPLEMENTATION REQUIREMENTS:
+
+Use Tailwind's responsive utilities
+Add smooth transitions (transform, opacity)
+Prevent body scroll when mobile menu is open
+Implement touch gestures for mobile
+Test on iOS Safari and Chrome mobile
+
+Provide the complete responsive implementation with proper touch handling and animations.
+
+---
+
+## **PHASE 2: Intelligence Layer & Quick Actions**
+
+### **Prompt 2.1: Global Command Bar**
+Build the "Command Center" global search/command bar for LexoHub.
+COMPONENT STRUCTURE:
+typescriptinterface CommandBarProps {
+  onSearch: (query: string) => void;
+  onVoiceActivate: () => void;
+  placeholder?: string;
+}
+
+interface SearchResult {
+  type: 'matter' | 'client' | 'invoice' | 'document' | 'action';
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon: string;
+  href?: string;
+  action?: () => void;
+}
+FEATURES TO BUILD:
+
+SEARCH INPUT:
+
+
+Always visible in navigation bar (prominent position)
+Keyboard shortcut: Cmd/Ctrl + K to focus
+Clear button when text is entered
+Microphone icon for voice (placeholder for now)
+
+
+SEARCH RESULTS DROPDOWN:
+
+
+Categorized results (Matters, Clients, Invoices, Quick Actions)
+Fuzzy search implementation
+Keyboard navigation (up/down arrows, enter to select)
+Recent searches section
+"Search all results" footer link
+
+
+MOCK DATA FOR TESTING:
+Create sample data for:
+
+
+5 matters (e.g., "Smith v. Jones", "ABC Corp Litigation")
+5 clients
+5 invoices
+5 quick actions (e.g., "Create Pro Forma", "Start Time Entry")
+
+
+STYLING:
+
+
+Dropdown appears below command bar
+Max height with scroll
+Highlight on hover/keyboard focus
+Loading state while searching
+
+Build this as a reusable component with TypeScript and Tailwind.
+
+---
+
+### **Prompt 2.2: Quick Actions + Button**
+Create the Quick Actions dropdown menu for high-frequency tasks.
+REQUIREMENTS:
+
+BUTTON DESIGN:
+
+
+Large + icon button
+Positioned on right side of navigation bar
+Tooltip: "Quick Actions (Ctrl+Shift+N)"
+Pulsing animation on first visit (onboarding hint)
+
+
+DROPDOWN MENU ACTIONS:
+
+typescriptinterface QuickAction {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  shortcut?: string;
+  action: () => void;
+  requiresPermission?: string;
+}
+
+DEFAULT ACTIONS:
+
+
+Start Voice Time Entry (microphone icon)
+Create Pro Forma (file-plus icon)
+Add New Matter (folder-plus icon)
+Analyze Brief (brain icon)
+Quick Invoice (receipt icon)
+
+
+BEHAVIOR:
+
+
+Click to open dropdown
+Click outside to close
+Keyboard shortcuts trigger actions directly
+Show shortcut hints in menu
+Track usage analytics (which actions are used most)
+
+
+ADVANCED FEATURES:
+
+
+User can customize which actions appear (settings panel)
+Show most-used actions at top
+Add dividers between action groups
+
+Implement with smooth animations and proper keyboard support.
+
+---
+
+### **Prompt 2.3: Dynamic "At-a-Glance" Ticker**
+Build the real-time alert ticker for the navigation bar.
+COMPONENT OVERVIEW:
+A small cycling display on the left side of the nav bar that shows critical alerts pulled from across the application.
+BACKEND API STRUCTURE NEEDED:
+typescriptinterface TickerAlert {
+  id: string;
+  type: 'overdue' | 'budget' | 'calendar' | 'wip' | 'conflict';
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  action?: {
+    label: string;
+    href: string;
+  };
+  timestamp: Date;
+}
+
+// API endpoint: GET /api/navigation/ticker-alerts
+interface TickerResponse {
+  alerts: TickerAlert[];
+  unreadCount: number;
+}
+FRONTEND COMPONENT:
+
+TICKER UI:
+
+
+Fixed width (300px)
+Icon based on alert type
+Truncated message with expand on hover
+Color coding by severity (blue/yellow/red)
+Smooth fade transition between alerts (every 5 seconds)
+
+
+INTERACTION:
+
+
+Click alert to navigate to relevant page
+Pause auto-cycle on hover
+"View all alerts" link
+Dismiss button for individual alerts
+
+
+SAMPLE ALERTS FOR MOCKUP:
+
+
+"Overdue: Invoice #PF20250012 is 3 days overdue"
+"Budget Alert: Matter 'Smith v. Jones' at 90% budget"
+"Upcoming: Hearing for 'ABC Corp' in 45 minutes"
+"High WIP: R45,000 in unbilled time older than 30 days"
+
+
+FEATURES:
+
+
+Auto-refresh every 60 seconds
+Bell icon with badge showing unread count
+Empty state: "All caught up!"
+
+Build the frontend component with mock data. I'll provide the API integration separately.
+
+---
+
+## **PHASE 3: AI & Dynamic Integration**
+
+### **Prompt 3.1: Voice Command Integration Setup**
+Prepare the LexoHub command bar for voice integration with AWS Claude and ElevenLabs.
+ARCHITECTURE OVERVIEW:
+
+Browser captures voice input (Web Speech API)
+Audio sent to backend
+Backend uses AWS Claude Sonnet 3.5 for natural language understanding
+System executes command or returns data
+ElevenLabs provides voice response (optional)
+
+FRONTEND IMPLEMENTATION:
+
+VOICE CAPTURE COMPONENT:
+
+typescriptinterface VoiceInputProps {
+  onTranscript: (text: string) => void;
+  onCommand: (command: ParsedCommand) => void;
+  isListening: boolean;
+}
+
+interface ParsedCommand {
+  intent: 'search' | 'navigate' | 'create' | 'query' | 'analyze';
+  entity?: string;
+  parameters?: Record<string, any>;
+  rawTranscript: string;
+}
+
+UI STATES:
+
+
+Idle: microphone icon
+Listening: pulsing red microphone + "Listening..."
+Processing: spinner + "Understanding..."
+Transcript Display: Show what was heard
+Suggested Commands: Show examples on first use
+
+
+EXAMPLE COMMANDS TO SUPPORT:
+
+
+"Show me my matters for client ABC Corp"
+"What's my projected income for October?"
+"Summarize the brief from XYZ Attorneys"
+"Create a pro forma for Smith v. Jones"
+"How many overdue invoices do I have?"
+
+
+FRONTEND COMMAND PARSER (FALLBACK):
+Build a simple local parser for common patterns:
+
+
+Regex patterns for dates, numbers, client names
+Keyword matching for intents
+Fuzzy matching for matter/client names
+
+
+SUGGESTED COMMANDS UI:
+Create a modal that appears on first voice activation:
+
+
+Group commands by category
+Show microphone icon + text for each
+"Try saying..." prompt
+Dismiss permanently option
+
+Implement the frontend voice UI and basic command structure. I'll handle the AI backend integration next.
+
+---
+
+### **Prompt 3.2: Voice Command Backend Integration**
+Build the backend API for processing voice commands using AWS Claude Sonnet 3.5.
+ENDPOINT STRUCTURE:
+typescript// POST /api/voice/process-command
+interface VoiceCommandRequest {
+  transcript: string;
+  context?: {
+    currentPage: string;
+    recentActions: string[];
+    userId: string;
+  };
+}
+
+interface VoiceCommandResponse {
+  success: boolean;
+  intent: string;
+  action?: {
+    type: 'navigate' | 'display_data' | 'create_entity' | 'error';
+    data?: any;
+    redirectTo?: string;
+    message?: string;
+  };
+  voiceResponse?: string; // Text for ElevenLabs to speak
+}
+CLAUDE INTEGRATION:
+
+SYSTEM PROMPT FOR CLAUDE:
+
+You are LexoHub's voice command processor for legal professionals. 
+
+Parse user commands and return structured JSON responses.
+
+Available commands:
+- Navigation: "show [entity]", "go to [page]"
+- Data queries: "what is [metric]", "how many [items]"
+- Creation: "create [entity]", "start [action]"
+- Analysis: "summarize [document]", "analyze [brief]"
+
+Context provided: current page, recent user actions, user ID.
+
+Return JSON with:
+{
+  "intent": "navigate|query|create|analyze",
+  "entity": "matters|clients|invoices|etc",
+  "parameters": {},
+  "confidence": 0-1,
+  "voiceResponse": "natural language response"
+}
+
+ERROR HANDLING:
+
+
+Low confidence (<0.6): Ask for clarification
+Ambiguous entities: Present options
+Unauthorized actions: Polite denial
+
+
+INTEGRATION REQUIREMENTS:
+
+
+AWS SDK for Claude API calls
+Rate limiting (10 requests/minute per user)
+Response caching for common queries
+Logging for training data
+
+
+ELEVENLABS VOICE RESPONSE (OPTIONAL):
+
+
+Text-to-speech for confirmations
+Configurable voice settings
+Streaming audio response
+
+Provide the complete backend implementation with error handling and logging.
+
+---
+
+### **Prompt 3.3: Real-Time Ticker with WebSockets**
+Upgrade the ticker component to use WebSocket connections for real-time updates.
+REQUIREMENTS:
+
+WEBSOCKET CONNECTION:
+
+typescript// Client-side WebSocket manager
+class TickerWebSocket {
+  private ws: WebSocket;
+  private reconnectAttempts: number;
+  
+  connect(userId: string): void;
+  onAlert(callback: (alert: TickerAlert) => void): void;
+  onUpdate(callback: (alerts: TickerAlert[]) => void): void;
+  disconnect(): void;
+}
+
+BACKEND WEBSOCKET SERVER:
+
+
+Use Socket.IO or native WebSockets
+Authenticate connection with JWT
+Subscribe user to relevant alert channels
+Push updates when:
+
+Invoice becomes overdue
+Matter budget threshold crossed
+Calendar event approaching
+Conflict check triggered
+
+
+
+
+FRONTEND INTEGRATION:
+
+
+Connect on navigation bar mount
+Graceful degradation (fallback to polling if WebSocket fails)
+Reconnection logic with exponential backoff
+Visual indicator when disconnected
+
+
+ALERT PRIORITY SYSTEM:
+
+typescriptinterface AlertConfig {
+  type: string;
+  priority: 1 | 2 | 3; // 1=critical, 2=warning, 3=info
+  displayDuration: number; // seconds
+  canDismiss: boolean;
+  persistent: boolean; // stays until explicitly dismissed
+}
+
+USER PREFERENCES:
+Create settings panel:
+
+
+Toggle alert types on/off
+Set quiet hours
+Choose notification sound
+Configure display duration
+
+Implement the WebSocket integration with proper error handling and reconnection logic.
+
+---
+
+## **PHASE 4: Role-Based Access & Release**
+
+### **Prompt 4.1: Feature Flagging & Tiered Access**
+Implement role-based navigation access control for LexoHub's subscription tiers.
+SUBSCRIPTION TIERS:
+
+Junior Start (R599/month)
+Advocate Pro (R899/month)
+Senior Advocate (R1,299/month)
+Chambers Enterprise (Custom pricing)
+
+FEATURE ACCESS MATRIX:
+typescriptinterface FeatureAccess {
+  [tier: string]: {
+    navigation: {
+      dashboard: boolean;
+      matters: string[]; // which submenu items
+      finance: string[];
+      growth: string[];
+      intelligence: string[];
+      academy: boolean;
+    };
+    commandBar: {
+      voice: boolean;
+      aiSearch: boolean;
+      quickActions: string[];
+    };
+    ticker: {
+      enabled: boolean;
+      alertTypes: string[];
+    };
+  };
+}
+TIER-SPECIFIC FEATURES:
+Junior Start:
+
+Basic Matters (no AI analysis)
+Pro Forma & Invoices (no analytics)
+No Growth module
+No ticker alerts
+No voice commands
+
+Advocate Pro:
+
+All Matter features
+Full Finance with analytics
+Growth module access
+Ticker with 3 alert types
+Basic voice commands
+
+Senior Advocate:
+
+Everything in Pro
+Advanced AI features
+Full ticker access
+Unlimited voice commands
+Academy access
+
+Chambers Enterprise:
+
+Everything in Senior
+Workspace switcher
+Admin panel in navigation
+Multi-user management
+Custom branding options
+
+IMPLEMENTATION:
+
+Create feature flag system
+Filter navigation items based on user tier
+Show "Upgrade" badges on locked features
+Disable command bar features gracefully
+Add upgrade prompts when attempting locked actions
+
+Build the access control system with clear upgrade pathways.
+
+---
+
+### **Prompt 4.2: Onboarding Tour & Documentation**
+Create an interactive onboarding experience for the new navigation system.
+REQUIREMENTS:
+
+FIRST-TIME USER TOUR:
+Use a library like react-joyride or build custom:
+
+Tour Steps:
+
+Step 1: "Welcome to your new Command Center" (highlight entire nav)
+Step 2: "Search anything instantly" (focus on command bar)
+Step 3: "Quick actions at your fingertips" (highlight + button)
+Step 4: "Stay informed in real-time" (point to ticker)
+Step 5: "Explore by category" (show mega menu)
+Step 6: "Try voice commands" (if available in tier)
+
+
+CONTEXTUAL TOOLTIPS:
+
+
+Appear on first hover of each element
+Dismissible with "Got it" button
+Never show again option
+Track completion in user preferences
+
+
+HELP CONTENT:
+Create a help modal accessible from navigation:
+
+typescriptinterface HelpSection {
+  title: string;
+  content: string;
+  videoUrl?: string;
+  shortcuts?: KeyboardShortcut[];
+}
+
+const helpSections: HelpSection[] = [
+  {
+    title: "Using the Command Bar",
+    content: "...",
+    shortcuts: [
+      { key: "Cmd+K", action: "Open command bar" },
+      { key: "Esc", action: "Close command bar" }
+    ]
+  },
+  // ... more sections
+];
+
+KEYBOARD SHORTCUTS REFERENCE:
+
+
+Overlay showing all shortcuts (trigger with "?")
+Grouped by category
+Printable version
+Search within shortcuts
+
+
+VIDEO TUTORIALS:
+
+
+30-second clips for each major feature
+Embedded in help modal
+Linked from upgrade prompts
+
+
+IN-APP NOTIFICATIONS:
+
+
+Announce new navigation features
+Show usage tips based on behavior
+Celebrate milestones ("You've used voice commands 10 times!")
+
+Implement the tour system with engaging copy and smooth animations.
+
+---
+
+### **Prompt 4.3: Performance Optimization & Monitoring**
+Optimize the navigation system for production and implement monitoring.
+PERFORMANCE TARGETS:
+
+First paint: <100ms
+Mega menu open: <16ms (60fps)
+Command bar search: <200ms
+Ticker update: imperceptible
+Voice processing: <2s end-to-end
+
+OPTIMIZATION TASKS:
+
+CODE SPLITTING:
+
+typescript// Lazy load heavy components
+const MegaMenu = lazy(() => import('./MegaMenu'));
+const VoiceInput = lazy(() => import('./VoiceInput'));
+const TickerComponent = lazy(() => import('./Ticker'));
+
+MEMOIZATION:
+
+
+Memo-ize navigation data
+Use React.memo for static components
+Implement useMemo for expensive computations
+useCallback for event handlers
+
+
+BUNDLE SIZE:
+
+
+Analyze with webpack-bundle-analyzer
+Remove unused Tailwind classes (PurgeCSS)
+Compress icons with SVGO
+Lazy load ElevenLabs SDK
+
+
+CACHING STRATEGY:
+
+
+Cache search results (5 minutes)
+LocalStorage for navigation preferences
+Service worker for offline navigation structure
+CDN for static assets
+
+
+MONITORING & ANALYTICS:
+
+typescriptinterface NavAnalytics {
+  trackNavigationClick: (category: string, item: string) => void;
+  trackCommandBarUsage: (query: string, resultClicked: boolean) => void;
+  trackVoiceCommand: (command: string, success: boolean) => void;
+  trackMegaMenuOpen: (category: string, timeToInteract: number) => void;
+}
+
+ERROR TRACKING:
+
+
+Sentry integration for navigation errors
+Log WebSocket disconnections
+Track voice command failures
+Monitor API latency
+
+
+PERFORMANCE MONITORING:
+
+
+Track component render times
+Measure mega menu animation performance
+Monitor memory usage during voice capture
+Alert on slow search queries (>500ms)
+
+Implement these optimizations and provide a performance monitoring dashboard.
+
+---
+
+## **FINAL PROMPT: Integration & Testing**
+Perform final integration testing and prepare for production release.
+TEST CHECKLIST:
+Functionality:
+
+ All navigation links route correctly
+ Mega menus open/close smoothly
+ Command bar search returns accurate results
+ Voice commands process correctly
+ Ticker cycles through alerts
+ Quick actions execute properly
+ Role-based access enforced
+ Mobile menu works on touch devices
+
+Accessibility:
+
+ Keyboard navigation fully functional
+ Screen reader compatibility
+ Focus management correct
+ ARIA labels present
+ Color contrast meets WCAG AA
+ No keyboard traps
+
+Performance:
+
+ Navigation renders in <100ms
+ No layout shift during load
+ Smooth 60fps animations
+ Search responds in <200ms
+ Voice processing <2s
+ WebSocket reconnects reliably
+
+Cross-Browser:
+
+ Chrome (desktop & mobile)
+ Safari (desktop & iOS)
+ Firefox
+ Edge
+
+Edge Cases:
+
+ Behavior with slow network
+ Offline functionality
+ Very long matter names
+ Empty search results
+ Voice command errors
+ WebSocket disconnection
+
+User Experience:
+
+ Onboarding tour completes
+ Help documentation accessible
+ Upgrade prompts clear
+ Loading states visible
+ Error messages helpful
+
+Create automated E2E tests using Playwright or Cypress for critical navigation flows.
+Provide:
+
+Test suite implementation
+Bug tracking template
+Release checklist
+Rollback procedure
+
+
+---
+
+## **BONUS: Maintenance & Iteration Prompt**
+Create a system for continuous improvement of the navigation system.
+POST-LAUNCH MONITORING:
+
+ANALYTICS DASHBOARD:
+Track:
+
+
+Most-used navigation paths
+Command bar search patterns
+Voice command success rate
+Mega menu engagement
+Ticker alert click-through rate
+Quick action usage frequency
+
+
+USER FEEDBACK:
+
+
+In-app feedback button on navigation
+NPS survey after 30 days
+Session replay for confused users
+Heat mapping of navigation interactions
+
+
+A/B TESTING FRAMEWORK:
+Test variations of:
+
+
+Mega menu layouts
+Command bar positioning
+Ticker message formats
+Quick action order
+
+
+ITERATION PRIORITIES:
+Based on data, plan improvements:
+
+
+Add most-requested quick actions
+Reorder mega menu items by usage
+Improve voice command accuracy
+Optimize alert prioritization
+
+
+DOCUMENTATION UPDATES:
+
+
+Keep help content current
+Update video tutorials
+Maintain keyboard shortcut reference
+Document new features
+
+Create a monthly review process and improvement roadmap.
+
+---
+
+**Usage Instructions:**
+1. Start with Phase 1 prompts in order
+2. Review and test output before moving to next phase
+3. Adapt prompts based on your specific tech stack
+4. Keep context windows focused (don't try to do everything in one prompt)
+5. Iterate on AI outputs - refine the designs as you go

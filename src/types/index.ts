@@ -22,6 +22,140 @@ export type ModalType =
   | 'confirm-delete'
   | null;
 
+// Navigation System Types (Phase 1)
+export interface NavigationItem {
+  id: string;
+  label: string;
+  href?: string;
+  page?: Page;
+  icon?: React.ComponentType<{ className?: string }>;
+  description?: string;
+  badge?: string;
+  isNew?: boolean;
+  isComingSoon?: boolean;
+  requiresUpgrade?: boolean;
+  minTier?: UserTier;
+}
+
+export interface NavigationSection {
+  id: string;
+  title: string;
+  items: NavigationItem[];
+}
+
+export interface NavigationCategory {
+  id: string;
+  label: string;
+  href?: string;
+  page?: Page;
+  icon: React.ComponentType<{ className?: string }>;
+  sections: NavigationSection[];
+  featured?: NavigationItem[];
+  description?: string;
+}
+
+export interface NavigationConfig {
+  categories: NavigationCategory[];
+  quickActions: NavigationItem[];
+}
+
+// Phase 2: Command Bar and Quick Actions Types
+export interface SearchResult {
+  id: string;
+  title: string;
+  description?: string;
+  category: SearchCategory;
+  icon?: React.ComponentType<{ className?: string }>;
+  page?: Page;
+  href?: string;
+  metadata?: Record<string, unknown>;
+  relevanceScore?: number;
+}
+
+export enum SearchCategory {
+  MATTERS = 'matters',
+  CLIENTS = 'clients', 
+  INVOICES = 'invoices',
+  ACTIONS = 'actions',
+  DOCUMENTS = 'documents',
+  RECENT = 'recent'
+}
+
+export interface SearchState {
+  query: string;
+  isOpen: boolean;
+  isLoading: boolean;
+  results: SearchResult[];
+  selectedIndex: number;
+  recentSearches: string[];
+  categories: SearchCategory[];
+}
+
+export interface QuickAction {
+  id: string;
+  label: string;
+  description?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  shortcut?: string;
+  page?: Page;
+  action?: () => void;
+  badge?: string;
+  isNew?: boolean;
+  minTier?: UserTier;
+  usageCount?: number;
+  lastUsed?: string;
+}
+
+export interface QuickActionsState {
+  isOpen: boolean;
+  actions: QuickAction[];
+  customActions: QuickAction[];
+  defaultActions: QuickAction[];
+}
+
+export interface CommandBarState {
+  search: SearchState;
+  quickActions: QuickActionsState;
+  voiceEnabled: boolean;
+  isListening: boolean;
+}
+
+export interface KeyboardShortcut {
+  key: string;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  description: string;
+  action: () => void;
+}
+
+// User Tier Types for Access Control
+export enum UserTier {
+  JUNIOR_START = 'junior_start',
+  ADVOCATE_PRO = 'advocate_pro', 
+  SENIOR_ADVOCATE = 'senior_advocate',
+  CHAMBERS_ENTERPRISE = 'chambers_enterprise'
+}
+
+// Navigation State Types
+export interface NavigationState {
+  activeCategory: string | null;
+  activePage: Page;
+  megaMenuOpen: boolean;
+  mobileMenuOpen: boolean;
+  hoveredCategory: string | null;
+}
+
+// Accessibility Types
+export interface NavigationA11y {
+  ariaLabel: string;
+  ariaExpanded?: boolean;
+  ariaHaspopup?: boolean;
+  role?: string;
+  tabIndex?: number;
+}
+
 // Database Enums (matching Supabase schema)
 export enum BarAssociation {
   JOHANNESBURG = 'johannesburg',

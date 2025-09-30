@@ -102,7 +102,7 @@ export class SettingsService {
       if (!user) throw new Error('User not authenticated');
 
       // Prepare update data
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
       
       if (updates.firmName !== undefined) updateData.firm_name = updates.firmName;
       if (updates.practiceAreas !== undefined) updateData.practice_areas = updates.practiceAreas;

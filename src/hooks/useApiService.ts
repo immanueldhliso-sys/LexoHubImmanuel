@@ -301,13 +301,13 @@ export function useOptimisticUpdate<T>(
     setData(prev => [item, ...prev]);
   }, []);
 
-  const optimisticUpdate = useCallback((id: any, updates: Partial<T>) => {
+  const optimisticUpdate = useCallback((id: T[keyof T], updates: Partial<T>) => {
     setData(prev => prev.map(item => 
       item[keyField] === id ? { ...item, ...updates } : item
     ));
   }, [keyField]);
 
-  const optimisticRemove = useCallback((id: any) => {
+  const optimisticRemove = useCallback((id: T[keyof T]) => {
     setData(prev => prev.filter(item => item[keyField] !== id));
   }, [keyField]);
 

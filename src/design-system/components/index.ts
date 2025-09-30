@@ -11,5 +11,8 @@ export type { ModalProps, ModalHeaderProps, ModalBodyProps, ModalFooterProps } f
 export { default as Input } from './Input';
 export type { InputProps } from './Input';
 
+export { Icon } from './Icon';
+export type { IconProps } from './Icon';
+
 // Removed Storybook type re-exports to avoid Vite transform errors in runtime builds
 // export type { Meta, StoryObj } from '@storybook/react';

@@ -203,7 +203,7 @@ export class AdvancedOCRService {
   /**
    * Extract text using advanced OCR
    */
-  private static async extractTextWithOCR(preprocessedData: any): Promise<OCRResult> {
+  private static async extractTextWithOCR(preprocessedData: Record<string, unknown>): Promise<OCRResult> {
     // No mock OCR output. Return an empty result until a provider is configured.
       toast('OCR provider not configured. Returning empty extraction.', { icon: 'ℹ️' });
     return {
@@ -322,7 +322,7 @@ export class AdvancedOCRService {
   /**
    * Calculate quality metrics for OCR result
    */
-  private static calculateQualityMetrics(ocrResult: OCRResult, extractedData: any) {
+  private static calculateQualityMetrics(ocrResult: OCRResult, extractedData: Record<string, unknown>) {
     const textLength = ocrResult.text.length;
     const entityCount = Object.values(extractedData).flat().length;
     

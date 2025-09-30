@@ -12,12 +12,17 @@ import {
   Brain,
   CheckCircle,
   Loader2,
-  Zap
+  Zap,
+  Navigation,
+  Search,
+  Command
 } from 'lucide-react';
 import { Modal, ModalBody, ModalFooter, Button } from '../../design-system/components';
 import { AudioRecordingService } from '../../services/audio-recording.service';
 import { speechToTextService } from '../../services/speech-to-text.service';
 import { nlpProcessor } from '../../services/nlp-processor.service';
+import { voiceNavigationService } from '../../services/voice-navigation.service';
+import type { VoiceNavigationResult } from '../../services/voice-navigation.service';
 import type { 
   VoiceRecording, 
   VoiceRecordingState, 
@@ -31,6 +36,8 @@ interface GlobalVoiceModalProps {
   onTimeEntryExtracted: (data: ExtractedTimeEntryData) => void;
   availableMatters?: Matter[];
   className?: string;
+  onNavigationCommand?: (result: VoiceNavigationResult) => void;
+  mode?: 'time-capture' | 'navigation' | 'auto';
 }
 
 interface ProcessingState {
@@ -44,7 +51,9 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
   onClose,
   onTimeEntryExtracted,
   availableMatters = [],
-  className = ''
+  className = '',
+  onNavigationCommand,
+  mode = 'auto'
 }) => {
   const [recordingState, setRecordingState] = useState<VoiceRecordingState>({
     isRecording: false,
@@ -57,11 +66,12 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcription, setTranscription] = useState<string>('');
-  const [extractedData, setExtractedData] = useState<ExtractedTimeEntryData | null>(null);
+  const [extractedData, setExtractedData] = useState<any>(null);
+  const [navigationResult, setNavigationResult] = useState<VoiceNavigationResult | null>(null);
+  const [detectedMode, setDetectedMode] = useState<'time-capture' | 'navigation'>('time-capture');
   const [processingState, setProcessingState] = useState<ProcessingState>({
     stage: 'idle',
-    progress: 0,
-    message: ''
+    progress: 0
   });
 
   const audioServiceRef = useRef<AudioRecordingService | null>(null);
@@ -107,6 +117,16 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
       audioElementRef.current.pause();
       audioElementRef.current = null;
     }
+    
+    setRecordingState({ isRecording: false, isPaused: false, duration: 0, audioLevel: 0 });
+    setAudioBlob(null);
+    setIsPlaying(false);
+    setError(null);
+    setTranscription('');
+    setExtractedData(null);
+    setNavigationResult(null);
+    setDetectedMode('time-capture');
+    setProcessingState({ stage: 'idle', progress: 0, message: '' });
   }, []);
 
   const startRecording = useCallback(async () => {
@@ -206,26 +226,63 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
       const transcriptionResult = await speechToTextService.transcribeAudio(blob);
       setTranscription(transcriptionResult.text);
 
-      // Stage 2: NLP Extraction with Claude
+      // Stage 2: Determine intent (navigation vs time capture)
       setProcessingState({
         stage: 'extracting',
-        progress: 75,
-        message: 'Extracting time entry data with AI...'
+        progress: 50,
+        message: 'Analyzing intent...'
       });
-
-      const extractedData = await nlpProcessor.extractTimeEntryData(
-        transcriptionResult.text,
-        availableMatters
-      );
       
-      setExtractedData(extractedData);
+      if (mode === 'auto') {
+        // Try navigation first
+        const navResult = await voiceNavigationService.processVoiceInput(transcriptionResult.text);
+        
+        if (navResult.success && navResult.confidence > 0.7) {
+          setNavigationResult(navResult);
+          setDetectedMode('navigation');
+          setProcessingState({
+            stage: 'complete',
+            progress: 100,
+            message: 'Navigation command detected!'
+          });
+          return;
+        }
+      }
 
-      // Stage 3: Complete
-      setProcessingState({
-        stage: 'complete',
-        progress: 100,
-        message: 'Processing complete!'
-      });
+      if (mode === 'navigation') {
+        // Process as navigation command
+        setProcessingState({
+          stage: 'extracting',
+          progress: 75,
+          message: 'Processing navigation command...'
+        });
+        const navResult = await voiceNavigationService.processVoiceInput(transcriptionResult.text);
+        setNavigationResult(navResult);
+        setDetectedMode('navigation');
+        setProcessingState({
+          stage: 'complete',
+          progress: 100,
+          message: 'Navigation processing complete!'
+        });
+      } else {
+        // Process as time entry (default or fallback)
+        setProcessingState({
+          stage: 'extracting',
+          progress: 75,
+          message: 'Extracting time entry data with AI...'
+        });
+        const extractedData = await nlpProcessor.extractTimeEntryData(
+          transcriptionResult.text,
+          availableMatters
+        );
+        setExtractedData(extractedData);
+        setDetectedMode('time-capture');
+        setProcessingState({
+          stage: 'complete',
+          progress: 100,
+          message: 'Processing complete!'
+        });
+      }
 
     } catch (err) {
       console.error('Failed to process recording:', err);
@@ -236,7 +293,7 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
       });
       setError('Failed to process recording');
     }
-  }, [availableMatters]);
+  }, [availableMatters, mode]);
 
   const playRecording = useCallback(() => {
     if (!audioBlob) return;
@@ -274,12 +331,47 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
     }
   }, []);
 
-  const createTimeEntry = useCallback(() => {
-    if (extractedData) {
-      onTimeEntryExtracted(extractedData);
+  const createTimeEntry = useCallback(async () => {
+    if (!extractedData) return;
+
+    try {
+      // Here you would typically call your time entry API
+      console.log('Creating time entry:', extractedData);
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Call the callback if provided
+      if (onTimeEntryExtracted) {
+        onTimeEntryExtracted(extractedData);
+      }
+      
+      // Close modal
       handleClose();
+    } catch (error) {
+      console.error('Failed to create time entry:', error);
+      setError('Failed to create time entry');
     }
   }, [extractedData, onTimeEntryExtracted]);
+
+  const executeNavigationCommand = useCallback(async () => {
+    if (!navigationResult) return;
+
+    try {
+      console.log('Executing navigation command:', navigationResult);
+      
+      // Call the navigation callback if provided
+      if (onNavigationCommand) {
+        onNavigationCommand(navigationResult);
+      }
+      
+      // Close modal
+      handleClose();
+    } catch (error) {
+      console.error('Failed to execute navigation command:', error);
+      setError('Failed to execute navigation command');
+    }
+  }, [navigationResult, onNavigationCommand]);
 
   const handleClose = useCallback(() => {
     cleanup();
@@ -324,7 +416,8 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
   const canPauseResume = recordingState.isRecording && processingState.stage === 'idle';
   const canStop = recordingState.isRecording;
   const canPlay = audioBlob && !isPlaying && !recordingState.isRecording && processingState.stage !== 'transcribing' && processingState.stage !== 'extracting';
-  const canCreateEntry = extractedData && processingState.stage === 'complete';
+  const canCreateEntry = extractedData && processingState.stage === 'complete' && detectedMode === 'time-capture';
+  const canExecuteNavigation = navigationResult && processingState.stage === 'complete' && detectedMode === 'navigation';
   const isProcessing = processingState.stage === 'transcribing' || processingState.stage === 'extracting';
 
   return (
@@ -335,11 +428,31 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-mpondo-gold-100 rounded-lg">
-                <Zap className="w-6 h-6 text-mpondo-gold-600" />
+                {mode === 'navigation' || detectedMode === 'navigation' ? (
+                  <Navigation className="w-6 h-6 text-mpondo-gold-600" />
+                ) : mode === 'time-capture' || detectedMode === 'time-capture' ? (
+                  <Zap className="w-6 h-6 text-mpondo-gold-600" />
+                ) : (
+                  <Command className="w-6 h-6 text-mpondo-gold-600" />
+                )}
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-neutral-900">Voice Time Capture</h2>
-                <p className="text-sm text-neutral-600">AI-powered voice-to-time-entry</p>
+                <h2 className="text-xl font-semibold text-neutral-900">
+                  {mode === 'navigation' || detectedMode === 'navigation' 
+                    ? 'Voice Navigation' 
+                    : mode === 'time-capture' || detectedMode === 'time-capture'
+                    ? 'Voice Time Capture'
+                    : 'Voice Assistant'
+                  }
+                </h2>
+                <p className="text-sm text-neutral-600">
+                  {mode === 'navigation' || detectedMode === 'navigation'
+                    ? 'Navigate with voice commands'
+                    : mode === 'time-capture' || detectedMode === 'time-capture'
+                    ? 'AI-powered voice-to-time-entry'
+                    : 'Voice commands for navigation and time capture'
+                  }
+                </p>
               </div>
             </div>
             <button
@@ -490,8 +603,51 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
             </div>
           )}
 
+          {/* Navigation Result Display */}
+          {navigationResult && processingState.stage === 'complete' && detectedMode === 'navigation' && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-neutral-900 flex items-center gap-2">
+                <Navigation className="w-4 h-4" />
+                Navigation Command Detected
+                <span className="text-xs bg-mpondo-gold-100 text-mpondo-gold-700 px-2 py-1 rounded-full">
+                  {Math.round(navigationResult.confidence * 100)}% confidence
+                </span>
+              </h3>
+              <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-neutral-600">Command Type</label>
+                  <p className="text-sm text-neutral-900 capitalize">{navigationResult.type}</p>
+                </div>
+                {navigationResult.page && (
+                  <div>
+                    <label className="text-xs font-medium text-neutral-600">Target Page</label>
+                    <p className="text-sm text-neutral-900 capitalize">{navigationResult.page.replace('-', ' ')}</p>
+                  </div>
+                )}
+                {navigationResult.action && (
+                  <div>
+                    <label className="text-xs font-medium text-neutral-600">Action</label>
+                    <p className="text-sm text-neutral-900">{navigationResult.action}</p>
+                  </div>
+                )}
+                {navigationResult.query && (
+                  <div>
+                    <label className="text-xs font-medium text-neutral-600">Search Query</label>
+                    <p className="text-sm text-neutral-900">{navigationResult.query}</p>
+                  </div>
+                )}
+                {navigationResult.originalInput && (
+                  <div>
+                    <label className="text-xs font-medium text-neutral-600">Original Command</label>
+                    <p className="text-sm text-neutral-900 italic">"{navigationResult.originalInput}"</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Extracted Data Display */}
-          {extractedData && processingState.stage === 'complete' && (
+          {extractedData && processingState.stage === 'complete' && detectedMode === 'time-capture' && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-neutral-900 flex items-center gap-2">
                 <Brain className="w-4 h-4" />
@@ -531,12 +687,34 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
           {!recordingState.isRecording && !audioBlob && !error && processingState.stage === 'idle' && (
             <div className="text-center space-y-2">
               <p className="text-sm text-neutral-600">
-                Click "Start Recording" and describe your work:
+                {mode === 'navigation' 
+                  ? 'Click "Start Recording" and speak your navigation command:'
+                  : mode === 'time-capture'
+                  ? 'Click "Start Recording" and describe your work:'
+                  : 'Click "Start Recording" and speak your command:'
+                }
               </p>
               <div className="text-xs text-neutral-500 space-y-1">
-                <p>"I worked on the Smith matter for 2 hours reviewing contracts"</p>
-                <p>"30 minutes on client call for ABC Corporation case"</p>
-                <p>"Research on employment law for Johnson case, 1.5 hours"</p>
+                {mode === 'navigation' ? (
+                  <>
+                    <p>"Open matters page"</p>
+                    <p>"Show dashboard"</p>
+                    <p>"Search for Smith case"</p>
+                    <p>"Create new invoice"</p>
+                  </>
+                ) : mode === 'time-capture' ? (
+                  <>
+                    <p>"I worked on the Smith matter for 2 hours reviewing contracts"</p>
+                    <p>"30 minutes on client call for ABC Corporation case"</p>
+                    <p>"Research on employment law for Johnson case, 1.5 hours"</p>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>Navigation:</strong> "Open matters page", "Show dashboard"</p>
+                    <p><strong>Time Entry:</strong> "2 hours on Smith matter reviewing contracts"</p>
+                    <p><strong>Search:</strong> "Search for ABC Corporation case"</p>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -561,6 +739,17 @@ export const GlobalVoiceModal: React.FC<GlobalVoiceModalProps> = ({
             >
               <CheckCircle className="w-4 h-4" />
               Create Time Entry
+            </Button>
+          )}
+
+          {canExecuteNavigation && (
+            <Button
+              onClick={executeNavigationCommand}
+              variant="primary"
+              className="flex items-center gap-2"
+            >
+              <Navigation className="w-4 h-4" />
+              Execute Command
             </Button>
           )}
 

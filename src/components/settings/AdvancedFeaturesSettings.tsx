@@ -12,7 +12,8 @@ import {
   CheckCircle, 
   Circle,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
 import { toast } from 'react-hot-toast';
@@ -42,6 +43,9 @@ const CATEGORY_ICONS = {
   [FeatureCategory.PROFESSIONAL_DEVELOPMENT]: GraduationCap
 };
 
+// Loading timeout in milliseconds (10 seconds)
+const LOADING_TIMEOUT = 10000;
+
 export const AdvancedFeaturesSettings: React.FC<AdvancedFeaturesSettingsProps> = ({
   onFeatureToggle,
   className = ''
@@ -68,6 +72,8 @@ export const AdvancedFeaturesSettings: React.FC<AdvancedFeaturesSettingsProps> =
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Load initial state
   useEffect(() => {
@@ -76,12 +82,25 @@ export const AdvancedFeaturesSettings: React.FC<AdvancedFeaturesSettingsProps> =
 
   const loadUserPreferences = async () => {
     setLoading(true);
+    setError(null);
+    
+    // Set up timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        setError('Loading timed out. Please try again.');
+        setLoading(false);
+      }
+    }, LOADING_TIMEOUT);
+
     try {
       const response = await userPreferencesService.getCurrentUserPreferences();
       
+      // Clear timeout since we got a response
+      clearTimeout(timeoutId);
+      
       if (response.error) {
         console.error('Failed to load user preferences:', response.error);
-        toast.error('Failed to load preferences');
+        setError('Failed to load preferences. Please try again.');
         return;
       }
 
@@ -109,13 +128,37 @@ export const AdvancedFeaturesSettings: React.FC<AdvancedFeaturesSettingsProps> =
         });
         
         setCategories(newCategories);
+      } else {
+        // No data but no error - initialize with defaults
+        await featureToggleService.initialize(null);
+        
+        const newCategories = { ...categories };
+        FEATURE_CATEGORIES.forEach(category => {
+          const categoryFeatures = getFeaturesByCategory(category.id);
+          newCategories[category.id] = {
+            enabled: false,
+            loading: false,
+            features: categoryFeatures.map(feature => ({
+              ...feature,
+              enabled: false
+            }))
+          };
+        });
+        
+        setCategories(newCategories);
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('Error loading preferences:', error);
-      toast.error('Failed to load preferences');
+      setError('Failed to load preferences. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    loadUserPreferences();
   };
 
   const handleCategoryToggle = async (category: FeatureCategory, enabled: boolean) => {
@@ -287,12 +330,83 @@ export const AdvancedFeaturesSettings: React.FC<AdvancedFeaturesSettingsProps> =
     }
   };
 
+  // Show error state with retry option
+  if (error) {
+    return (
+      <div className={`space-y-6 ${className}`}>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center max-w-md">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-neutral-900 mb-2">
+              Unable to Load Advanced Features
+            </h3>
+            <p className="text-neutral-600 mb-6">
+              {error}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button 
+                onClick={handleRetry}
+                variant="primary"
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Try Again
+              </Button>
+              <Button 
+                onClick={() => {
+                  setError(null);
+                  setLoading(false);
+                  // Initialize with defaults
+                  const newCategories = { ...categories };
+                  FEATURE_CATEGORIES.forEach(category => {
+                    const categoryFeatures = getFeaturesByCategory(category.id);
+                    newCategories[category.id] = {
+                      enabled: false,
+                      loading: false,
+                      features: categoryFeatures.map(feature => ({
+                        ...feature,
+                        enabled: false
+                      }))
+                    };
+                  });
+                  setCategories(newCategories);
+                }}
+                variant="secondary"
+              >
+                Continue with Defaults
+              </Button>
+            </div>
+            {retryCount > 0 && (
+              <p className="text-sm text-neutral-500 mt-3">
+                Retry attempt: {retryCount}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state with better UX
   if (loading) {
     return (
       <div className={`space-y-6 ${className}`}>
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-mpondo-gold-500" />
-          <span className="ml-2 text-neutral-600">Loading advanced features...</span>
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-mpondo-gold-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-neutral-900 mb-2">
+              Loading Advanced Features
+            </h3>
+            <p className="text-neutral-600 mb-4">
+              Please wait while we load your feature preferences...
+            </p>
+            <div className="w-64 bg-neutral-200 rounded-full h-2 mx-auto">
+              <div className="bg-mpondo-gold-500 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
+            <p className="text-xs text-neutral-500 mt-3">
+              This usually takes just a few seconds
+            </p>
+          </div>
         </div>
       </div>
     );

@@ -12,7 +12,7 @@ import {
   Phone,
   CheckCircle
 } from 'lucide-react';
-import { PracticeGrowthService, type AdvocateProfile, type SpecialisationCategory } from '../../services/api/practice-growth.service';
+import { PracticeGrowthService, type AdvocateProfileWithDetails, type SpecialisationCategory, type AdvocateSpecialisation } from '../../services/api/practice-growth.service';
 import { toast } from 'react-hot-toast';
 
 interface AdvocateDirectoryModalProps {
@@ -40,7 +40,7 @@ const SPECIALISATION_OPTIONS: { value: SpecialisationCategory; label: string }[]
 ];
 
 export const AdvocateDirectoryModal: React.FC<AdvocateDirectoryModalProps> = ({ onClose }) => {
-  const [advocates, setAdvocates] = useState<AdvocateProfile[]>([]);
+  const [advocates, setAdvocates] = useState<AdvocateProfileWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
@@ -48,7 +48,7 @@ export const AdvocateDirectoryModal: React.FC<AdvocateDirectoryModalProps> = ({ 
     bar: '',
     acceptingReferrals: true
   });
-  const [selectedAdvocate, setSelectedAdvocate] = useState<AdvocateProfile | null>(null);
+  const [selectedAdvocate, setSelectedAdvocate] = useState<AdvocateProfileWithDetails | null>(null);
 
   useEffect(() => {
     searchAdvocates();
@@ -166,7 +166,7 @@ export const AdvocateDirectoryModal: React.FC<AdvocateDirectoryModalProps> = ({ 
               </div>
             ) : (
               <div className="divide-y divide-neutral-200">
-                {advocates.map((advocate: any) => (
+                {advocates.map((advocate: AdvocateProfileWithDetails) => (
                   <div
                     key={advocate.id}
                     onClick={() => setSelectedAdvocate(advocate)}
@@ -216,17 +216,17 @@ export const AdvocateDirectoryModal: React.FC<AdvocateDirectoryModalProps> = ({ 
               <div className="space-y-6">
                 <div>
                   <h3 className="text-2xl font-bold text-neutral-900">
-                    {(selectedAdvocate as any).advocate?.full_name || 'Unknown Advocate'}
+                    {selectedAdvocate.advocate?.full_name || 'Unknown Advocate'}
                   </h3>
                   <div className="flex items-center gap-4 mt-2 text-sm text-neutral-600">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
-                      <span>{(selectedAdvocate as any).advocate?.bar === 'johannesburg' ? 'Johannesburg Bar' : 'Cape Town Bar'}</span>
+                      <span>{selectedAdvocate.advocate?.bar === 'johannesburg' ? 'Johannesburg Bar' : 'Cape Town Bar'}</span>
                     </div>
-                    {(selectedAdvocate as any).advocate?.email && (
+                    {selectedAdvocate.advocate?.email && (
                       <div className="flex items-center gap-1">
                         <Mail className="w-4 h-4" />
-                        <span>{(selectedAdvocate as any).advocate.email}</span>
+                        <span>{selectedAdvocate.advocate.email}</span>
                       </div>
                     )}
                   </div>
@@ -255,11 +255,11 @@ export const AdvocateDirectoryModal: React.FC<AdvocateDirectoryModalProps> = ({ 
                   </div>
                 )}
 
-                {(selectedAdvocate as any).specialisations && (selectedAdvocate as any).specialisations.length > 0 && (
+                {selectedAdvocate.specialisations && selectedAdvocate.specialisations.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-neutral-900 mb-2">Specialisations</h4>
                     <div className="space-y-2">
-                      {(selectedAdvocate as any).specialisations.map((spec: any, index: number) => (
+                      {selectedAdvocate.specialisations.map((spec, index: number) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                           <div>
                             <p className="font-medium text-neutral-900">

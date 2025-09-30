@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { z } from 'zod';
+import type { TimeEntry } from '@/types';
 
 // Types for Document Intelligence
 export interface DocumentIntelligence {
@@ -114,6 +115,19 @@ export type PrecedentType =
   | 'correspondence'
   | 'court_orders'
   | 'other';
+
+// Work category structure for fee narrative generation
+interface WorkCategory {
+  hours: number;
+  entries: number;
+  totalValue: number;
+}
+
+// Database record types for mapping
+interface DatabaseRecord {
+  id: string;
+  [key: string]: unknown;
+}
 
 // Validation schemas
 const DocumentAnalysisRequestSchema = z.object({
@@ -456,8 +470,8 @@ export class DocumentIntelligenceService {
     }
   }
 
-  private static categorizeTimeEntries(entries: any[]): Record<string, any> {
-    const categories: Record<string, any> = {};
+  private static categorizeTimeEntries(entries: TimeEntry[]): Record<string, WorkCategory> {
+    const categories: Record<string, WorkCategory> = {};
     
     entries.forEach(entry => {
       const category = this.getTimeEntryCategory(entry.description);
@@ -490,7 +504,7 @@ export class DocumentIntelligenceService {
     return 'General Legal Services';
   }
 
-  private static extractKeyActivities(entries: any[]): string[] {
+  private static extractKeyActivities(entries: TimeEntry[]): string[] {
     const activities = new Set<string>();
     
     entries.forEach(entry => {
@@ -508,7 +522,7 @@ export class DocumentIntelligenceService {
     return Array.from(activities).slice(0, 10);
   }
 
-  private static generateValuePropositions(categories: Record<string, any>, activities: string[]): string[] {
+  private static generateValuePropositions(categories: Record<string, WorkCategory>, activities: string[]): string[] {
     const propositions: string[] = [];
     
     // Based on work categories
@@ -545,7 +559,7 @@ export class DocumentIntelligenceService {
   }
 
   // Mapping functions
-  private static mapGeneratedNarrative(record: any): GeneratedFeeNarrative {
+  private static mapGeneratedNarrative(record: DatabaseRecord): GeneratedFeeNarrative {
     return {
       id: record.id,
       invoiceId: record.invoice_id,

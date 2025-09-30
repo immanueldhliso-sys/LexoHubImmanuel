@@ -90,7 +90,8 @@ const config = {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Work Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['Libre Baskerville', 'Georgia', 'serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
       fontSize: {

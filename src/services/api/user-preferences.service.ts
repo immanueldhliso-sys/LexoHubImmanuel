@@ -376,7 +376,7 @@ class UserPreferencesService extends BaseApiService<UserPreferences> {
 
     try {
       const results: UserPreferences[] = [];
-      const errors: any[] = [];
+      const errors: Array<{ userId: string; error: string }> = [];
 
       // Execute updates in parallel
       const promises = updates.map(async ({ userId, preferences }) => {

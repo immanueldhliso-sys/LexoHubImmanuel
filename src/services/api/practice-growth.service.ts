@@ -84,6 +84,15 @@ export interface AdvocateProfile {
   isPublic: boolean;
 }
 
+export interface AdvocateProfileWithDetails extends AdvocateProfile {
+  advocate?: {
+    full_name: string;
+    bar: 'johannesburg' | 'cape_town';
+    email: string;
+  };
+  specialisations?: AdvocateSpecialisation[];
+}
+
 export type SpecialisationCategory = 
   | 'administrative_law'
   | 'banking_finance'
@@ -399,7 +408,7 @@ export class PracticeGrowthService {
     bar?: string;
     acceptingReferrals?: boolean;
     search?: string;
-  }): Promise<AdvocateProfile[]> {
+  }): Promise<AdvocateProfileWithDetails[]> {
     try {
       let query = supabase
         .from('advocate_profiles')
@@ -427,11 +436,11 @@ export class PracticeGrowthService {
       let results = data || [];
       if (filters.specialisation) {
         results = results.filter(profile => 
-          profile.specialisations?.some((s: any) => s.category === filters.specialisation)
+          profile.specialisations?.some((s: AdvocateSpecialisation) => s.category === filters.specialisation)
         );
       }
 
-      return results.map(this.mapAdvocateProfile);
+      return results.map(this.mapAdvocateProfileWithDetails);
     } catch (error) {
       console.error('Error searching advocate directory:', error);
       toast.error('Failed to search advocate directory');
@@ -440,7 +449,7 @@ export class PracticeGrowthService {
   }
 
   // Helper functions to map database records to frontend types
-  private static mapOverflowBrief(record: any): OverflowBrief {
+  private static mapOverflowBrief(record: Record<string, unknown>): OverflowBrief {
     return {
       id: record.id,
       postingAdvocateId: record.posting_advocate_id,
@@ -467,7 +476,7 @@ export class PracticeGrowthService {
     };
   }
 
-  private static mapBriefApplication(record: any): BriefApplication {
+  private static mapBriefApplication(record: Record<string, unknown>): BriefApplication {
     return {
       id: record.id,
       briefId: record.brief_id,
@@ -482,7 +491,7 @@ export class PracticeGrowthService {
     };
   }
 
-  private static mapReferralRelationship(record: any): ReferralRelationship {
+  private static mapReferralRelationship(record: Record<string, unknown>): ReferralRelationship {
     return {
       id: record.id,
       advocateAId: record.advocate_a_id,
@@ -497,7 +506,7 @@ export class PracticeGrowthService {
     };
   }
 
-  private static mapAdvocateProfile(record: any): AdvocateProfile {
+  private static mapAdvocateProfile(record: Record<string, unknown>): AdvocateProfile {
     return {
       id: record.id,
       advocateId: record.advocate_id,
@@ -515,6 +524,14 @@ export class PracticeGrowthService {
       averageCompletionDays: record.average_completion_days,
       successRate: record.success_rate,
       isPublic: record.is_public
+    };
+  }
+
+  private static mapAdvocateProfileWithDetails(record: Record<string, unknown>): AdvocateProfileWithDetails {
+    return {
+      ...this.mapAdvocateProfile(record),
+      advocate: record.advocate as { full_name: string; bar: 'johannesburg' | 'cape_town'; email: string } | undefined,
+      specialisations: record.specialisations as AdvocateSpecialisation[] | undefined
     };
   }
 }

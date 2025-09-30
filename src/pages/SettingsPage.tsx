@@ -5,7 +5,7 @@ import { toast } from 'react-hot-toast';
 import { AdvancedFeaturesSettings } from '../components/settings/AdvancedFeaturesSettings';
 
 const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'advanced-features'>('practice');
+  const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'templates' | 'advanced-features'>('practice');
   const [practiceSettings, setPracticeSettings] = useState({
     firmName: 'Mpondo & Associates',
     practiceAreas: ['Commercial Litigation', 'Employment Law', 'Mining Law'],
@@ -87,13 +87,13 @@ const SettingsPage: React.FC = () => {
       <div className="flex items-center justify-between">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900">Settings</h1>
+          <h1 className="heading-2 text-neutral-900">Settings</h1>
           <p className="text-neutral-600 mt-1">Manage your practice configuration and preferences</p>
         </div>
 
         {/* Tabs */}
         <div className="flex space-x-1 bg-neutral-100 rounded-lg p-1">
-          {(['practice', 'integrations', 'compliance', 'billing', 'advanced-features'] as const).map((tab) => (
+          {(['practice', 'integrations', 'compliance', 'billing', 'templates', 'advanced-features'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -108,6 +108,7 @@ const SettingsPage: React.FC = () => {
                tab === 'integrations' ? 'Integrations' :
                tab === 'compliance' ? 'Compliance' :
                tab === 'billing' ? 'Billing' :
+               tab === 'templates' ? 'Templates' :
                'Advanced Features'}
             </button>
           ))}
@@ -120,7 +121,7 @@ const SettingsPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-neutral-900">Practice Information</h2>
+                <h2 className="heading-4 text-neutral-900">Practice Information</h2>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -210,7 +211,7 @@ const SettingsPage: React.FC = () => {
 
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-neutral-900">Working Hours & Billing</h2>
+                <h2 className="heading-4 text-neutral-900">Working Hours & Billing</h2>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -567,6 +568,139 @@ const SettingsPage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+
+          <div className="flex justify-end space-x-4">
+            <Button 
+              variant="outline" 
+              onClick={handleResetToDefaults}
+              disabled={isLoading}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset to Defaults
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleSaveSettings}
+              disabled={!hasUnsavedChanges || isLoading}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isLoading ? 'Saving...' : 'Save All Settings'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'templates' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <h2 className="text-xl font-semibold text-neutral-900">Template Settings</h2>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Default Template Category
+                  </label>
+                  <select className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent">
+                    <option value="General">General</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Employment">Employment</option>
+                    <option value="Mining">Mining</option>
+                    <option value="Personal">Personal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Auto-save Templates
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      className="rounded border-neutral-300 text-mpondo-gold-600 focus:ring-mpondo-gold-500"
+                    />
+                    <span className="text-sm text-neutral-700">
+                      Automatically save frequently used matter configurations as templates
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Template Sharing
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      className="rounded border-neutral-300 text-mpondo-gold-600 focus:ring-mpondo-gold-500"
+                    />
+                    <span className="text-sm text-neutral-700">
+                      Allow sharing templates with other advocates in your organization
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h2 className="text-xl font-semibold text-neutral-900">Template Library</h2>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-neutral-700">Total Templates</span>
+                    <span className="text-sm text-neutral-900">12</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-neutral-700">Shared Templates</span>
+                    <span className="text-sm text-neutral-900">3</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-neutral-700">Most Used</span>
+                    <span className="text-sm text-neutral-900">Commercial Litigation</span>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-neutral-200">
+                  <Button variant="outline" size="sm" className="w-full">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Manage Templates
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <h2 className="text-xl font-semibold text-neutral-900">Template Categories</h2>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  { name: 'General', count: 3, description: 'General purpose matter templates' },
+                  { name: 'Commercial', count: 4, description: 'Commercial litigation and contracts' },
+                  { name: 'Employment', count: 2, description: 'Employment law matters' },
+                  { name: 'Mining', count: 2, description: 'Mining law and regulations' },
+                  { name: 'Personal', count: 1, description: 'Personal legal matters' }
+                ].map((category, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
+                    <div>
+                      <h4 className="font-medium text-neutral-900">{category.name}</h4>
+                      <p className="text-sm text-neutral-600">{category.description}</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded-full">
+                        {category.count} templates
+                      </span>
+                      <Button variant="ghost" size="sm">
+                        Manage
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="flex justify-end space-x-4">
             <Button 

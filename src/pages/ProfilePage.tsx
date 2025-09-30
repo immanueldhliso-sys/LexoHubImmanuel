@@ -23,8 +23,8 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    const md: any = user.user_metadata || {};
-    const ap = user.advocate_profile || ({} as any);
+    const md = user.user_metadata || {};
+    const ap = user.advocate_profile || {};
     const year = md.year_admitted || new Date().getFullYear();
     const experienceYears = Math.max(0, new Date().getFullYear() - (md.year_admitted || new Date().getFullYear()));
     setUserProfile({
@@ -42,7 +42,7 @@ const ProfilePage: React.FC = () => {
   const handleSave = async () => {
     try {
       const year = userProfile.admissionDate ? Number(userProfile.admissionDate.split('-')[0]) : undefined;
-      const updates: any = {
+      const updates = {
         full_name: userProfile.name,
         practice_number: userProfile.practiceNumber,
         phone_number: userProfile.phone || undefined,
@@ -74,11 +74,11 @@ const ProfilePage: React.FC = () => {
     }));
   };
 
-  const specializations: any[] = [];
+  const specializations: string[] = [];
 
-  const developmentGoals: any[] = [];
+  const developmentGoals: string[] = [];
 
-  const achievements: any[] = [];
+  const achievements: string[] = [];
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: UserIcon }

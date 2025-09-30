@@ -14,7 +14,7 @@ import {
   Calculator,
   RefreshCw
 } from 'lucide-react';
-import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { Card, CardHeader, CardContent, Button, Icon } from '../design-system/components';
 import { NewMatterModal } from '../components/matters/NewMatterModal';
 import { InvoiceService } from '../services/api/invoices.service';
 import { matterApiService } from '../services/api';
@@ -288,16 +288,16 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   <div className="max-w-7xl mx-auto space-y-6">
     <div className="flex items-center justify-between">
       <div>
-        <h1 className="text-3xl font-bold text-neutral-900">Dashboard</h1>
+        <h1 className="heading-2 text-neutral-900">Dashboard</h1>
         <p className="text-neutral-600 mt-1">Welcome to your practice intelligence platform</p>
       </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleRefreshData} disabled={dashboardData.isLoading}>
-            <TrendingUp className="w-4 h-4 mr-2" />
+            <Icon icon={TrendingUp} className="w-4 h-4 mr-2" noGradient />
             Refresh Data
           </Button>
           <Button variant="primary" onClick={() => handleQuickAction('new-matter')}>
-            <Plus className="w-4 h-4 mr-2" />
+            <Icon icon={Plus} className="w-4 h-4 mr-2" noGradient />
             New Matter
           </Button>
         </div>
@@ -310,7 +310,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={() => handleQuickAction('new-invoice')}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <FileText className="w-6 h-6 mb-1 text-mpondo-gold-600" />
+          <Icon icon={FileText} className="w-6 h-6 mb-1" />
           <span className="text-sm font-medium">Generate Invoice</span>
         </Button>
         <Button 
@@ -318,7 +318,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={() => onNavigate?.('proforma')}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Calculator className="w-6 h-6 mb-1 text-judicial-blue-600" />
+          <Icon icon={Calculator} className="w-6 h-6 mb-1" />
           <span className="text-sm font-medium">Create Pro Forma</span>
         </Button>
         <Button 
@@ -326,7 +326,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={() => handleQuickAction('time-entry')}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Clock className="w-6 h-6 mb-1 text-status-success-600" />
+          <Icon icon={Clock} className="w-6 h-6 mb-1" />
           <span className="text-sm font-medium">Quick Time Entry</span>
         </Button>
         <Button 
@@ -334,7 +334,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={handleViewAllMatters}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Briefcase className="w-6 h-6 mb-1 text-neutral-600" />
+          <Icon icon={Briefcase} className="w-6 h-6 mb-1" />
           <span className="text-sm font-medium">View All Matters</span>
         </Button>
     </div>
@@ -343,53 +343,53 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <Card hoverable onClick={() => onNavigate?.('invoices')} className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
-          <div className="text-mpondo-gold-500 mb-2">
-            <FileText className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+            <Icon icon={FileText} className="w-8 h-8 mx-auto" />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : invoiceMetrics.totalInvoices}
           </h3>
           <p className="text-sm text-neutral-600">Total Invoices</p>
           <div className="mt-2 text-xs text-mpondo-gold-600 flex items-center justify-center">
-            Manage Invoices <ArrowRight className="w-3 h-3 ml-1" />
+            Manage Invoices <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
           </div>
         </CardContent>
       </Card>
 
       <Card hoverable onClick={() => onNavigate?.('proforma')} className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
-          <div className="text-judicial-blue-500 mb-2">
-            <Calculator className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+            <Icon icon={Calculator} className="w-8 h-8 mx-auto" />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : invoiceMetrics.totalProFormas}
           </h3>
           <p className="text-sm text-neutral-600">Pro Formas</p>
           <div className="mt-2 text-xs text-judicial-blue-600 flex items-center justify-center">
-            View Pro Formas <ArrowRight className="w-3 h-3 ml-1" />
+            View Pro Formas <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
           </div>
         </CardContent>
       </Card>
 
       <Card hoverable onClick={handleOverdueInvoicesClick} className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
-          <div className="text-status-error-500 mb-2">
-            <AlertTriangle className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+            <Icon icon={AlertTriangle} className="w-8 h-8 mx-auto" />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : invoiceMetrics.overdueCount}
           </h3>
           <p className="text-sm text-neutral-600">Overdue Invoices</p>
           <div className="mt-2 text-xs text-status-error-600 flex items-center justify-center">
-            Review Overdue <ArrowRight className="w-3 h-3 ml-1" />
+            Review Overdue <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
           </div>
         </CardContent>
       </Card>
 
       <Card hoverable className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
-          <div className="text-status-success-500 mb-2">
-            <DollarSign className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+            <Icon icon={DollarSign} className="w-8 h-8 mx-auto" />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : formatCurrency(invoiceMetrics.paidThisMonth)}
@@ -407,52 +407,52 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         {/* Quick Stats with click handlers */}
         <Card hoverable onClick={handleViewAllMatters} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
-          <div className="text-mpondo-gold-500 mb-2">
-            <Briefcase className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+            <Icon icon={Briefcase} className="w-8 h-8 mx-auto" />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{dashboardData.activeMatters}</h3>
           <p className="text-sm text-neutral-600">Active Matters</p>
             <div className="mt-2 text-xs text-mpondo-gold-600 flex items-center justify-center">
-              View Details <ArrowRight className="w-3 h-3 ml-1" />
+              View Details <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
             </div>
         </CardContent>
       </Card>
 
         <Card hoverable onClick={handleWipReportClick} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
-          <div className="text-judicial-blue-900 mb-2">
-            <FileText className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+            <Icon icon={FileText} className="w-8 h-8 mx-auto" />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{formatCurrency(dashboardData.outstandingWip)}</h3>
           <p className="text-sm text-neutral-600">Outstanding WIP</p>
             <div className="mt-2 text-xs text-judicial-blue-600 flex items-center justify-center">
-              View WIP Report <ArrowRight className="w-3 h-3 ml-1" />
+              View WIP Report <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
             </div>
         </CardContent>
       </Card>
 
         <Card hoverable onClick={handleBillingReportClick} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
-          <div className="text-status-success-500 mb-2">
-            <BarChart3 className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+            <Icon icon={BarChart3} className="w-8 h-8 mx-auto" />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{formatCurrency(dashboardData.monthlyBilling)}</h3>
           <p className="text-sm text-neutral-600">This Month Billing</p>
             <div className="mt-2 text-xs text-status-success-600 flex items-center justify-center">
-              View Reports <ArrowRight className="w-3 h-3 ml-1" />
+              View Reports <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
             </div>
         </CardContent>
       </Card>
 
         <Card hoverable onClick={handleOverdueInvoicesClick} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
-          <div className="text-status-warning-500 mb-2">
-              <AlertTriangle className="w-8 h-8 mx-auto" />
+          <div className="mb-2">
+              <Icon icon={AlertTriangle} className="w-8 h-8 mx-auto" />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{dashboardData.overdueInvoices}</h3>
           <p className="text-sm text-neutral-600">Overdue Invoices</p>
             <div className="mt-2 text-xs text-status-warning-600 flex items-center justify-center">
-              Review Overdue <ArrowRight className="w-3 h-3 ml-1" />
+              Review Overdue <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
             </div>
         </CardContent>
       </Card>
@@ -463,7 +463,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="text-xl font-semibold text-neutral-900">Recent Matters</h2>
             <Button variant="ghost" size="sm" onClick={handleViewAllMatters}>
-              View All <ArrowRight className="w-4 h-4 ml-1" />
+              View All <Icon icon={ArrowRight} className="w-4 h-4 ml-1" noGradient />
             </Button>
         </CardHeader>
           <CardContent className="space-y-3">
@@ -491,13 +491,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                     }`}>
                       {matter.status}
                     </span>
-                    <ArrowRight className="w-4 h-4 text-neutral-400" />
+                    <Icon icon={ArrowRight} className="w-4 h-4 text-neutral-400" noGradient />
           </div>
             </div>
               ))
             ) : (
               <div className="text-center py-8 text-neutral-500">
-                <Briefcase className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
+                <Icon icon={Briefcase} className="w-12 h-12 mx-auto mb-2 text-neutral-300" noGradient />
                 <p>No recent matters found</p>
                 <Button variant="outline" size="sm" className="mt-2" onClick={() => handleQuickAction('new-matter')}>
                   Create First Matter
@@ -512,7 +512,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="text-xl font-semibold text-neutral-900">Recent Invoices</h2>
           <Button variant="ghost" size="sm" onClick={() => onNavigate?.('invoices')}>
-            View All <ArrowRight className="w-4 h-4 ml-1" />
+            View All <Icon icon={ArrowRight} className="w-4 h-4 ml-1" noGradient />
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -543,13 +543,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                   }`}>
                     {invoice.status}
                   </span>
-                  <ArrowRight className="w-4 h-4 text-neutral-400" />
+                  <Icon icon={ArrowRight} className="w-4 h-4 text-neutral-400" noGradient />
                 </div>
               </div>
             ))
           ) : (
             <div className="text-center py-8 text-neutral-500">
-              <FileText className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
+              <Icon icon={FileText} className="w-12 h-12 mx-auto mb-2 text-neutral-300" noGradient />
               <p>No recent invoices found</p>
               <Button variant="outline" size="sm" className="mt-2" onClick={() => handleQuickAction('new-invoice')}>
                 Generate First Invoice
@@ -594,7 +594,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             </div>
             <div className="pt-2">
               <Button variant="outline" size="sm" className="w-full" onClick={handleAnalyticsClick}>
-                <BarChart3 className="w-4 h-4 mr-2" />
+                <Icon icon={BarChart3} className="w-4 h-4 mr-2" noGradient />
                 View Detailed Analytics
               </Button>
           </div>
@@ -633,7 +633,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                   toast.success('Opening invoice generation...');
                 }}
               >
-                <FileText className="w-4 h-4 mr-2" />
+                <Icon icon={FileText} className="w-4 h-4 mr-2" noGradient />
                 Open Invoice Generator
               </Button>
               <Button 
@@ -700,7 +700,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                     toast.success('Time entry saved successfully!');
                   }}
                 >
-                  <Clock className="w-4 h-4 mr-2" />
+                  <Icon icon={Clock} className="w-4 h-4 mr-2" noGradient />
                   Save Time Entry
                 </Button>
                 <Button 
@@ -778,7 +778,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
               <div className="p-4 bg-neutral-50 rounded-lg">
                 <h4 className="font-medium text-neutral-900 mb-2">Monthly Trend</h4>
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-status-success-500" />
+                  <Icon icon={TrendingUp} className="w-4 h-4 text-status-success-500" noGradient />
                   <span className="text-status-success-600 font-medium">+22.3%</span>
                   <span className="text-neutral-600">compared to last month</span>
                 </div>

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600&family=Libre+Baskerville:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -22,7 +22,7 @@
 
   /* Base Typography & Colors */
   body {
-    @apply font-sans text-neutral-900 bg-neutral-50 antialiased;
+    @apply font-ui text-neutral-900 bg-neutral-50 antialiased;
     font-feature-settings: 'kern' 1, 'liga' 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -198,6 +198,8 @@
     animation: fadeIn var(--animation-duration) var(--animation-timing);
   }
 
+
+
   .animate-out {
     animation: fadeOut var(--animation-duration) var(--animation-timing);
   }
@@ -232,5 +234,90 @@
 
   .safe-right {
     padding-right: env(safe-area-inset-right);
+  }
+
+  /* Font System Utilities */
+  .font-ui {
+    @apply font-sans; /* Work Sans for UI elements */
+  }
+
+  .font-heading {
+    @apply font-serif; /* Libre Baskerville for headings */
+  }
+
+  .font-data {
+    @apply font-mono; /* JetBrains Mono for data/code */
+  }
+
+  /* Heading Styles with New Font */
+  .heading-1 {
+    @apply font-heading text-4xl font-bold leading-tight;
+  }
+
+  .heading-2 {
+    @apply font-heading text-3xl font-bold leading-tight;
+  }
+
+  .heading-3 {
+    @apply font-heading text-2xl font-semibold leading-tight;
+  }
+
+  .heading-4 {
+    @apply font-heading text-xl font-semibold leading-tight;
+  }
+
+  .heading-5 {
+    @apply font-heading text-lg font-semibold leading-tight;
+  }
+
+  .heading-6 {
+    @apply font-heading text-base font-semibold leading-tight;
+  }
+
+  /* Body Text Styles */
+  .body-large {
+    @apply font-ui text-lg font-normal leading-relaxed;
+  }
+
+  .body-medium {
+    @apply font-ui text-base font-normal leading-relaxed;
+  }
+
+  .body-small {
+    @apply font-ui text-sm font-normal leading-relaxed;
+  }
+
+  /* UI Element Styles */
+  .ui-label {
+    @apply font-ui text-sm font-medium;
+  }
+
+  .ui-caption {
+    @apply font-ui text-xs font-normal;
+  }
+
+  .ui-button {
+    @apply font-ui text-sm font-medium;
+  }
+
+  /* Data/Code Styles */
+  .data-large {
+    @apply font-data text-lg font-normal;
+  }
+
+  .data-medium {
+    @apply font-data text-base font-normal;
+  }
+
+  .data-small {
+    @apply font-data text-sm font-normal;
+  }
+
+  /* Icon Gradient Utility */
+  .text-gradient-icon {
+    background: linear-gradient(135deg, #D4AF37 0%, #1E3A8A 50%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }

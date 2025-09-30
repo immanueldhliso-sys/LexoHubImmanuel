@@ -1,13 +1,28 @@
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { Suspense, useState, useCallback, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
-import { Scale, Briefcase, FileText, BarChart3, Settings, Menu, X, Users, LogOut, Brain, Mic, Shield } from 'lucide-react';
-import { Card, CardContent, Button } from './design-system/components';
+
+// Icons
+import { 
+  Mic
+} from 'lucide-react';
+
+// UI Components
+import { LoadingSpinner } from './components/design-system/components/LoadingSpinner';
+
+// Navigation Components
+import { NavigationBar } from './components/navigation';
+
+// Auth
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { LoadingSpinner } from './components/design-system/components/LoadingSpinner';
+
+// Global Components
 import { GlobalVoiceModal } from './components/voice/GlobalVoiceModal';
-import type { Page, ExtractedTimeEntryData, Matter } from './types';
+
+// Types
+import type { Page, Matter, UserTier } from './types';
+import type { ExtractedTimeEntryData } from './types/voice';
 import {
   DashboardPage,
   MattersPage,
@@ -112,219 +127,34 @@ const DefaultErrorFallback: React.FC<{ error: Error }> = ({ error }) => {
 
 
 // Navigation Component
-const Navigation: React.FC<{
-  activePage: Page;
-  sidebarOpen: boolean;
-  onPageChange: (page: Page) => void;
-  onToggleSidebar: () => void;
-}> = ({ activePage, sidebarOpen, onPageChange, onToggleSidebar }) => {
-  const { user, signOut } = useAuth();
-  const [accessibleItems, setAccessibleItems] = React.useState<any[]>([]);
-  
-  const allNavigationItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-    { id: 'matters', label: 'Matters', icon: Briefcase },
-    { id: 'invoices', label: 'Invoices', icon: FileText },
-    { id: 'proforma', label: 'Pro Forma', icon: FileText },
-    { id: 'pricing-management', label: 'Pricing', icon: Scale },
-    { id: 'compliance', label: 'Compliance', icon: Shield },
-    // Advanced features (will be filtered based on user preferences)
-    { id: 'ai-analytics', label: 'AI Analytics', icon: Brain },
-    { id: 'strategic-finance', label: 'Finance', icon: Scale },
-    { id: 'practice-growth', label: 'Practice Growth', icon: Users },
-    { id: 'workflow-integrations', label: 'Workflow', icon: Settings },
-    // Always visible
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ] as const;
-
-  // Filter navigation items based on feature access
-  React.useEffect(() => {
-    const updateAccessibleItems = async () => {
-      try {
-        // Import services dynamically to avoid circular dependencies
-        const { featureGuardService } = await import('./services/feature-guard.service');
-        
-        const filteredItems = allNavigationItems.filter(item => {
-          const accessResult = featureGuardService.canAccessPage(item.id);
-          return accessResult.allowed;
-        });
-        
-        setAccessibleItems(filteredItems);
-      } catch (error) {
-        console.error('Error filtering navigation items:', error);
-        // Fallback to core items only
-        setAccessibleItems([
-          { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-          { id: 'matters', label: 'Matters', icon: Briefcase },
-          { id: 'invoices', label: 'Invoices', icon: FileText },
-          { id: 'proforma', label: 'Pro Forma', icon: FileText },
-          { id: 'pricing-management', label: 'Pricing', icon: Scale },
-          { id: 'compliance', label: 'Compliance', icon: Shield },
-          { id: 'settings', label: 'Settings', icon: Settings },
-        ]);
-      }
-    };
-
-    updateAccessibleItems();
-
-    // Listen for feature toggle changes
-    let unsubscribe: (() => void) | undefined;
-    
-    const setupFeatureListener = async () => {
-      try {
-        const { featureToggleService } = await import('./services/feature-toggle.service');
-        unsubscribe = featureToggleService.onFeatureChange(() => {
-          updateAccessibleItems();
-        });
-      } catch (error) {
-        console.error('Error setting up feature listener:', error);
-      }
-    };
-
-    setupFeatureListener();
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
-
-  const handlePageChange = (pageId: string) => {
-    // Validate access before changing page
-    const validateAndChange = async () => {
-      try {
-        const { featureGuardService } = await import('./services/feature-guard.service');
-        
-        if (featureGuardService.validatePageAccess(pageId)) {
-          onPageChange(pageId as Page);
-        }
-      } catch (error) {
-        console.error('Error validating page access:', error);
-        // Fallback to direct navigation for core pages
-        const corePages = ['dashboard', 'matters', 'invoices', 'proforma', 'pricing-management', 'compliance', 'settings', 'profile'];
-        if (corePages.includes(pageId)) {
-          onPageChange(pageId as Page);
-        }
-      }
-    };
-
-    validateAndChange();
-  };
-
-  return (
-    <nav className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-neutral-200 transform transition-transform duration-300 ease-in-out flex flex-col ${
-      sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-    } lg:translate-x-0`}>
-      <div className="flex items-center justify-between h-16 px-6 border-b border-neutral-200">
-        <div className="flex items-center gap-2">
-          <Scale className="w-8 h-8 text-mpondo-gold-600" />
-          <span className="text-xl font-bold text-neutral-900">LexoHub</span>
-        </div>
-        <button
-          onClick={onToggleSidebar}
-          className="lg:hidden p-2 rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100"
-          aria-label="Close sidebar"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      
-      <div className="px-3 py-4 flex-1">
-        <ul className="space-y-1">
-          {accessibleItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activePage === item.id;
-            
-            return (
-              <li key={item.id}>
-                <button
-                  onClick={() => handlePageChange(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-mpondo-gold-100 text-mpondo-gold-900'
-                      : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
-                  }`}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      {/* User Profile & Sign Out */}
-      <div className="px-3 py-4 border-t border-neutral-200">
-        <button
-          onClick={() => handlePageChange('profile')}
-          className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 rounded-lg transition-colors"
-        >
-          <div className="w-10 h-10 bg-neutral-100 rounded-full flex items-center justify-center">
-            <span className="text-mpondo-gold-600 font-medium text-lg">
-              {user?.advocate_profile?.full_name?.charAt(0)?.toLowerCase() || user?.email?.charAt(0)?.toLowerCase() || 'n'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-neutral-900 text-base">
-              User
-            </p>
-            <p className="text-sm text-neutral-500 truncate">
-              {user?.email || 'nkosinathi.dhliso@gmail.com'}
-            </p>
-          </div>
-        </button>
-        <button
-          onClick={signOut}
-          className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 rounded-lg transition-colors mt-2"
-        >
-          <LogOut className="w-5 h-5" />
-          Sign Out
-        </button>
-      </div>
-    </nav>
-  );
-};
+// Navigation component is now replaced by NavigationBar from ./components/navigation
 
 // Main Layout Component
 const MainLayout: React.FC<{ 
   children: React.ReactNode;
   activePage: Page;
-  sidebarOpen: boolean;
   onPageChange: (page: Page) => void;
-  onToggleSidebar: () => void;
-}> = ({ children, activePage, sidebarOpen, onPageChange, onToggleSidebar }) => {
+}> = ({ children, activePage, onPageChange }) => {
+  const { user } = useAuth();
+  
+  // Determine user tier based on user data (simplified for now)
+  const userTier: UserTier = 'professional'; // This should come from user data/subscription
+  
   return (
     <div className="min-h-screen bg-neutral-50">
-      <Navigation
+      <NavigationBar
         activePage={activePage}
-        sidebarOpen={sidebarOpen}
         onPageChange={onPageChange}
-        onToggleSidebar={onToggleSidebar}
+        userTier={userTier}
+        user={user}
       />
-      
-      <div className="lg:pl-[257px]">
-        <div className="sticky top-0 z-40 lg:hidden">
-          <div className="flex items-center gap-x-6 bg-white px-4 py-4 shadow-sm sm:px-6">
-            <button
-              type="button"
-              className="-m-2.5 p-2.5 text-neutral-700 lg:hidden"
-              onClick={onToggleSidebar}
-              aria-label="Open sidebar"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
 
-        <main className="py-10">
-          <div className="px-4 sm:px-6 lg:px-8">
-            {children}
-          </div>
-        </main>
-      </div>
+      {/* Main content area */}
+      <main className="pt-16 lg:pt-20">
+        <div className="px-4 sm:px-6 lg:px-8 py-8">
+          {children}
+        </div>
+      </main>
     </div>
   );
 };
@@ -333,7 +163,6 @@ const MainLayout: React.FC<{
 const AppContent: React.FC = () => {
   type AppUiState = {
     activePage: Page;
-    sidebarOpen: boolean;
     voiceModalOpen: boolean;
     user: {
       id: string;
@@ -346,7 +175,6 @@ const AppContent: React.FC = () => {
 
   const [appState, setAppState] = useState<AppUiState>({
     activePage: 'dashboard',
-    sidebarOpen: false,
     voiceModalOpen: false,
     user: {
       id: '1',
@@ -492,9 +320,7 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
-  const handleToggleSidebar = useCallback(() => {
-    setAppState(prev => ({ ...prev, sidebarOpen: !prev.sidebarOpen }));
-  }, []);
+
 
   const handleOpenVoiceModal = useCallback(() => {
     if (isVoiceCaptureEnabled) {
@@ -634,9 +460,7 @@ const AppContent: React.FC = () => {
       <div className="App">
         <MainLayout
           activePage={appState.activePage}
-          sidebarOpen={appState.sidebarOpen}
           onPageChange={handlePageChange}
-          onToggleSidebar={handleToggleSidebar}
         >
           <Suspense fallback={<LoadingSpinner />}>
             {renderPage()}
@@ -657,27 +481,33 @@ const AppContent: React.FC = () => {
         {isVoiceCaptureEnabled && (
           <button
             onClick={handleOpenVoiceModal}
-            className="fixed bottom-6 right-6 z-40 lg:hidden w-14 h-14 bg-mpondo-gold-600 hover:bg-mpondo-gold-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+            className="fixed bottom-4 right-4 z-40 lg:hidden w-12 h-12 bg-mpondo-gold-600 hover:bg-mpondo-gold-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group animate-pulse hover:animate-none focus:animate-none active:scale-95 safe-area-inset-bottom safe-area-inset-right"
             aria-label="Open voice capture"
             title="Voice Capture (Ctrl+Shift+V)"
+            style={{ 
+              marginBottom: 'env(safe-area-inset-bottom, 0px)',
+              marginRight: 'env(safe-area-inset-right, 0px)'
+            }}
           >
-            <Mic className="w-6 h-6" />
+            <Mic className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            <div className="absolute inset-0 rounded-full bg-mpondo-gold-400 opacity-30 animate-ping group-hover:animate-none group-focus:animate-none"></div>
           </button>
         )}
 
         {/* Desktop Voice Shortcut Indicator */}
         {isVoiceCaptureEnabled && (
-          <div className="hidden lg:block fixed bottom-6 right-6 z-30">
-            <div className="bg-neutral-900 text-white px-3 py-2 rounded-lg text-sm shadow-lg opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <div className="hidden lg:block fixed bottom-4 right-4 z-30 group">
+            <div className="absolute bottom-full right-0 mb-2 bg-neutral-900 text-white px-3 py-2 rounded-lg text-sm shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap">
               Press Ctrl+Shift+V for voice capture
+              <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-neutral-900"></div>
             </div>
             <button
               onClick={handleOpenVoiceModal}
-              className="mt-2 w-12 h-12 bg-mpondo-gold-600 hover:bg-mpondo-gold-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+              className="w-10 h-10 bg-mpondo-gold-600 hover:bg-mpondo-gold-700 text-white rounded-full shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-mpondo-gold-400 focus:ring-offset-2 focus:ring-offset-white"
               aria-label="Open voice capture"
               title="Voice Capture (Ctrl+Shift+V)"
             >
-              <Mic className="w-5 h-5" />
+              <Mic className="w-4 h-4" />
             </button>
           </div>
         )}

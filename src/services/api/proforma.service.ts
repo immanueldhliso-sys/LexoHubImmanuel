@@ -59,10 +59,26 @@ export class ProFormaService {
         throw new Error('User not authenticated');
       }
 
+      // Get advocate data to retrieve bar association
+      const { data: advocate, error: advocateError } = await supabase
+        .from('advocates')
+        .select('bar')
+        .eq('id', user.id)
+        .single();
+
+      if (advocateError || !advocate) {
+        throw new Error('Advocate data not found');
+      }
+
       // Generate quote number
       const quoteNumber = await this.generateQuoteNumber();
 
+      // Set VAT rate and fees amount
+      const vatRate = 0.15; // VAT rate as decimal (15%)
+      const feesAmount = data.total_amount;
+
       // Create pro forma as an invoice with is_pro_forma = true
+      // Note: subtotal, vat_amount, and total_amount are generated columns
       const { data: invoice, error } = await supabase
         .from('invoices')
         .insert({
@@ -71,12 +87,10 @@ export class ProFormaService {
           invoice_number: quoteNumber,
           invoice_date: data.quote_date,
           due_date: data.valid_until,
-          fees_amount: data.total_amount,
+          fees_amount: feesAmount,
           disbursements_amount: 0,
-          subtotal: data.total_amount,
-          vat_rate: 15,
-          vat_amount: data.total_amount * 0.15,
-          total_amount: data.total_amount * 1.15,
+          vat_rate: vatRate,
+          bar: advocate.bar,
           status: 'pro_forma',
           is_pro_forma: true,
           fee_narrative: data.fee_narrative,

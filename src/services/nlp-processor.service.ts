@@ -350,7 +350,7 @@ class NLPProcessor {
       // Day names
       { pattern: /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, offset: null, confidence: 0.7 },
       // Date formats
-      { pattern: /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g, offset: null, confidence: 0.8 }
+      { pattern: /\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/g, offset: null, confidence: 0.8 }
     ];
 
     for (const { pattern, offset, confidence } of patterns) {
@@ -478,11 +478,11 @@ class NLPProcessor {
     // Remove date mentions
     cleanText = cleanText.replace(/\b(?:today|yesterday|tomorrow)\b/gi, '');
     cleanText = cleanText.replace(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '');
-    cleanText = cleanText.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, '');
+    cleanText = cleanText.replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, '');
     
     // Clean up extra whitespace and punctuation
     cleanText = cleanText.replace(/\s+/g, ' ').trim();
-    cleanText = cleanText.replace(/^[,\.\-\s]+|[,\.\-\s]+$/g, '');
+    cleanText = cleanText.replace(/^[,.-\s]+|[,.-\s]+$/g, '');
     
     // Ensure first letter is capitalized
     if (cleanText.length > 0) {
@@ -552,7 +552,7 @@ class NLPProcessor {
   private preprocessText(text: string): string {
     return text
       .toLowerCase()
-      .replace(/[^\w\s\-:\/]/g, ' ') // Remove special chars except hyphens, colons, slashes
+      .replace(/[^\w\s\-:/]/g, ' ') // Remove special chars except hyphens, colons, slashes
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -589,7 +589,7 @@ class NLPProcessor {
   /**
    * Test Claude integration
    */
-  async testClaudeIntegration(): Promise<{ success: boolean; error?: string; status?: any }> {
+  async testClaudeIntegration(): Promise<{ success: boolean; error?: string; status?: unknown }> {
     try {
       const status = awsBedrockService.getServiceStatus();
       
@@ -627,7 +627,7 @@ class NLPProcessor {
     claudeAvailable: boolean;
     traditionalNLPAvailable: boolean;
     lastClaudeError?: string;
-    claudeStatus?: any;
+    claudeStatus?: unknown;
   } {
     const claudeStatus = awsBedrockService.getServiceStatus();
     

@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { X, AlertTriangle, Save, FileText } from 'lucide-react';
-import { Button, Card, CardContent, Input, Modal, ModalBody, ModalFooter } from '../../design-system/components';
+import React, { useEffect, useState, useMemo } from 'react';
+import { X, AlertTriangle, Save, FileText, RotateCcw, Library, Bookmark, Mic, Brain, Sparkles } from 'lucide-react';
+import { Button, Card, CardContent, Input, Modal, ModalBody, ModalFooter, Icon } from '../../design-system/components';
 import { matterApiService } from '../../services/api';
 import { authService } from '../../services/auth.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { BarAssociation, FeeType, RiskLevel, ClientType, MatterStatus } from '../../types';
 import type { Matter, NewMatterForm } from '../../types';
+import { TemplateLibraryModal, SaveTemplateModal } from './templates';
+import type { MatterTemplateData } from '../../types/matter-templates';
+import { templateSuggestionService, type TemplateSuggestion, type VoiceTemplateAnalysis } from '../../services/template-suggestion.service';
+import { speechToTextService } from '../../services/speech-to-text.service';
 
 interface NewMatterFormData {
   title: string;
@@ -34,10 +38,45 @@ interface NewMatterFormData {
   tags: string;
 }
 
+// Export prepopulation data type for use by other components
+export interface MatterPrepopulationData {
+  title?: string;
+  description?: string;
+  matter_type?: string;
+  court_case_number?: string;
+  bar?: BarAssociation;
+  client_name?: string;
+  client?: string; // Alias for client_name
+  client_email?: string;
+  client_phone?: string;
+  client_address?: string;
+  client_type?: ClientType;
+  instructing_attorney?: string;
+  attorney?: string; // Alias for instructing_attorney
+  instructing_attorney_email?: string;
+  instructing_attorney_phone?: string;
+  instructing_firm?: string;
+  firm?: string; // Alias for instructing_firm
+  instructing_firm_ref?: string;
+  fee_type?: FeeType;
+  estimated_fee?: string | number;
+  fee_cap?: string | number;
+  risk_level?: RiskLevel;
+  settlement_probability?: string | number;
+  expected_completion_date?: string;
+  vat_exempt?: boolean;
+  tags?: string | string[];
+  // Voice integration specific fields
+  work_type?: string; // Maps to matter_type
+  duration?: string; // Could be used for estimated_fee calculation
+  billable?: boolean; // Maps to fee_type
+}
+
 interface NewMatterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onMatterCreated?: (matter: Matter) => void;
+  initialData?: MatterPrepopulationData; // New prop for prepopulation
 }
 
 const MATTER_TYPES = [
@@ -54,13 +93,92 @@ const MATTER_TYPES = [
   'Other'
 ];
 
+// Smart field mapping function
+const normalizeInitialData = (initialData?: MatterPrepopulationData): Partial<NewMatterFormData> => {
+  if (!initialData) return {};
+
+  const normalized: Partial<NewMatterFormData> = {};
+
+  // Direct field mappings
+  if (initialData.title) normalized.title = initialData.title;
+  if (initialData.description) normalized.description = initialData.description;
+  if (initialData.matter_type) normalized.matter_type = initialData.matter_type;
+  if (initialData.court_case_number) normalized.court_case_number = initialData.court_case_number;
+  if (initialData.bar) normalized.bar = initialData.bar;
+  if (initialData.client_email) normalized.client_email = initialData.client_email;
+  if (initialData.client_phone) normalized.client_phone = initialData.client_phone;
+  if (initialData.client_address) normalized.client_address = initialData.client_address;
+  if (initialData.client_type) normalized.client_type = initialData.client_type;
+  if (initialData.instructing_attorney_email) normalized.instructing_attorney_email = initialData.instructing_attorney_email;
+  if (initialData.instructing_attorney_phone) normalized.instructing_attorney_phone = initialData.instructing_attorney_phone;
+  if (initialData.instructing_firm_ref) normalized.instructing_firm_ref = initialData.instructing_firm_ref;
+  if (initialData.fee_type) normalized.fee_type = initialData.fee_type;
+  if (initialData.risk_level) normalized.risk_level = initialData.risk_level;
+  if (initialData.expected_completion_date) normalized.expected_completion_date = initialData.expected_completion_date;
+  if (initialData.vat_exempt !== undefined) normalized.vat_exempt = initialData.vat_exempt;
+
+  // Handle aliases and smart mappings
+  if (initialData.client_name) normalized.client_name = initialData.client_name;
+  else if (initialData.client) normalized.client_name = initialData.client;
+
+  if (initialData.instructing_attorney) normalized.instructing_attorney = initialData.instructing_attorney;
+  else if (initialData.attorney) normalized.instructing_attorney = initialData.attorney;
+
+  if (initialData.instructing_firm) normalized.instructing_firm = initialData.instructing_firm;
+  else if (initialData.firm) normalized.instructing_firm = initialData.firm;
+
+  // Voice integration specific mappings
+  if (initialData.work_type && !normalized.matter_type) {
+    // Map common work types to matter types
+    const workTypeMapping: Record<string, string> = {
+      'research': 'Commercial Litigation',
+      'drafting': 'Contract Law',
+      'consultation': 'Other',
+      'court appearance': 'Commercial Litigation',
+      'negotiation': 'Contract Law',
+      'due diligence': 'Commercial Litigation'
+    };
+    normalized.matter_type = workTypeMapping[initialData.work_type.toLowerCase()] || 'Other';
+  }
+
+  // Handle numeric fields
+  if (initialData.estimated_fee !== undefined) {
+    normalized.estimated_fee = String(initialData.estimated_fee);
+  }
+  if (initialData.fee_cap !== undefined) {
+    normalized.fee_cap = String(initialData.fee_cap);
+  }
+  if (initialData.settlement_probability !== undefined) {
+    normalized.settlement_probability = String(initialData.settlement_probability);
+  }
+
+  // Handle tags (array or string)
+  if (initialData.tags) {
+    if (Array.isArray(initialData.tags)) {
+      normalized.tags = initialData.tags.join(', ');
+    } else {
+      normalized.tags = initialData.tags;
+    }
+  }
+
+  // Handle billable status mapping to fee type
+  if (initialData.billable !== undefined && !normalized.fee_type) {
+    normalized.fee_type = initialData.billable ? FeeType.STANDARD : FeeType.PRO_BONO;
+  }
+
+  return normalized;
+};
+
 export const NewMatterModal: React.FC<NewMatterModalProps> = ({
   isOpen,
   onClose,
-  onMatterCreated
+  onMatterCreated,
+  initialData
 }) => {
   const { user } = useAuth();
-  const [formData, setFormData] = useState<NewMatterFormData>({
+  
+  // Default form data
+  const defaultFormData: NewMatterFormData = {
     title: '',
     description: '',
     matter_type: '',
@@ -84,11 +202,133 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     expected_completion_date: '',
     vat_exempt: false,
     tags: ''
-  });
+  };
+
+  // Memoize the initial form data to prevent unnecessary re-renders
+  const initialFormData = useMemo(() => {
+    const normalized = normalizeInitialData(initialData);
+    return { ...defaultFormData, ...normalized };
+  }, [initialData]);
+
+  const [formData, setFormData] = useState<NewMatterFormData>(initialFormData);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof NewMatterFormData, string>>>({});
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Template functionality state
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+
+  // Voice-powered template suggestions state
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTranscription, setVoiceTranscription] = useState('');
+  const [voiceAnalysis, setVoiceAnalysis] = useState<VoiceTemplateAnalysis | null>(null);
+  const [showVoiceSuggestions, setShowVoiceSuggestions] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Track which fields were prepopulated for visual indicators
+  const prepopulatedFields = useMemo(() => {
+    if (!initialData) return new Set<string>();
+    const normalized = normalizeInitialData(initialData);
+    return new Set(Object.keys(normalized));
+  }, [initialData]);
+
+  // Reset form when modal opens/closes or initialData changes
+  useEffect(() => {
+    if (isOpen) {
+      const newFormData = { ...defaultFormData, ...normalizeInitialData(initialData) };
+      setFormData(newFormData);
+      setCurrentStep(1);
+      setErrors({});
+    }
+  }, [isOpen, initialData]);
+
+  // Clear prepopulated data function
+  const handleClearPrepopulatedData = () => {
+    setFormData(defaultFormData);
+    setErrors({});
+  };
+
+  // Check if any data was prepopulated
+  const hasPrepopulatedData = prepopulatedFields.size > 0;
+
+  // Helper function to render input with prepopulation indicator
+  const renderInputWithIndicator = (
+    field: keyof NewMatterFormData,
+    label: string,
+    type: string = 'text',
+    placeholder?: string,
+    required?: boolean
+  ) => {
+    const isPrepopulated = prepopulatedFields.has(field);
+    return (
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+          {isPrepopulated && (
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Pre-filled
+            </span>
+          )}
+        </label>
+        <input
+          type={type}
+          value={formData[field] as string}
+          onChange={(e) => handleInputChange(field, e.target.value)}
+          placeholder={placeholder}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors[field] ? 'border-red-500' : isPrepopulated ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+          }`}
+        />
+        {errors[field] && (
+          <p className="text-red-500 text-sm">{errors[field]}</p>
+        )}
+      </div>
+    );
+  };
+
+  // Helper function to render select with prepopulation indicator
+  const renderSelectWithIndicator = (
+    field: keyof NewMatterFormData,
+    label: string,
+    options: { value: string; label: string }[],
+    required?: boolean
+  ) => {
+    const isPrepopulated = prepopulatedFields.has(field);
+    return (
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+          {isPrepopulated && (
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Pre-filled
+            </span>
+          )}
+        </label>
+        <select
+          value={formData[field] as string}
+          onChange={(e) => handleInputChange(field, e.target.value)}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors[field] ? 'border-red-500' : isPrepopulated ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+          }`}
+        >
+          {options.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {errors[field] && (
+          <p className="text-red-500 text-sm">{errors[field]}</p>
+        )}
+      </div>
+    );
+  };
 
   const handleInputChange = (field: keyof NewMatterFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -96,6 +336,156 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  // Template functionality handlers
+  const handleTemplateSelect = (templateData: MatterTemplateData) => {
+    const normalized = normalizeInitialData(templateData);
+    setFormData(prev => ({ ...prev, ...normalized }));
+    setShowTemplateLibrary(false);
+    toast.success('Template applied successfully');
+  };
+
+  const handleSaveAsTemplate = () => {
+    // Check if there's meaningful data to save
+    const hasData = formData.title || formData.matter_type || formData.client_name || 
+                   formData.instructing_attorney || formData.fee_type !== FeeType.STANDARD;
+    
+    if (!hasData) {
+      toast.error('Please fill in some form data before saving as template');
+      return;
+    }
+    
+    setShowSaveTemplate(true);
+  };
+
+  const convertFormDataToTemplateData = (): MatterTemplateData => {
+    return {
+      matterTitle: formData.title,
+      matterType: formData.matter_type,
+      description: formData.description,
+      courtCaseNumber: formData.court_case_number,
+      bar: formData.bar,
+      clientName: formData.client_name,
+      clientEmail: formData.client_email,
+      clientPhone: formData.client_phone,
+      clientAddress: formData.client_address,
+      clientType: formData.client_type,
+      instructingAttorney: formData.instructing_attorney,
+      instructingAttorneyEmail: formData.instructing_attorney_email,
+      instructingAttorneyPhone: formData.instructing_attorney_phone,
+      instructingFirm: formData.instructing_firm,
+      instructingFirmRef: formData.instructing_firm_ref,
+      feeType: formData.fee_type,
+      estimatedFee: formData.estimated_fee,
+      feeCap: formData.fee_cap,
+      riskLevel: formData.risk_level,
+      settlementProbability: formData.settlement_probability,
+      expectedCompletionDate: formData.expected_completion_date,
+      vatExempt: formData.vat_exempt,
+      tags: formData.tags
+    };
+  };
+
+  // Voice functionality handlers
+  const handleVoiceInput = async () => {
+    if (isListening) {
+      // Stop listening
+      speechToTextService.stopListening();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      setIsListening(true);
+      setVoiceTranscription('');
+      setVoiceAnalysis(null);
+
+      // Start voice recognition
+      const transcription = await speechToTextService.startListening({
+        onTranscript: (transcript) => {
+          setVoiceTranscription(transcript);
+        },
+        onError: (error) => {
+          console.error('Voice recognition error:', error);
+          toast.error('Voice recognition failed. Please try again.');
+          setIsListening(false);
+        }
+      });
+
+      if (transcription) {
+        setIsListening(false);
+        setIsAnalyzing(true);
+        
+        // Analyze transcription for template suggestions
+        const analysis = await templateSuggestionService.analyzeVoiceForTemplates(transcription);
+        setVoiceAnalysis(analysis);
+        
+        if (analysis.suggestions.length > 0) {
+          setShowVoiceSuggestions(true);
+          toast.success(`Found ${analysis.suggestions.length} template suggestions!`);
+        } else if (Object.keys(analysis.extractedMatterData).length > 0) {
+          // Apply extracted data directly if no templates found
+          handleApplyVoiceData(analysis.extractedMatterData);
+          toast.success('Applied voice data to form');
+        } else {
+          toast.info('No template suggestions found, but transcription captured');
+        }
+        
+        setIsAnalyzing(false);
+      }
+    } catch (error) {
+      console.error('Voice input error:', error);
+      toast.error('Voice input failed. Please try again.');
+      setIsListening(false);
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleApplyVoiceData = (extractedData: any) => {
+    setFormData(prev => ({
+      ...prev,
+      ...extractedData
+    }));
+  };
+
+  const handleApplyTemplateSuggestion = (suggestion: TemplateSuggestion) => {
+    const templateData = suggestion.template.data;
+    
+    setFormData(prev => ({
+      ...prev,
+      title: templateData.matterTitle || prev.title,
+      description: templateData.description || prev.description,
+      matter_type: templateData.matterType || prev.matter_type,
+      court_case_number: templateData.courtCaseNumber || prev.court_case_number,
+      bar: templateData.bar || prev.bar,
+      client_name: templateData.clientName || prev.client_name,
+      client_email: templateData.clientEmail || prev.client_email,
+      client_phone: templateData.clientPhone || prev.client_phone,
+      client_address: templateData.clientAddress || prev.client_address,
+      client_type: templateData.clientType || prev.client_type,
+      instructing_attorney: templateData.instructingAttorney || prev.instructing_attorney,
+      instructing_attorney_email: templateData.instructingAttorneyEmail || prev.instructing_attorney_email,
+      instructing_attorney_phone: templateData.instructingAttorneyPhone || prev.instructing_attorney_phone,
+      instructing_firm: templateData.instructingFirm || prev.instructing_firm,
+      instructing_firm_ref: templateData.instructingFirmRef || prev.instructing_firm_ref,
+      fee_type: templateData.feeType || prev.fee_type,
+      estimated_fee: templateData.estimatedFee || prev.estimated_fee,
+      fee_cap: templateData.feeCap || prev.fee_cap,
+      risk_level: templateData.riskLevel || prev.risk_level,
+      settlement_probability: templateData.settlementProbability || prev.settlement_probability,
+      expected_completion_date: templateData.expectedCompletionDate || prev.expected_completion_date,
+      vat_exempt: templateData.vatExempt !== undefined ? templateData.vatExempt : prev.vat_exempt,
+      tags: templateData.tags || prev.tags
+    }));
+
+    // Apply any voice-extracted data on top of template
+    if (voiceAnalysis?.extractedMatterData) {
+      handleApplyVoiceData(voiceAnalysis.extractedMatterData);
+    }
+
+    setShowVoiceSuggestions(false);
+    toast.success(`Applied template: ${suggestion.template.name}`);
   };
 
   const validateStep = (step: number): boolean => {
@@ -316,73 +706,40 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-neutral-900 mb-4">Basic Information</h3>
       
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">
-          Matter Title *
-        </label>
-        <Input
-          value={formData.title}
-          onChange={(e) => handleInputChange('title', e.target.value)}
-          placeholder="e.g., Smith v Jones Commercial Dispute"
-          error={errors.title}
-        />
-      </div>
+      {renderInputWithIndicator('title', 'Matter Title', 'text', 'e.g., Smith v Jones Commercial Dispute', true)}
 
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">
-          Matter Type *
-        </label>
-        <select
-          value={formData.matter_type}
-          onChange={(e) => handleInputChange('matter_type', e.target.value)}
-          className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mpondo-gold focus:border-transparent"
-        >
-          <option value="">Select matter type</option>
-          {MATTER_TYPES.map(type => (
-            <option key={type} value={type}>{type}</option>
-          ))}
-        </select>
-        {errors.matter_type && (
-          <p className="mt-1 text-sm text-red-600">{errors.matter_type}</p>
-        )}
-      </div>
+      {renderSelectWithIndicator('matter_type', 'Matter Type', [
+        { value: '', label: 'Select matter type' },
+        ...MATTER_TYPES.map(type => ({ value: type, label: type }))
+      ], true)}
 
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
           Description
+          {prepopulatedFields.has('description') && (
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Pre-filled
+            </span>
+          )}
         </label>
         <textarea
           value={formData.description}
           onChange={(e) => handleInputChange('description', e.target.value)}
           placeholder="Brief description of the matter"
           rows={3}
-          className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mpondo-gold focus:border-transparent"
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.description ? 'border-red-500' : prepopulatedFields.has('description') ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+          }`}
         />
+        {errors.description && (
+          <p className="text-red-500 text-sm">{errors.description}</p>
+        )}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">
-          Client Name *
-        </label>
-        <Input
-          value={formData.client_name}
-          onChange={(e) => handleInputChange('client_name', e.target.value)}
-          placeholder="Client or company name"
-          error={errors.client_name}
-        />
-      </div>
+      {renderInputWithIndicator('client_name', 'Client Name', 'text', 'Client or company name', true)}
 
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">
-          Instructing Attorney *
-        </label>
-        <Input
-          value={formData.instructing_attorney}
-          onChange={(e) => handleInputChange('instructing_attorney', e.target.value)}
-          placeholder="Name of instructing attorney"
-          error={errors.instructing_attorney}
-        />
-      </div>
+      {renderInputWithIndicator('instructing_attorney', 'Instructing Attorney', 'text', 'Name of instructing attorney', true)}
     </div>
   );
 
@@ -392,60 +749,26 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">
-            Client Type
-          </label>
-          <select
-            value={formData.client_type}
-            onChange={(e) => handleInputChange('client_type', e.target.value as ClientType)}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mpondo-gold focus:border-transparent"
-          >
-            <option value={ClientType.INDIVIDUAL}>Individual</option>
-            <option value={ClientType.COMPANY}>Company</option>
-            <option value={ClientType.TRUST}>Trust</option>
-            <option value={ClientType.GOVERNMENT}>Government</option>
-            <option value={ClientType.NGO}>NGO</option>
-          </select>
+          {renderSelectWithIndicator('client_type', 'Client Type', [
+            { value: ClientType.INDIVIDUAL, label: 'Individual' },
+            { value: ClientType.COMPANY, label: 'Company' },
+            { value: ClientType.TRUST, label: 'Trust' },
+            { value: ClientType.GOVERNMENT, label: 'Government' },
+            { value: ClientType.NGO, label: 'NGO' }
+          ])}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">
-            Bar Association
-          </label>
-          <select
-            value={formData.bar}
-            onChange={(e) => handleInputChange('bar', e.target.value as BarAssociation)}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mpondo-gold focus:border-transparent"
-          >
-            <option value={BarAssociation.JOHANNESBURG}>Johannesburg Bar</option>
-            <option value={BarAssociation.CAPE_TOWN}>Cape Town Bar</option>
-          </select>
+          {renderSelectWithIndicator('bar', 'Bar Association', [
+            { value: BarAssociation.JOHANNESBURG, label: 'Johannesburg Bar' },
+            { value: BarAssociation.CAPE_TOWN, label: 'Cape Town Bar' }
+          ])}
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">
-          Client Email
-        </label>
-        <Input
-          type="email"
-          value={formData.client_email}
-          onChange={(e) => handleInputChange('client_email', e.target.value)}
-          placeholder="client@example.com"
-          error={errors.client_email}
-        />
-      </div>
+      {renderInputWithIndicator('client_email', 'Client Email', 'email', 'client@example.com')}
 
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">
-          Client Phone
-        </label>
-        <Input
-          value={formData.client_phone}
-          onChange={(e) => handleInputChange('client_phone', e.target.value)}
-          placeholder="+27 11 123 4567"
-        />
-      </div>
+      {renderInputWithIndicator('client_phone', 'Client Phone', 'text', '+27 11 123 4567')}
 
       <div>
         <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -654,13 +977,67 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
           <div className="flex items-center space-x-2">
             <FileText className="h-6 w-6 text-mpondo-gold" />
             <h2 className="text-xl font-semibold text-neutral-900">New Matter</h2>
+            {hasPrepopulatedData && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <RotateCcw className="w-3 h-3 mr-1" />
+                Pre-filled data
+              </span>
+            )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-neutral-400 hover:text-neutral-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleVoiceInput}
+              disabled={isAnalyzing}
+              className={`inline-flex items-center px-3 py-1 text-sm font-medium border rounded-md transition-colors ${
+                isListening 
+                  ? 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' 
+                  : isAnalyzing
+                  ? 'text-blue-600 bg-blue-50 border-blue-200'
+                  : 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100'
+              }`}
+              title={isListening ? 'Stop voice input' : isAnalyzing ? 'Analyzing...' : 'Voice-powered templates'}
+            >
+              {isListening ? (
+                <Icon icon={Mic} className="w-4 h-4 mr-1 animate-pulse" />
+              ) : isAnalyzing ? (
+                <Icon icon={Brain} className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <Icon icon={Sparkles} className="w-4 h-4 mr-1" />
+              )}
+              {isListening ? 'Listening...' : isAnalyzing ? 'Analyzing...' : 'Voice'}
+            </button>
+            <button
+              onClick={() => setShowTemplateLibrary(true)}
+              className="inline-flex items-center px-3 py-1 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
+              title="Load from template"
+            >
+              <Icon icon={Library} className="w-4 h-4 mr-1" />
+              Templates
+            </button>
+            <button
+              onClick={handleSaveAsTemplate}
+              className="inline-flex items-center px-3 py-1 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
+              title="Save as template"
+            >
+              <Icon icon={Bookmark} className="w-4 h-4 mr-1" />
+              Save Template
+            </button>
+            {hasPrepopulatedData && (
+              <button
+                onClick={handleClearPrepopulatedData}
+                className="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+              >
+                <Icon icon={X} className="w-4 h-4 mr-1" noGradient />
+                Clear Pre-filled
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              <Icon icon={X} className="h-6 w-6" noGradient />
+            </button>
+          </div>
         </div>
 
         {/* Progress indicator */}
@@ -762,6 +1139,138 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
           </div>
         </div>
       </ModalFooter>
+
+      {/* Template Modals */}
+      <TemplateLibraryModal
+        isOpen={showTemplateLibrary}
+        onClose={() => setShowTemplateLibrary(false)}
+        onTemplateSelect={handleTemplateSelect}
+        currentMatterData={convertFormDataToTemplateData()}
+      />
+
+      <SaveTemplateModal
+        isOpen={showSaveTemplate}
+        onClose={() => setShowSaveTemplate(false)}
+        sourceData={convertFormDataToTemplateData()}
+        onTemplateSaved={(templateId) => {
+          setShowSaveTemplate(false);
+          toast.success('Template saved successfully');
+        }}
+      />
+
+      {/* Voice Transcription Display */}
+      {voiceTranscription && (
+        <div className="fixed bottom-4 right-4 max-w-md bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
+          <div className="flex items-start justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-900">Voice Transcription</h4>
+            <button
+              onClick={() => setVoiceTranscription('')}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-sm text-gray-700 mb-3">{voiceTranscription}</p>
+          {voiceAnalysis && (
+            <div className="text-xs text-gray-500">
+              Confidence: {Math.round(voiceAnalysis.confidence * 100)}%
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Voice Template Suggestions Modal */}
+      {showVoiceSuggestions && voiceAnalysis && (
+        <Modal isOpen={true} onClose={() => setShowVoiceSuggestions(false)} size="lg">
+          <ModalBody>
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <Sparkles className="w-5 h-5 text-purple-600 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900">Voice-Powered Template Suggestions</h3>
+              </div>
+
+              {voiceAnalysis.extractedData && Object.keys(voiceAnalysis.extractedData).length > 0 && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2">Extracted Information</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {Object.entries(voiceAnalysis.extractedData).map(([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-blue-700 capitalize">{key.replace('_', ' ')}:</span>
+                        <span className="text-blue-900 font-medium">{String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {voiceAnalysis.suggestions.length > 0 ? (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-gray-900">Recommended Templates</h4>
+                  {voiceAnalysis.suggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors cursor-pointer"
+                      onClick={() => handleApplyTemplateSuggestion(suggestion)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="font-medium text-gray-900">{suggestion.templateName}</h5>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500">
+                            {Math.round(suggestion.confidence * 100)}% match
+                          </span>
+                          <div className={`w-2 h-2 rounded-full ${
+                            suggestion.confidence > 0.8 ? 'bg-green-500' :
+                            suggestion.confidence > 0.6 ? 'bg-yellow-500' : 'bg-gray-400'
+                          }`} />
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">{suggestion.description}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {suggestion.matchedKeywords.map((keyword, i) => (
+                          <span
+                            key={i}
+                            className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded"
+                          >
+                            {keyword}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Brain className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">No template suggestions found for this voice input.</p>
+                  <p className="text-sm text-gray-500 mt-1">Try describing your matter type or legal area.</p>
+                </div>
+              )}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <div className="flex justify-between w-full">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (voiceAnalysis?.extractedData) {
+                    handleApplyVoiceData(voiceAnalysis.extractedData);
+                  }
+                  setShowVoiceSuggestions(false);
+                }}
+                disabled={!voiceAnalysis?.extractedData || Object.keys(voiceAnalysis.extractedData).length === 0}
+              >
+                Apply Extracted Data Only
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowVoiceSuggestions(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </ModalFooter>
+        </Modal>
+      )}
     </Modal>
   );
 };

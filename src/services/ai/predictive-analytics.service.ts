@@ -231,7 +231,7 @@ export class PredictiveAnalyticsService {
   /**
    * Generate fee optimization recommendations
    */
-  static async optimizeFeeStructure(matter: Matter, marketData?: any): Promise<FeeOptimizationRecommendation> {
+  static async optimizeFeeStructure(matter: Matter, marketData?: Record<string, unknown>): Promise<FeeOptimizationRecommendation> {
     try {
       const currentModel = this.identifyCurrentFeeModel(matter);
       const optimization = this.calculateOptimalFeeStructure(matter, marketData);
@@ -255,7 +255,7 @@ export class PredictiveAnalyticsService {
   /**
    * Analyze practice growth potential
    */
-  static async analyzePracticeGrowth(advocateId: string, practiceData: any): Promise<PracticeGrowthInsights> {
+  static async analyzePracticeGrowth(advocateId: string, practiceData: Record<string, unknown>): Promise<PracticeGrowthInsights> {
     try {
       // Analyze current practice performance
       const growthPotential = this.calculateGrowthPotential(practiceData);
@@ -313,7 +313,7 @@ export class PredictiveAnalyticsService {
   /**
    * Assess comprehensive risk for a matter
    */
-  static async assessRisk(matter: Matter, relatedData: any): Promise<RiskAssessment> {
+  static async assessRisk(matter: Matter, relatedData: Record<string, unknown>): Promise<RiskAssessment> {
     try {
       const categories = {
         financial: this.assessFinancialRisk(matter, relatedData),
@@ -353,7 +353,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static calculateBaseProbability(features: any): number {
+  private static calculateBaseProbability(features: Record<string, unknown>): number {
     // Mock ML calculation
     let probability = 0.5; // Base 50%
     
@@ -392,7 +392,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static identifyInfluencingFactors(matter: Matter, features: any) {
+  private static identifyInfluencingFactors(matter: Matter, features: Record<string, unknown>) {
     const factors = [];
     
     if (features.riskLevel === 'Low') {
@@ -458,7 +458,7 @@ export class PredictiveAnalyticsService {
     return Math.floor((Date.now() - new Date(dateCreated).getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  private static extractOutcomeFeatures(matter: Matter, timeEntries: TimeEntry[]) {
+  private static extractOutcomeFeatures(matter: Matter, timeEntries: TimeEntry[]): Record<string, unknown> {
     return {
       complexity: timeEntries.length > 50 ? 'high' : timeEntries.length > 20 ? 'medium' : 'low',
       totalHours: timeEntries.reduce((sum, te) => sum + te.duration, 0) / 60,
@@ -467,7 +467,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static calculateOutcomeProbabilities(features: any) {
+  private static calculateOutcomeProbabilities(features: Record<string, unknown>) {
     // Mock ML model results
     return {
       settlement: 0.45,
@@ -478,7 +478,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static assessRiskFactors(matter: Matter, features: any) {
+  private static assessRiskFactors(matter: Matter, features: Record<string, unknown>) {
     const factors = [];
     
     if (features.totalHours > 100) {
@@ -516,7 +516,7 @@ export class PredictiveAnalyticsService {
     return matter.estimatedFee > 0 ? 'Fixed Fee' : 'Hourly Rate';
   }
 
-  private static calculateOptimalFeeStructure(matter: Matter, marketData: any) {
+  private static calculateOptimalFeeStructure(matter: Matter, marketData: Record<string, unknown>) {
     // Mock optimization calculation
     return {
       model: 'Performance-Based',
@@ -559,7 +559,7 @@ export class PredictiveAnalyticsService {
     ];
   }
 
-  private static analyzeReferralOptimization(practiceData: any) {
+  private static analyzeReferralOptimization(practiceData: Record<string, unknown>) {
     return {
       underutilizedNetworks: ['Mining Law Chamber', 'Commercial Bar Association'],
       potentialReferrers: [
@@ -593,7 +593,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static generateCashFlowScenarios(baseProjection: any) {
+  private static generateCashFlowScenarios(baseProjection: Record<string, unknown>) {
     return {
       optimistic: {
         inflow: baseProjection.inflow * 1.3,
@@ -632,7 +632,7 @@ export class PredictiveAnalyticsService {
     ];
   }
 
-  private static assessFinancialRisk(matter: Matter, relatedData: any) {
+  private static assessFinancialRisk(matter: Matter, relatedData: Record<string, unknown>) {
     const score = matter.wipValue > 1000000 ? 75 : matter.wipValue > 500000 ? 50 : 25;
     return {
       score,
@@ -640,7 +640,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static assessLegalRisk(matter: Matter, relatedData: any) {
+  private static assessLegalRisk(matter: Matter, relatedData: Record<string, unknown>) {
     const complexityScore = matter.briefType?.includes('Constitutional') ? 80 : 
                            matter.briefType?.includes('Commercial') ? 60 : 40;
     return {
@@ -649,14 +649,14 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static assessClientRisk(matter: Matter, relatedData: any) {
+  private static assessClientRisk(matter: Matter, relatedData: Record<string, unknown>) {
     return {
       score: 30, // Mock score
       factors: ['Established client relationship', 'Good payment history']
     };
   }
 
-  private static assessTimelineRisk(matter: Matter, relatedData: any) {
+  private static assessTimelineRisk(matter: Matter, relatedData: Record<string, unknown>) {
     const age = this.calculateDuration(matter.dateCreated);
     const score = age > 365 ? 70 : age > 180 ? 50 : 30;
     return {
@@ -665,7 +665,7 @@ export class PredictiveAnalyticsService {
     };
   }
 
-  private static assessReputationRisk(matter: Matter, relatedData: any) {
+  private static assessReputationRisk(matter: Matter, relatedData: Record<string, unknown>) {
     return {
       score: 20, // Mock score
       factors: ['Standard matter profile', 'No public interest concerns']
@@ -679,7 +679,7 @@ export class PredictiveAnalyticsService {
     return 'low';
   }
 
-  private static generateMitigationStrategies(categories: any) {
+  private static generateMitigationStrategies(categories: Record<string, { score: number; factors: string[] }>) {
     const strategies = [];
     
     Object.entries(categories).forEach(([category, data]: [string, any]) => {

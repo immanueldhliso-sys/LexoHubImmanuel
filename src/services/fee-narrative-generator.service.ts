@@ -382,7 +382,7 @@ Total professional time: {totalHours} hours at the applicable professional rates
     entries: TimeEntry[],
     totalDuration: number,
     matter: Matter,
-    template: any
+    template: { verbs: string[]; objects: string[]; outcomes: string[] }
   ): string {
     const duration = this.formatDuration(totalDuration);
     const verb = this.selectRandomItem(template.verbs);
@@ -758,7 +758,7 @@ Total professional time: {totalHours} hours at the applicable professional rates
     narrative: string,
     timeEntries: TimeEntry[],
     matter: Matter
-  ): any {
+  ): { issues: string[]; recommendations: string[]; score: number; isCompliant: boolean } {
     const issues: string[] = [];
     const recommendations: string[] = [];
     
@@ -808,7 +808,7 @@ Total professional time: {totalHours} hours at the applicable professional rates
   private generateBarCompliantSuggestions(
     narrative: string,
     timeEntries: TimeEntry[],
-    complianceCheck: any
+    complianceCheck: { issues: string[]; recommendations: string[]; score: number; isCompliant: boolean }
   ): string[] {
     const suggestions: string[] = [...complianceCheck.recommendations];
     

@@ -296,7 +296,7 @@ export class ExternalAPIService {
   }
 
   // Connect bank account
-  static async connectBankAccount(bankId: string, credentials: any): Promise<BankAccount[]> {
+  static async connectBankAccount(bankId: string, credentials: Record<string, unknown>): Promise<BankAccount[]> {
     try {
       const bankAPI = this.BANKING_APIS.get(bankId);
       if (!bankAPI) {
@@ -373,7 +373,7 @@ export class ExternalAPIService {
    */
 
   // Validate electronic filing
-  private static validateElectronicFiling(filing: any): void {
+  private static validateElectronicFiling(filing: Record<string, unknown>): void {
     if (!filing.caseNumber) {
       throw new Error('Case number is required');
     }
@@ -389,7 +389,7 @@ export class ExternalAPIService {
   }
 
   // Authenticate with bank API
-  private static async authenticateWithBank(bankAPI: BankingAPI, credentials: any): Promise<void> {
+  private static async authenticateWithBank(bankAPI: BankingAPI, credentials: Record<string, unknown>): Promise<void> {
     // Simulate authentication process
     if (bankAPI.authType === 'oauth2') {
       // OAuth2 flow simulation
@@ -408,7 +408,7 @@ export class ExternalAPIService {
   }
 
   // Get integration status
-  static async getIntegrationStatus(): Promise<Record<string, any>> {
+  static async getIntegrationStatus(): Promise<Record<string, unknown>> {
     return {
       courts: {
         connected: this.COURT_APIS.size,

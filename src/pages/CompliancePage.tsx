@@ -298,25 +298,23 @@ const CompliancePage: React.FC = () => {
   const [deadlines, setDeadlines] = useState<ComplianceDeadline[]>([]);
   const [violations, setViolations] = useState<ComplianceViolation[]>([]);
 
-  const complianceService = new ComplianceService();
-
   // Load dashboard data
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         
-        const [statsResponse, alertsResponse, deadlinesResponse, violationsResponse] = await Promise.all([
-          complianceService.getDashboardStats(),
-          complianceService.getActiveAlerts(),
-          complianceService.getUpcomingDeadlines(),
-          complianceService.getRecentViolations()
+        const [statsData, alertsData, deadlinesData, violationsData] = await Promise.all([
+          ComplianceService.getDashboardStats(),
+          ComplianceService.getAlerts({ status: ['active'] }),
+          ComplianceService.getDeadlines({ status: ['pending'] }),
+          ComplianceService.getViolations()
         ]);
 
-        if (statsResponse.data) setStats(statsResponse.data);
-        if (alertsResponse.data) setAlerts(alertsResponse.data);
-        if (deadlinesResponse.data) setDeadlines(deadlinesResponse.data);
-        if (violationsResponse.data) setViolations(violationsResponse.data);
+        setStats(statsData);
+        setAlerts(alertsData);
+        setDeadlines(deadlinesData);
+        setViolations(violationsData);
 
       } catch (error) {
         console.error('Error loading compliance data:', error);
@@ -331,13 +329,9 @@ const CompliancePage: React.FC = () => {
 
   const handleResolveAlert = async (alertId: string) => {
     try {
-      const response = await complianceService.resolveAlert(alertId);
-      if (response.data) {
-        setAlerts(prev => prev.filter(alert => alert.id !== alertId));
-        toast.success('Alert resolved successfully');
-      } else {
-        throw new Error(response.error || 'Failed to resolve alert');
-      }
+      await ComplianceService.resolveAlert(alertId);
+      setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+      toast.success('Alert resolved successfully');
     } catch (error) {
       console.error('Error resolving alert:', error);
       toast.error('Failed to resolve alert');

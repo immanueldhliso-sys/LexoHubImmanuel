@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, FileText, Calendar, Building, Search, Filter, RefreshCw, Send, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Plus, FileText, Calendar, Building, Search, Filter, RefreshCw, Send, CheckCircle, Clock, AlertCircle, Download, Printer } from 'lucide-react';
 import { Button, Card, CardHeader, CardContent, Input, Modal, ModalBody, ModalFooter } from '../design-system/components';
 import { LoadingSpinner } from '../components/design-system/components/LoadingSpinner';
 import { ProFormaCreationModal } from '../components/proforma/ProFormaCreationModal';
 import { proformaService } from '../services/api/proforma.service';
+import { InvoicePDFService } from '../services/pdf/invoice-pdf.service';
+import { AdvocateService } from '../services/api/advocate.service';
+import { MatterService } from '../services/api/matters.service';
 import { toast } from 'react-hot-toast';
 import { formatRand } from '../lib/currency';
 import type { 
@@ -11,6 +14,7 @@ import type {
   ProFormaFilters, 
   ProFormaSummaryStats,
   Matter,
+  Advocate,
   ProFormaGenerationRequest,
   ProFormaStatus 
 } from '../types';
@@ -20,23 +24,27 @@ interface ProFormaPageState {
   proformas: ProForma[];
   filteredProFormas: ProForma[];
   matters: Matter[];
+  advocate: Advocate | null;
   
   // UI State
   isLoading: boolean;
   error: string | null;
   
-  // Modal States
+  // Modal states
   showCreationModal: boolean;
   showDetailsModal: boolean;
   showConversionModal: boolean;
   showDeleteModal: boolean;
   selectedProFormaId: string | null;
   
-  // Filter State
+  // Filters
   filters: ProFormaFilters;
   
-  // Summary Statistics
+  // Summary stats
   summaryStats: ProFormaSummaryStats;
+
+  // PDF generation states
+  pdfGenerating: Record<string, boolean>;
 }
 
 const ProFormaPage: React.FC = () => {
@@ -63,7 +71,8 @@ const ProFormaPage: React.FC = () => {
       conversionRate: 0,
       averageValue: 0,
       pendingAcceptance: 0
-    }
+    },
+    pdfGenerating: {}
   });
 
   // Apply filters to pro formas
@@ -108,6 +117,114 @@ const ProFormaPage: React.FC = () => {
     });
   }, [state.matters]);
 
+  // PDF Generation Functions
+  const handleDownloadPDF = async (proforma: ProForma) => {
+    const matter = state.matters.find(m => m.id === proforma.matter_id);
+    
+    if (!matter) {
+      toast.error('Matter information not found for this pro forma');
+      return;
+    }
+
+    if (!state.advocate) {
+      toast.error('Advocate information not found');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      pdfGenerating: { ...prev.pdfGenerating, [proforma.id]: true }
+    }));
+
+    try {
+      // Use static method with correct parameters
+      const result = await InvoicePDFService.generateProFormaPDF(
+        proforma, 
+        matter, 
+        state.advocate,
+        { autoDownload: false }
+      );
+
+      if (result.success && result.blob) {
+        // Use the static downloadPDF method
+        const filename = `proforma-${proforma.invoice_number || proforma.id}.pdf`;
+        InvoicePDFService.downloadPDF(result.blob, filename);
+        toast.success('Pro forma PDF downloaded successfully');
+      } else {
+        throw new Error(result.error || 'Failed to generate PDF');
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF. Please try again.');
+    } finally {
+      setState(prev => ({
+        ...prev,
+        pdfGenerating: { ...prev.pdfGenerating, [proforma.id]: false }
+      }));
+    }
+  };
+
+  const handlePrintPDF = async (proforma: ProForma) => {
+    const matter = state.matters.find(m => m.id === proforma.matter_id);
+    
+    if (!matter) {
+      toast.error('Matter information not found for this pro forma');
+      return;
+    }
+
+    if (!state.advocate) {
+      toast.error('Advocate information not found');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      pdfGenerating: { ...prev.pdfGenerating, [`${proforma.id}_print`]: true }
+    }));
+
+    try {
+      // Use static method with correct parameters
+      const result = await InvoicePDFService.generateProFormaPDF(
+        proforma, 
+        matter, 
+        state.advocate,
+        { autoDownload: false }
+      );
+
+      if (result.success && result.blob) {
+        // Create a temporary URL for the PDF
+        const pdfUrl = URL.createObjectURL(result.blob);
+        
+        // Open in new window for printing
+        const printWindow = window.open(pdfUrl, '_blank');
+        if (printWindow) {
+          printWindow.onload = () => {
+            printWindow.print();
+            // Clean up the URL after a delay
+            setTimeout(() => {
+              URL.revokeObjectURL(pdfUrl);
+            }, 1000);
+          };
+        } else {
+          toast.error('Please allow popups to print the PDF');
+          URL.revokeObjectURL(pdfUrl);
+        }
+        
+        toast.success('PDF opened for printing');
+      } else {
+        throw new Error(result.error || 'Failed to generate PDF');
+      }
+    } catch (error) {
+      console.error('Error generating PDF for printing:', error);
+      toast.error('Failed to generate PDF for printing. Please try again.');
+    } finally {
+      setState(prev => ({
+        ...prev,
+        pdfGenerating: { ...prev.pdfGenerating, [`${proforma.id}_print`]: false }
+      }));
+    }
+  };
+
   // Calculate summary statistics
   const calculateSummaryStats = useCallback((proformas: ProForma[]): ProFormaSummaryStats => {
     const currentMonth = new Date().getMonth();
@@ -136,16 +253,18 @@ const ProFormaPage: React.FC = () => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // Load pro formas and matters from API
-      const [proformasData, mattersData] = await Promise.all([
+      // Load pro formas, matters, and advocate data from API
+      const [proformasData, mattersResponse, advocateData] = await Promise.all([
         proformaService.getProFormas(),
-        // MattersService.getMatters() // Assuming this exists
+        MatterService.getMatters({ page: 1, pageSize: 100 }),
+        AdvocateService.getCurrentAdvocate()
       ]);
 
       setState(prev => ({
         ...prev,
         proformas: proformasData,
-        matters: mattersData || [],
+        matters: mattersResponse?.data || [],
+        advocate: advocateData,
         isLoading: false
       }));
     } catch (error) {
@@ -479,26 +598,59 @@ const ProFormaPage: React.FC = () => {
                         </div>
                       </div>
                       
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setState(prev => ({ ...prev, showDetailsModal: true, selectedProFormaId: proforma.id }))}
-                        >
-                          View Details
-                        </Button>
-                        {proforma.status === 'accepted' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => setState(prev => ({ ...prev, showConversionModal: true, selectedProFormaId: proforma.id }))}
-                            className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
-                          >
-                            <Send className="h-4 w-4 mr-1" />
-                            Convert to Invoice
-                          </Button>
-                        )}
-                      </div>
+                      <div className="flex flex-wrap gap-2">
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => setState(prev => ({ ...prev, showDetailsModal: true, selectedProFormaId: proforma.id }))}
+                         >
+                           View Details
+                         </Button>
+                         
+                         {/* PDF Download Button */}
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => handleDownloadPDF(proforma)}
+                           disabled={state.pdfGenerating[proforma.id]}
+                           className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                         >
+                           {state.pdfGenerating[proforma.id] ? (
+                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                           ) : (
+                             <Download className="h-4 w-4 mr-1" />
+                           )}
+                           {state.pdfGenerating[proforma.id] ? 'Generating...' : 'Download PDF'}
+                         </Button>
+                         
+                         {/* PDF Print Button */}
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => handlePrintPDF(proforma)}
+                           disabled={state.pdfGenerating[`${proforma.id}_print`]}
+                           className="text-green-600 border-green-600 hover:bg-green-50"
+                         >
+                           {state.pdfGenerating[`${proforma.id}_print`] ? (
+                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                           ) : (
+                             <Printer className="h-4 w-4 mr-1" />
+                           )}
+                           {state.pdfGenerating[`${proforma.id}_print`] ? 'Preparing...' : 'Print PDF'}
+                         </Button>
+                         
+                         {proforma.status === 'accepted' && (
+                           <Button
+                             variant="primary"
+                             size="sm"
+                             onClick={() => setState(prev => ({ ...prev, showConversionModal: true, selectedProFormaId: proforma.id }))}
+                             className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700"
+                           >
+                             <Send className="h-4 w-4 mr-1" />
+                             Convert to Invoice
+                           </Button>
+                         )}
+                       </div>
                     </div>
                   </div>
                 </CardContent>
