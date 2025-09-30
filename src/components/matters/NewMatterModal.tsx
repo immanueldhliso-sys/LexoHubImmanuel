@@ -5,6 +5,7 @@ import { matterApiService } from '../../services/api';
 import { authService } from '../../services/auth.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../../lib/supabase';
 import { BarAssociation, FeeType, RiskLevel, ClientType, MatterStatus } from '../../types';
 import type { Matter, NewMatterForm } from '../../types';
 import { TemplateLibraryModal, SaveTemplateModal } from './templates';
@@ -227,6 +228,12 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
   const [showVoiceSuggestions, setShowVoiceSuggestions] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Service selection state
+  const [serviceCategories, setServiceCategories] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+
   // Track which fields were prepopulated for visual indicators
   const prepopulatedFields = useMemo(() => {
     if (!initialData) return new Set<string>();
@@ -241,8 +248,63 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
       setFormData(newFormData);
       setCurrentStep(1);
       setErrors({});
+      setSelectedServices([]);
     }
   }, [isOpen, initialData]);
+
+  // Fetch services when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchServices();
+    }
+  }, [isOpen]);
+
+  const fetchServices = async () => {
+    try {
+      setLoadingServices(true);
+      
+      // Fetch service categories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('service_categories')
+        .select('*')
+        .order('name');
+      
+      if (categoriesError) {
+        console.error('Error fetching service categories:', categoriesError);
+        toast.error('Failed to load service categories');
+        return;
+      }
+      
+      // Fetch services with their categories
+      const { data: servicesData, error: servicesError } = await supabase
+        .from('services')
+        .select(`
+          id,
+          name,
+          description,
+          category_id,
+          service_categories (
+            id,
+            name
+          )
+        `)
+        .order('name');
+      
+      if (servicesError) {
+        console.error('Error fetching services:', servicesError);
+        toast.error('Failed to load services');
+        return;
+      }
+      
+      setServiceCategories(categoriesData || []);
+      setServices(servicesData || []);
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      toast.error('Failed to load services');
+    } finally {
+      setLoadingServices(false);
+    }
+  };
 
   // Clear prepopulated data function
   const handleClearPrepopulatedData = () => {
@@ -429,7 +491,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
           handleApplyVoiceData(analysis.extractedMatterData);
           toast.success('Applied voice data to form');
         } else {
-          toast.info('No template suggestions found, but transcription captured');
+          toast('No template suggestions found, but transcription captured');
         }
         
         setIsAnalyzing(false);
@@ -633,7 +695,8 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
         risk_level: formData.risk_level,
         expectedCompletionDate: formData.expected_completion_date || undefined,
         expected_completion_date: formData.expected_completion_date || undefined,
-        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : []
+        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
+        services: selectedServices // Include selected services
       };
 
       console.debug('[NewMatterModal] Submitting new matter form', { newMatterForm });
@@ -963,6 +1026,66 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
         />
         <p className="mt-1 text-xs text-neutral-500">
           Separate multiple tags with commas
+        </p>
+      </div>
+
+      {/* Service Selection */}
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-2">
+          Associated Services
+        </label>
+        {loadingServices ? (
+          <div className="flex items-center justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-mpondo-gold"></div>
+            <span className="ml-2 text-sm text-neutral-600">Loading services...</span>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-60 overflow-y-auto border border-neutral-200 rounded-md p-3">
+            {serviceCategories.map(category => {
+              const categoryServices = services.filter(service => service.category_id === category.id);
+              if (categoryServices.length === 0) return null;
+              
+              return (
+                <div key={category.id} className="space-y-2">
+                  <h4 className="font-medium text-sm text-neutral-800 border-b border-neutral-200 pb-1">
+                    {category.name}
+                  </h4>
+                  <div className="space-y-1 pl-2">
+                    {categoryServices.map(service => (
+                      <label key={service.id} className="flex items-start space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedServices.includes(service.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedServices(prev => [...prev, service.id]);
+                            } else {
+                              setSelectedServices(prev => prev.filter(id => id !== service.id));
+                            }
+                          }}
+                          className="mt-0.5 rounded border-neutral-300 text-mpondo-gold focus:ring-mpondo-gold"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm text-neutral-700">{service.name}</span>
+                          {service.description && (
+                            <p className="text-xs text-neutral-500 mt-0.5">{service.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {serviceCategories.length === 0 && (
+              <p className="text-sm text-neutral-500 text-center py-4">
+                No services available. Please contact your administrator.
+              </p>
+            )}
+          </div>
+        )}
+        <p className="mt-1 text-xs text-neutral-500">
+          Select the services that will be provided for this matter
         </p>
       </div>
     </div>

@@ -3684,6 +3684,90 @@ export type Database = {
           },
         ]
       }
+      service_categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          id: string
+          category_id: string
+          name: string
+          description: string | null
+        }
+        Insert: {
+          id?: string
+          category_id: string
+          name: string
+          description?: string | null
+        }
+        Update: {
+          id?: string
+          category_id?: string
+          name?: string
+          description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      matter_services: {
+        Row: {
+          matter_id: string
+          service_id: string
+        }
+        Insert: {
+          matter_id: string
+          service_id: string
+        }
+        Update: {
+          matter_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_services_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matter_services_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "active_matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matter_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       active_matters: {

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Calendar, DollarSign, AlertCircle } from 'lucide-react';
+import { X, FileText, Calendar, DollarSign, AlertCircle, Settings } from 'lucide-react';
 import { Button, Input, Modal, ModalBody, ModalFooter } from '../../design-system/components';
 import { MatterService } from '../../services/api/matters.service';
 import type { ProFormaGenerationRequest, Matter } from '../../types';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../../lib/supabase';
 
 interface ProFormaCreationModalProps {
   isOpen: boolean;
@@ -32,10 +33,17 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
   const [loadingMatters, setLoadingMatters] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Service selection state
+  const [serviceCategories, setServiceCategories] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+
   // Load matters when modal opens
   useEffect(() => {
     if (isOpen) {
       loadMatters();
+      loadServices();
       // Reset form when modal opens
       setFormData({
         matter_id: '',
@@ -45,6 +53,7 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
         quote_date: new Date().toISOString().split('T')[0],
         notes: ''
       });
+      setSelectedServices([]);
       setErrors({});
     }
   }, [isOpen]);
@@ -66,6 +75,52 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
       setMatters([]);
     } finally {
       setLoadingMatters(false);
+    }
+  };
+
+  const loadServices = async () => {
+    setLoadingServices(true);
+    try {
+      // Fetch service categories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('service_categories')
+        .select('*')
+        .order('name');
+      
+      if (categoriesError) {
+        console.error('Error fetching service categories:', categoriesError);
+        toast.error('Failed to load service categories');
+        return;
+      }
+      
+      // Fetch services with their categories
+      const { data: servicesData, error: servicesError } = await supabase
+        .from('services')
+        .select(`
+          id,
+          name,
+          description,
+          category_id,
+          service_categories (
+            id,
+            name
+          )
+        `)
+        .order('name');
+      
+      if (servicesError) {
+        console.error('Error fetching services:', servicesError);
+        toast.error('Failed to load services');
+        return;
+      }
+      
+      setServiceCategories(categoriesData || []);
+      setServices(servicesData || []);
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      toast.error('Failed to load services');
+    } finally {
+      setLoadingServices(false);
     }
   };
 
@@ -115,7 +170,12 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
     }
 
     try {
-      await onSubmit(formData);
+      // Include selected services in the submission
+      const submissionData = {
+        ...formData,
+        services: selectedServices
+      };
+      await onSubmit(submissionData);
       onClose();
       // Reset form after successful submission
       setFormData({
@@ -147,6 +207,51 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
         return newErrors;
       });
     }
+  };
+
+  const generateFeeNarrativeFromServices = () => {
+    if (selectedServices.length === 0) {
+      toast.error('Please select at least one service to generate fee narrative');
+      return;
+    }
+
+    const selectedServiceObjects = services.filter(service => 
+      selectedServices.includes(service.id)
+    );
+
+    // Group services by category
+    const servicesByCategory = selectedServiceObjects.reduce((acc, service) => {
+      const categoryName = service.service_categories?.name || 'Other';
+      if (!acc[categoryName]) {
+        acc[categoryName] = [];
+      }
+      acc[categoryName].push(service);
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    // Generate narrative
+    let narrative = 'Professional legal services to be rendered:\n\n';
+    
+    Object.entries(servicesByCategory).forEach(([category, categoryServices]) => {
+      narrative += `${category}:\n`;
+      categoryServices.forEach(service => {
+        narrative += `• ${service.name}`;
+        if (service.description) {
+          narrative += ` - ${service.description}`;
+        }
+        narrative += '\n';
+      });
+      narrative += '\n';
+    });
+
+    narrative += 'All services will be rendered in accordance with professional standards and the Rules of the Bar.';
+
+    setFormData(prev => ({
+      ...prev,
+      fee_narrative: narrative
+    }));
+
+    toast.success('Fee narrative generated from selected services');
   };
 
   const selectedMatter = matters.find(m => m.id === formData.matter_id);
@@ -215,6 +320,80 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Service Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-neutral-700">
+                <Settings className="w-4 h-4 inline mr-1" />
+                Services to be Rendered
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={generateFeeNarrativeFromServices}
+                disabled={selectedServices.length === 0}
+                className="text-xs"
+              >
+                Generate Fee Narrative
+              </Button>
+            </div>
+            
+            {loadingServices ? (
+              <div className="flex items-center justify-center py-4 border border-neutral-300 rounded-lg">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-judicial-blue-600"></div>
+                <span className="ml-2 text-sm text-neutral-600">Loading services...</span>
+              </div>
+            ) : (
+              <div className="max-h-48 overflow-y-auto border border-neutral-300 rounded-lg p-3 space-y-3">
+                {serviceCategories.map(category => {
+                  const categoryServices = services.filter(service => service.category_id === category.id);
+                  if (categoryServices.length === 0) return null;
+                  
+                  return (
+                    <div key={category.id} className="space-y-2">
+                      <h4 className="font-medium text-sm text-neutral-800 border-b border-neutral-200 pb-1">
+                        {category.name}
+                      </h4>
+                      <div className="space-y-1 pl-2">
+                        {categoryServices.map(service => (
+                          <label key={service.id} className="flex items-start space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedServices.includes(service.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedServices(prev => [...prev, service.id]);
+                                } else {
+                                  setSelectedServices(prev => prev.filter(id => id !== service.id));
+                                }
+                              }}
+                              className="mt-0.5 rounded border-neutral-300 text-judicial-blue-600 focus:ring-judicial-blue-500"
+                            />
+                            <div className="flex-1">
+                              <span className="text-sm text-neutral-700">{service.name}</span>
+                              {service.description && (
+                                <p className="text-xs text-neutral-500 mt-0.5">{service.description}</p>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {serviceCategories.length === 0 && (
+                  <p className="text-sm text-neutral-500 text-center py-4">
+                    No services available. Please contact your administrator.
+                  </p>
+                )}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-neutral-500">
+              Select services to include in this pro forma. Use "Generate Fee Narrative" to auto-populate the description.
+            </p>
           </div>
 
           {/* Fee Narrative */}

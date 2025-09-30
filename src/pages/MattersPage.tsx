@@ -26,6 +26,7 @@ import { InvoiceService } from '../services/api/invoices.service';
 import { matterApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../lib/supabase';
 import type { Matter, VoiceRecording, TimeEntry, Invoice } from '../types';
 import { MatterStatus } from '../types';
 
@@ -58,7 +59,41 @@ const MattersPage: React.FC = () => {
           toast.error('Failed to load matters');
           setMatters([]);
         } else {
-          setMatters(data || []);
+          // Fetch associated services for each matter
+          const mattersWithServices = await Promise.all(
+            (data || []).map(async (matter) => {
+              try {
+                const { data: matterServices } = await supabase
+                  .from('matter_services')
+                  .select(`
+                    service_id,
+                    services (
+                      id,
+                      name,
+                      description,
+                      service_categories (
+                        id,
+                        name
+                      )
+                    )
+                  `)
+                  .eq('matter_id', matter.id);
+                
+                return {
+                  ...matter,
+                  associatedServices: matterServices?.map(ms => ms.services) || []
+                };
+              } catch (serviceError) {
+                console.error('Error fetching services for matter:', matter.id, serviceError);
+                return {
+                  ...matter,
+                  associatedServices: []
+                };
+              }
+            })
+          );
+          
+          setMatters(mattersWithServices);
         }
       } catch (err) {
         toast.error('Unexpected error loading matters');
@@ -380,6 +415,24 @@ const MattersPage: React.FC = () => {
                             <span className="ml-2 font-medium text-neutral-900">{matter.brief_type}</span>
                           </div>
                         </div>
+                        
+                        {/* Associated Services */}
+                        {(matter as any).associatedServices && (matter as any).associatedServices.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-neutral-200">
+                            <span className="text-sm font-medium text-neutral-700">Associated Services:</span>
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {(matter as any).associatedServices.map((service: any, index: number) => (
+                                <span
+                                  key={service.id || index}
+                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                  title={service.description || service.name}
+                                >
+                                  {service.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -439,7 +492,7 @@ const MattersPage: React.FC = () => {
                         size="sm"
                         onClick={() => {
                           // Navigate to matter details
-                          toast.info('Matter details view coming soon');
+                          toast('Matter details view coming soon');
                         }}
                         className="flex items-center gap-2"
                         title="View matter details"

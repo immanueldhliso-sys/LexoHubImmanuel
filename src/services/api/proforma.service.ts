@@ -105,6 +105,28 @@ export class ProFormaService {
         throw error;
       }
 
+      // Associate services with the pro forma if provided
+      if (data.services && data.services.length > 0) {
+        try {
+          const proformaServices = data.services.map(serviceId => ({
+            matter_id: data.matter_id,
+            service_id: serviceId
+          }));
+
+          const { error: servicesError } = await supabase
+            .from('matter_services')
+            .insert(proformaServices);
+
+          if (servicesError) {
+            console.error('Error associating services with pro forma:', servicesError);
+            toast.error('Pro forma created but failed to associate services');
+          }
+        } catch (serviceError) {
+          console.error('Error associating services:', serviceError);
+          toast.error('Pro forma created but failed to associate services');
+        }
+      }
+
       toast.success('Pro forma created successfully');
       return this.mapInvoiceToProForma(invoice);
     } catch (error) {

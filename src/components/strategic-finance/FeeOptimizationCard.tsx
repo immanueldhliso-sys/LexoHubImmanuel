@@ -299,7 +299,7 @@ export const FeeOptimizationCard: React.FC<FeeOptimizationCardProps> = ({ matter
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => toast.info('Customization feature coming soon!')}
+                          onClick={() => toast('Customization feature coming soon!')}
                         >
                           Customize
                         </Button>

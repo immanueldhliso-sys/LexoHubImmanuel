@@ -415,6 +415,7 @@ export interface ProFormaGenerationRequest {
   valid_until: string;
   quote_date: string;
   notes?: string;
+  services?: string[]; // Array of service IDs to associate with the pro forma
 }
 
 export interface ProFormaFilters {
@@ -647,6 +648,7 @@ export interface NewMatterForm {
   expectedCompletionDate?: string;
   expected_completion_date?: string;
   tags?: string[];
+  services?: string[]; // Array of service IDs to associate with the matter
 }
 
 export interface NewInvoiceForm {

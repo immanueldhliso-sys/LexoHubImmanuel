@@ -6,9 +6,11 @@ import { ProFormaCreationModal } from '../components/proforma/ProFormaCreationMo
 import { proformaService } from '../services/api/proforma.service';
 import { InvoicePDFService } from '../services/pdf/invoice-pdf.service';
 import { AdvocateService } from '../services/api/advocate.service';
-import { MatterService } from '../services/api/matters.service';
+import { matterApiService } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { formatRand } from '../lib/currency';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { 
   ProForma, 
   ProFormaFilters, 
@@ -48,6 +50,7 @@ interface ProFormaPageState {
 }
 
 const ProFormaPage: React.FC = () => {
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [state, setState] = useState<ProFormaPageState>({
     proformas: [],
     filteredProFormas: [],
@@ -250,20 +253,63 @@ const ProFormaPage: React.FC = () => {
 
   // Load pro formas and matters
   const loadData = useCallback(async () => {
+    if (!user?.id) {
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        error: 'User not authenticated' 
+      }));
+      return;
+    }
+
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
       
       // Load pro formas, matters, and advocate data from API
       const [proformasData, mattersResponse, advocateData] = await Promise.all([
         proformaService.getProFormas(),
-        MatterService.getMatters({ page: 1, pageSize: 100 }),
+        matterApiService.getByAdvocate(user.id),
         AdvocateService.getCurrentAdvocate()
       ]);
 
+      // Fetch associated services for each pro forma
+      const proformasWithServices = await Promise.all(
+        proformasData.map(async (proforma) => {
+          try {
+            const { data: proformaServices } = await supabase
+              .from('matter_services')
+              .select(`
+                service_id,
+                services (
+                  id,
+                  name,
+                  description,
+                  service_categories (
+                    id,
+                    name
+                  )
+                )
+              `)
+              .eq('matter_id', proforma.matter_id);
+            
+            return {
+              ...proforma,
+              associatedServices: proformaServices?.map(ps => ps.services) || []
+            };
+          } catch (serviceError) {
+            console.error('Error fetching services for pro forma:', proforma.id, serviceError);
+            return {
+              ...proforma,
+              associatedServices: []
+            };
+          }
+        })
+      );
+
       setState(prev => ({
         ...prev,
-        proformas: proformasData,
-        matters: mattersResponse?.data || [],
+        proformas: proformasWithServices,
+        matters: mattersResponse || [],
         advocate: advocateData,
         isLoading: false
       }));
@@ -275,7 +321,7 @@ const ProFormaPage: React.FC = () => {
         error: 'Failed to fetch pro formas'
       }));
     }
-  }, []);
+  }, [user]);
 
   // Handle pro forma creation
   const handleCreateProForma = useCallback(async (data: ProFormaGenerationRequest) => {
@@ -597,6 +643,24 @@ const ProFormaPage: React.FC = () => {
                           </p>
                         </div>
                       </div>
+
+                      {/* Associated Services */}
+                      {(proforma as any).associatedServices && (proforma as any).associatedServices.length > 0 && (
+                        <div className="mb-4 pt-3 border-t border-neutral-200">
+                          <span className="text-sm font-medium text-neutral-700">Services Included:</span>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(proforma as any).associatedServices.map((service: any, index: number) => (
+                              <span
+                                key={service.id || index}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-judicial-blue-100 text-judicial-blue-800"
+                                title={service.description || service.name}
+                              >
+                                {service.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="flex flex-wrap gap-2">
                          <Button

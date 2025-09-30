@@ -149,7 +149,33 @@ export class MatterApiService extends BaseApiService<Matter> {
       date_instructed: new Date().toISOString().split('T')[0]
     };
 
-    return this.create(matterData);
+    const result = await this.create(matterData);
+    
+    // If services are provided and matter was created successfully, associate them
+    if (result.data && formData.services && formData.services.length > 0) {
+      try {
+        const matterServices = formData.services.map(serviceId => ({
+          matter_id: result.data!.id,
+          service_id: serviceId
+        }));
+
+        const { error: servicesError } = await supabase
+          .from('matter_services')
+          .insert(matterServices);
+
+        if (servicesError) {
+          console.error('Error adding services to matter:', servicesError);
+          toast.error('Matter created but failed to associate services');
+        } else {
+          toast.success(`Matter created with ${formData.services.length} service(s) associated`);
+        }
+      } catch (serviceError) {
+        console.error('Error associating services:', serviceError);
+        toast.error('Matter created but failed to associate services');
+      }
+    }
+    
+    return result;
   }
 
   /**
