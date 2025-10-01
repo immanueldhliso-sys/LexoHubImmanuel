@@ -253,22 +253,13 @@ const ProFormaPage: React.FC = () => {
 
   // Load pro formas and matters
   const loadData = useCallback(async () => {
-    if (!user?.id) {
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: false, 
-        error: 'User not authenticated' 
-      }));
-      return;
-    }
-
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
       
       // Load pro formas, matters, and advocate data from API
       const [proformasData, mattersResponse, advocateData] = await Promise.all([
         proformaService.getProFormas(),
-        matterApiService.getByAdvocate(user.id),
+        matterApiService.getAll({ page: 1, pageSize: 100 }),
         AdvocateService.getCurrentAdvocate()
       ]);
 
@@ -321,7 +312,7 @@ const ProFormaPage: React.FC = () => {
         error: 'Failed to fetch pro formas'
       }));
     }
-  }, [user]);
+  }, []);
 
   // Handle pro forma creation
   const handleCreateProForma = useCallback(async (data: ProFormaGenerationRequest) => {
