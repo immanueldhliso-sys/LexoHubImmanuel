@@ -5,6 +5,14 @@
 
 import type { TranscriptionResult } from '../types';
 
+// Extend Window interface for Speech Recognition API
+declare global {
+  interface Window {
+    SpeechRecognition?: typeof SpeechRecognition;
+    webkitSpeechRecognition?: typeof SpeechRecognition;
+  }
+}
+
 export interface SpeechToTextConfig {
   apiKey?: string;
   region?: string;
@@ -78,7 +86,7 @@ export class SpeechToTextService {
         return;
       }
 
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
 
       recognition.continuous = true;

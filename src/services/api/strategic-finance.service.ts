@@ -28,6 +28,10 @@ export interface FeeOptimizationRecommendation {
   accepted: boolean;
   createdAt: string;
   expiresAt: string;
+  // AI-generated optional fields
+  aiRationale?: string;
+  implementationSteps?: string[];
+  riskAssessment?: string;
 }
 
 export interface CashFlowPrediction {
@@ -875,7 +879,7 @@ export class StrategicFinanceService {
           description: validated.description,
           success_definition: validated.successDefinition,
           success_probability: validated.successProbability,
-          base_fee: validated.baseFee,
+          baseFee: validated.baseFee,
           success_fee_percentage: validated.successFeePercentage,
           success_fee_cap: validated.successFeeCap,
           minimum_recovery: validated.minimumRecovery,

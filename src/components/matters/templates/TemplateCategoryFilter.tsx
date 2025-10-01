@@ -62,7 +62,7 @@ export const TemplateCategoryFilter: React.FC<TemplateCategoryFilterProps> = ({
   const handleSortChange = (sortBy: string, sortOrder: 'asc' | 'desc') => {
     onFiltersChange({
       ...filters,
-      sort_by: sortBy as any,
+      sort_by: sortBy as 'name' | 'usage_count' | 'created_at' | 'updated_at',
       sort_order: sortOrder
     });
   };

@@ -261,7 +261,7 @@ export const ComplianceMonitor: React.FC<ComplianceMonitorProps> = ({ className 
                 <Filter className="h-4 w-4" />
                 <select
                   value={selectedFilter}
-                  onChange={(e) => setSelectedFilter(e.target.value as any)}
+                  onChange={(e) => setSelectedFilter(e.target.value as 'all' | 'critical' | 'unresolved')}
                   className="px-3 py-1 border rounded-md text-sm"
                 >
                   <option value="all">All Alerts</option>

@@ -52,7 +52,7 @@ export const BriefAnalysisModal: React.FC<BriefAnalysisModalProps> = ({ onClose 
       
       toast.success('Document analysis started successfully!');
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error starting analysis:', error);
     } finally {
       setUploading(false);
@@ -109,7 +109,7 @@ export const BriefAnalysisModal: React.FC<BriefAnalysisModalProps> = ({ onClose 
             </label>
             <select
               value={analysisType}
-              onChange={(e) => setAnalysisType(e.target.value as any)}
+              onChange={(e) => setAnalysisType(e.target.value as 'brief' | 'contract' | 'opinion' | 'pleading' | 'general')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-mpondo-gold-500"
             >
               <option value="brief">Brief/Instructions</option>

@@ -8,7 +8,13 @@ interface IconProps {
   noGradient?: boolean;
   className?: string;
   size?: number;
-  [key: string]: any;
+  onClick?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  'aria-label'?: string;
+  'aria-hidden'?: boolean;
+  role?: string;
+  tabIndex?: number;
 }
 
 export const Icon: React.FC<IconProps> = ({ 

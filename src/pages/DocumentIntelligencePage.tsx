@@ -33,7 +33,7 @@ export const DocumentIntelligencePage: React.FC = () => {
   
   // Filters
   const [precedentSearch, setPrecedentSearch] = useState('');
-  const [precedentType, setPrecedentType] = useState('');
+  const [precedentType, setPrecedentType] = useState<PrecedentType | ''>('');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export const DocumentIntelligencePage: React.FC = () => {
       if (activeTab === 'precedents') {
         const results = await DocumentIntelligenceService.searchPrecedents({
           search: precedentSearch || undefined,
-          precedentType: precedentType as any || undefined,
+          precedentType: precedentType || undefined,
           verifiedOnly
         });
         setPrecedents(results);

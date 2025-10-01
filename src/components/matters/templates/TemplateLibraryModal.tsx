@@ -12,6 +12,10 @@ import type {
   TemplateCategory, 
   MatterTemplateData 
 } from '@/types/matter-templates';
+
+interface TemplateWithSuggestion extends MatterTemplate {
+  isSuggested?: boolean;
+}
 import { matterTemplatesService } from '@/services/api/matter-templates.service';
 import { TemplateCard } from './TemplateCard';
 import { TemplateCategoryFilter } from './TemplateCategoryFilter';
@@ -132,8 +136,8 @@ export const TemplateLibraryModal: React.FC<TemplateLibraryModalProps> = ({
     });
 
     // Put suggested templates first
-    const suggested = filtered.filter(t => (t as any).isSuggested);
-    const others = filtered.filter(t => !(t as any).isSuggested);
+    const suggested = filtered.filter(t => (t as TemplateWithSuggestion).isSuggested);
+    const others = filtered.filter(t => !(t as TemplateWithSuggestion).isSuggested);
     
     setFilteredTemplates([...suggested, ...others]);
   };
@@ -165,7 +169,7 @@ export const TemplateLibraryModal: React.FC<TemplateLibraryModalProps> = ({
     const total = templates.length;
     const shared = templates.filter(t => t.is_shared).length;
     const personal = total - shared;
-    const suggested = templates.filter(t => (t as any).isSuggested).length;
+    const suggested = templates.filter(t => (t as TemplateWithSuggestion).isSuggested).length;
 
     return { total, shared, personal, suggested };
   };
@@ -292,7 +296,7 @@ export const TemplateLibraryModal: React.FC<TemplateLibraryModalProps> = ({
                   template={template}
                   onSelect={() => handleTemplateSelect(template)}
                   onPreview={() => handleTemplatePreview(template)}
-                  isHighlighted={(template as any).isSuggested}
+                  isHighlighted={(template as TemplateWithSuggestion).isSuggested}
                 />
               ))}
             </div>

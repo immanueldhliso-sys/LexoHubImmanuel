@@ -32,7 +32,7 @@ export const FeatureDiscoveryNotification: React.FC<FeatureDiscoveryNotification
       
       if (response.error) {
         const code = response.error.code;
-        const type = response.error.type as any;
+        const type = response.error.type as string;
         const message = response.error.message?.toLowerCase?.() ?? '';
         const isBenign = 
           type === 'AUTHENTICATION_ERROR' ||
@@ -174,7 +174,7 @@ export const useFeatureDiscoveryNotification = () => {
       
       if (response.error) {
         const code = response.error.code;
-        const type = response.error.type as any;
+        const type = response.error.type as string;
         const message = response.error.message?.toLowerCase?.() ?? '';
         const isBenign = 
           type === 'AUTHENTICATION_ERROR' ||

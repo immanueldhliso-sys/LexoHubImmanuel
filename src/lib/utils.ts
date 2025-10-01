@@ -62,7 +62,7 @@ export function daysBetween(date1: string | Date, date2: string | Date): number 
 /**
  * Debounce function
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {

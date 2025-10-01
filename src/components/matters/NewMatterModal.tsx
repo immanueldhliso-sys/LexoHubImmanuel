@@ -229,8 +229,8 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Service selection state
-  const [serviceCategories, setServiceCategories] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
+  const [serviceCategories, setServiceCategories] = useState<unknown[]>([]);
+  const [services, setServices] = useState<unknown[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
 
@@ -504,7 +504,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     }
   };
 
-  const handleApplyVoiceData = (extractedData: any) => {
+  const handleApplyVoiceData = (extractedData: unknown) => {
     setFormData(prev => ({
       ...prev,
       ...extractedData

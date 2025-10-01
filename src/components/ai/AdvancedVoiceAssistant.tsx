@@ -28,7 +28,7 @@ import { getEnhancedSpeechService, type SpeechRequest } from '../../services/enh
 
 interface AdvancedVoiceAssistantProps {
   onCommandExecuted?: (command: VoiceCommandResult) => void;
-  onNavigate?: (page: string, params?: any) => void;
+  onNavigate?: (page: string, params?: Record<string, unknown>) => void;
   className?: string;
 }
 

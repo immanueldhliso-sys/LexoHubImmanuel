@@ -77,7 +77,7 @@ export const AIAnalyticsDashboard: React.FC = () => {
   const [feeOptimizations, setFeeOptimizations] = useState<FeeOptimizationRecommendation[]>([]);
 
   // Integration status
-  const [integrationStatus, setIntegrationStatus] = useState<any>(null);
+  const [integrationStatus, setIntegrationStatus] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -326,7 +326,7 @@ export const AIAnalyticsDashboard: React.FC = () => {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === tab.id
                   ? 'border-mpondo-gold-500 text-mpondo-gold-600'

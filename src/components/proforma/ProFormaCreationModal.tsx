@@ -6,6 +6,20 @@ import type { ProFormaGenerationRequest, Matter } from '../../types';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 
+interface ServiceCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  description?: string;
+  category_id: string;
+  category?: ServiceCategory;
+}
+
 interface ProFormaCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -34,8 +48,8 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Service selection state
-  const [serviceCategories, setServiceCategories] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
 
@@ -227,7 +241,7 @@ export const ProFormaCreationModal: React.FC<ProFormaCreationModalProps> = ({
       }
       acc[categoryName].push(service);
       return acc;
-    }, {} as Record<string, any[]>);
+    }, {} as Record<string, Service[]>);
 
     // Generate narrative
     let narrative = 'Professional legal services to be rendered:\n\n';

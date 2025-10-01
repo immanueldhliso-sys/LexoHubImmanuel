@@ -38,7 +38,7 @@ export interface MatterTemplateData {
   vatExempt?: boolean;
   
   // Additional fields that can be customized
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
   tags?: string;
   
   // Voice integration specific fields
@@ -180,7 +180,7 @@ export interface TemplateUsageStats {
 export interface TemplateError {
   code: string;
   message: string;
-  details?: any;
+  details?: unknown;
 }
 
 // Constants

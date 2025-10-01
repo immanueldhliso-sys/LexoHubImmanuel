@@ -6,7 +6,17 @@ export interface VoiceNavigationCommand {
   command: string;
   action: 'navigate' | 'search' | 'quick_action' | 'time_entry';
   target?: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
+  confidence: number;
+}
+
+// Interface for raw command data from Claude response
+interface RawVoiceNavigationCommand {
+  id: string;
+  command: string;
+  action: string;
+  target?: string;
+  parameters?: Record<string, unknown>;
   confidence: number;
 }
 
@@ -211,15 +221,14 @@ Examples:
     try {
       const parsed = JSON.parse(response);
       
-      // Validate the response structure
       if (typeof parsed.recognized !== 'boolean' || !Array.isArray(parsed.commands)) {
         throw new Error('Invalid Claude response structure');
       }
 
       // Validate and enhance commands
       const validatedCommands = parsed.commands
-        .filter((cmd: any) => this.validateCommand(cmd))
-        .map((cmd: any) => this.enhanceCommand(cmd));
+        .filter((cmd: RawVoiceNavigationCommand) => this.validateCommand(cmd))
+        .map((cmd: RawVoiceNavigationCommand) => this.enhanceCommand(cmd));
 
       return {
         recognized: parsed.recognized && validatedCommands.length > 0,
@@ -236,7 +245,7 @@ Examples:
   /**
    * Validate command structure
    */
-  private validateCommand(cmd: any): boolean {
+  private validateCommand(cmd: RawVoiceNavigationCommand): boolean {
     return (
       typeof cmd.id === 'string' &&
       typeof cmd.command === 'string' &&
@@ -250,11 +259,11 @@ Examples:
   /**
    * Enhance command with additional metadata
    */
-  private enhanceCommand(cmd: any): VoiceNavigationCommand {
+  private enhanceCommand(cmd: RawVoiceNavigationCommand): VoiceNavigationCommand {
     const enhanced: VoiceNavigationCommand = {
       id: cmd.id,
       command: cmd.command,
-      action: cmd.action,
+      action: cmd.action as 'navigate' | 'search' | 'quick_action' | 'time_entry',
       target: cmd.target,
       parameters: cmd.parameters || {},
       confidence: cmd.confidence

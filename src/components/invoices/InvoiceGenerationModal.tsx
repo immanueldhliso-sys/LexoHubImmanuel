@@ -455,7 +455,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
-                      onClick={() => setActiveTab(id as any)}
+                      onClick={() => setActiveTab(id as 'time' | 'expenses' | 'settings')}
                       className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm ${
                         activeTab === id
                           ? 'border-mpondo-gold-500 text-mpondo-gold-600'

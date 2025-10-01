@@ -90,9 +90,9 @@ class TemplateAnalysisService {
   /**
    * Extract matter-related data from voice transcription
    */
-  private extractMatterDataFromVoice(transcription: string, extractedData?: ExtractedTimeEntryData): Partial<any> {
+  private extractMatterDataFromVoice(transcription: string, extractedData?: ExtractedTimeEntryData): VoiceTemplateAnalysis['extractedMatterData'] {
     const lowerText = transcription.toLowerCase();
-    const extractedMatterData: any = {};
+    const extractedMatterData: VoiceTemplateAnalysis['extractedMatterData'] = {};
 
     // Extract matter type based on keywords
     for (const [matterType, keywords] of Object.entries(this.MATTER_TYPE_KEYWORDS)) {
@@ -120,7 +120,7 @@ class TemplateAnalysisService {
     }
 
     // Extract case number patterns
-    const caseNumberPattern = /(?:case|matter|file)\s*(?:number|no\.?|#)\s*([A-Z0-9\/\-]+)/i;
+    const caseNumberPattern = /(?:case|matter|file)\s*(?:number|no\.?|#)\s*([A-Z0-9/-]+)/i;
     const caseMatch = transcription.match(caseNumberPattern);
     if (caseMatch) {
       extractedMatterData.court_case_number = caseMatch[1];
@@ -133,7 +133,7 @@ class TemplateAnalysisService {
 
     // Extract tags from legal terms
     const tags: string[] = [];
-    for (const [category, terms] of Object.entries(this.LEGAL_ENTITIES_PATTERNS)) {
+    for (const terms of Object.values(this.LEGAL_ENTITIES_PATTERNS)) {
       for (const term of terms) {
         if (lowerText.includes(term.toLowerCase())) {
           tags.push(term);
@@ -153,7 +153,7 @@ class TemplateAnalysisService {
   private generateTemplateSuggestions(
     transcription: string, 
     templates: MatterTemplate[], 
-    extractedData: any
+    extractedData: VoiceTemplateAnalysis['extractedMatterData']
   ): TemplateSuggestion[] {
     const suggestions: TemplateSuggestion[] = [];
     const lowerText = transcription.toLowerCase();
@@ -239,7 +239,7 @@ class TemplateAnalysisService {
   /**
    * Calculate overall confidence score
    */
-  private calculateOverallConfidence(suggestions: TemplateSuggestion[], extractedData: any): number {
+  private calculateOverallConfidence(suggestions: TemplateSuggestion[], extractedData: VoiceTemplateAnalysis['extractedMatterData']): number {
     if (suggestions.length === 0) return 0;
 
     const topSuggestionConfidence = suggestions[0]?.confidence || 0;

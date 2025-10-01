@@ -87,7 +87,7 @@ export const AdvancedFeatureRoute: React.FC<AdvancedFeatureRouteProps> = ({
 /**
  * Higher-order component for protecting page components
  */
-export function withAdvancedFeatureGuard<P extends Record<string, any>>(
+export function withAdvancedFeatureGuard<P extends Record<string, unknown>>(
   page: string,
   Component: React.ComponentType<P>,
   options?: {

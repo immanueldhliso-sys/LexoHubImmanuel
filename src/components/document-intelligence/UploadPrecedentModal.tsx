@@ -81,15 +81,15 @@ export const UploadPrecedentModal: React.FC<UploadPrecedentModalProps> = ({ onCl
         subcategory: formData.subcategory || undefined,
         documentId: mockDocumentId,
         templateContent: useTemplate ? templateContent : undefined,
-        bar: formData.bar as any || undefined,
-        courtLevel: formData.courtLevel as any || undefined,
+        bar: formData.bar || undefined,
+        courtLevel: formData.courtLevel || undefined,
         applicableLaws: formData.applicableLaws ? formData.applicableLaws.split(',').map(s => s.trim()) : undefined,
         tags: formData.tags ? formData.tags.split(',').map(s => s.trim()) : undefined
       });
       
       toast.success('Precedent uploaded successfully!');
       onSuccess();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error uploading precedent:', error);
     } finally {
       setUploading(false);

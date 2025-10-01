@@ -15,6 +15,11 @@ import type {
 import { matterTemplatesService } from '@/services/api/matter-templates.service';
 import { toast } from 'react-hot-toast';
 
+interface ValidationError {
+  path?: string[];
+  message: string;
+}
+
 interface SaveTemplateModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -125,7 +130,7 @@ export const SaveTemplateModal: React.FC<SaveTemplateModalProps> = ({
         toast.error(result.error.message);
         if (result.error.type === 'VALIDATION_ERROR' && result.error.details) {
           const validationErrors: Record<string, string> = {};
-          (result.error.details as any[]).forEach(error => {
+          (result.error.details as ValidationError[]).forEach((error: ValidationError) => {
             validationErrors[error.path?.[0] || 'general'] = error.message;
           });
           setErrors(validationErrors);

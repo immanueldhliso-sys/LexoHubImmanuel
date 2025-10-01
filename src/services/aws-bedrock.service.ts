@@ -76,6 +76,38 @@ export interface CircuitBreakerConfig {
   monitoringPeriod: number;
 }
 
+export interface MarketData {
+  averageRates?: Record<string, number>;
+  competitorPricing?: Record<string, number>;
+  marketTrends?: string[];
+  economicIndicators?: Record<string, number>;
+}
+
+export interface FeeOptimizationRecommendation {
+  recommendedFee?: number;
+  confidence?: number;
+  reasoning?: string;
+  riskAssessment?: string;
+  marketComparison?: string;
+  adjustmentFactors?: string[];
+}
+
+export interface CashFlowOptimizationRecommendation {
+  recommendations?: string[];
+  priorityActions?: string[];
+  timeframe?: string;
+  expectedImpact?: string;
+  riskLevel?: string;
+  confidence?: number;
+}
+
+export interface Strategy {
+  id: string;
+  title: string;
+  description: string;
+  impact: 'high' | 'medium' | 'low';
+}
+
 enum CircuitBreakerState {
   CLOSED = 'CLOSED',
   OPEN = 'OPEN',
@@ -562,7 +594,7 @@ Return only valid JSON in the specified format.`;
   /**
    * Validate extracted data structure and types
    */
-  private validateExtractedData(data: any): { isValid: boolean; errors: string[] } {
+  private validateExtractedData(data: unknown): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (typeof data !== 'object' || data === null) {
@@ -621,8 +653,8 @@ Return only valid JSON in the specified format.`;
       complexity?: string;
       marketPosition?: string;
     },
-    marketData?: any
-  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    marketData?: MarketData
+  ): Promise<{ success: boolean; data?: FeeOptimizationRecommendation; error?: string }> {
     try {
       // Check circuit breaker
       if (!this.canMakeRequest()) {
@@ -761,7 +793,7 @@ Ensure all numerical values are realistic and based on South African legal marke
   /**
    * Parse fee optimization response from Claude
    */
-  private parseFeeOptimizationResponse(response: ClaudeResponse): { success: boolean; data?: any; error?: string } {
+  private parseFeeOptimizationResponse(response: ClaudeResponse): { success: boolean; data?: FeeOptimizationRecommendation; error?: string } {
     try {
       if (!response.content || response.content.length === 0) {
         return {
@@ -824,7 +856,7 @@ Ensure all numerical values are realistic and based on South African legal marke
   /**
    * Validate fee optimization data structure
    */
-  private validateFeeOptimizationData(data: any): { isValid: boolean; errors: string[] } {
+  private validateFeeOptimizationData(data: unknown): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (typeof data !== 'object' || data === null) {
@@ -987,7 +1019,7 @@ Ensure all numerical values are realistic and based on South African legal marke
       practiceType: string;
       marketConditions: string;
     }
-  ): Promise<{ success: boolean; data?: any; error?: string }> {
+  ): Promise<{ success: boolean; data?: CashFlowOptimizationRecommendation; error?: string }> {
     try {
       // Check circuit breaker
       if (!this.canMakeRequest()) {
@@ -1134,7 +1166,7 @@ Focus on practical, implementable strategies that consider the South African leg
   /**
    * Parse cash flow optimization response from Claude
    */
-  private parseCashFlowOptimizationResponse(response: ClaudeResponse): { success: boolean; data?: any; error?: string } {
+  private parseCashFlowOptimizationResponse(response: ClaudeResponse): { success: boolean; data?: CashFlowOptimizationRecommendation; error?: string } {
     try {
       if (!response.content || response.content.length === 0) {
         return {
@@ -1163,7 +1195,7 @@ Focus on practical, implementable strategies that consider the South African leg
       let parsedData;
       try {
         parsedData = JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
+      } catch {
         return {
           success: false,
           error: 'Failed to parse JSON from Claude response'
@@ -1201,7 +1233,7 @@ Focus on practical, implementable strategies that consider the South African leg
   /**
    * Validate cash flow optimization data structure
    */
-  private validateCashFlowOptimizationData(data: any): { isValid: boolean; errors: string[] } {
+  private validateCashFlowOptimizationData(data: unknown): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!data || typeof data !== 'object') {
@@ -1232,7 +1264,7 @@ Focus on practical, implementable strategies that consider the South African leg
 
     // Validate strategies structure
     if (Array.isArray(data.strategies)) {
-      data.strategies.forEach((strategy: any, index: number) => {
+      data.strategies.forEach((strategy: Strategy, index: number) => {
         if (!strategy.id || typeof strategy.id !== 'string') {
           errors.push(`Strategy ${index}: id must be a string`);
         }

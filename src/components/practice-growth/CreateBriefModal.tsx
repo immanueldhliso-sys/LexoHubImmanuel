@@ -8,6 +8,8 @@ interface CreateBriefModalProps {
   onSuccess: () => void;
 }
 
+type FeeType = 'standard' | 'contingency' | 'success' | 'retainer' | 'pro_bono';
+
 const SPECIALISATION_OPTIONS: { value: SpecialisationCategory; label: string }[] = [
   { value: 'administrative_law', label: 'Administrative Law' },
   { value: 'banking_finance', label: 'Banking & Finance' },
@@ -38,7 +40,7 @@ export const CreateBriefModal: React.FC<CreateBriefModalProps> = ({ onClose, onS
     requiredExperienceYears: 0,
     estimatedFeeRangeMin: '',
     estimatedFeeRangeMax: '',
-    feeType: 'standard' as const,
+    feeType: 'standard' as FeeType,
     referralPercentage: '',
     deadline: '',
     expectedDurationDays: '',
@@ -248,7 +250,7 @@ export const CreateBriefModal: React.FC<CreateBriefModalProps> = ({ onClose, onS
                 </label>
                 <select
                   value={formData.feeType}
-                  onChange={(e) => setFormData({ ...formData, feeType: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, feeType: e.target.value as FeeType })}
                   className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-mpondo-gold-500"
                 >
                   <option value="standard">Standard</option>

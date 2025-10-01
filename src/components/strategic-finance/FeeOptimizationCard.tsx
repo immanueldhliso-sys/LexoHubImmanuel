@@ -208,14 +208,14 @@ export const FeeOptimizationCard: React.FC<FeeOptimizationCardProps> = ({ matter
                 {selectedModel === rec.id && (
                   <div className="mt-4 pt-4 border-t border-neutral-200 space-y-4">
                     {/* AI Rationale */}
-                    {(rec as any).aiRationale && (
+                    {rec.aiRationale && (
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Brain className="w-4 h-4 text-mpondo-gold-500" />
                           <h5 className="font-medium text-neutral-900">AI Analysis</h5>
                         </div>
                         <p className="text-sm text-neutral-700 bg-neutral-50 p-3 rounded-lg">
-                          {(rec as any).aiRationale}
+                          {rec.aiRationale}
                         </p>
                       </div>
                     )}
@@ -255,14 +255,14 @@ export const FeeOptimizationCard: React.FC<FeeOptimizationCardProps> = ({ matter
                     </div>
 
                     {/* Implementation Steps */}
-                    {(rec as any).implementationSteps && Array.isArray((rec as any).implementationSteps) && (
+                    {rec.implementationSteps && Array.isArray(rec.implementationSteps) && (
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Clock className="w-4 h-4 text-success-500" />
                           <h5 className="font-medium text-neutral-900">Implementation Steps</h5>
                         </div>
                         <ol className="text-sm space-y-1">
-                          {(rec as any).implementationSteps.map((step: string, index: number) => (
+                          {rec.implementationSteps.map((step: string, index: number) => (
                             <li key={index} className="flex items-start gap-2">
                               <span className="text-neutral-400 font-medium min-w-[20px]">{index + 1}.</span>
                               <span className="text-neutral-700">{step}</span>
@@ -273,14 +273,14 @@ export const FeeOptimizationCard: React.FC<FeeOptimizationCardProps> = ({ matter
                     )}
 
                     {/* Risk Assessment */}
-                    {(rec as any).riskAssessment && (
+                    {rec.riskAssessment && (
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Shield className="w-4 h-4 text-warning-500" />
                           <h5 className="font-medium text-neutral-900">Risk Assessment</h5>
                         </div>
                         <p className="text-sm text-neutral-700 bg-warning-50 p-3 rounded-lg border border-warning-200">
-                          {(rec as any).riskAssessment}
+                          {rec.riskAssessment}
                         </p>
                       </div>
                     )}

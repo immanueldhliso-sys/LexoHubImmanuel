@@ -25,12 +25,12 @@ export const PrecedentBankModal: React.FC<PrecedentBankModalProps> = ({ onClose 
     try {
       const searchResults = await DocumentIntelligenceService.searchPrecedents({
         search: searchTerm || undefined,
-        precedentType: precedentType as any || undefined,
+        precedentType: precedentType || undefined,
         category: category || undefined,
         verifiedOnly
       });
       setResults(searchResults);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error searching precedents:', error);
     } finally {
       setLoading(false);
@@ -41,7 +41,7 @@ export const PrecedentBankModal: React.FC<PrecedentBankModalProps> = ({ onClose 
     try {
       const url = await DocumentIntelligenceService.downloadPrecedent(precedentId);
       window.open(url, '_blank');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error downloading precedent:', error);
     }
   };

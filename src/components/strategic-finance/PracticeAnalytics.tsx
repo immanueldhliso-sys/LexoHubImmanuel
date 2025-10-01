@@ -129,7 +129,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ className 
             <div className="flex items-center gap-2">
               <select
                 value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                onChange={(e) => setSelectedPeriod(e.target.value as 'month' | 'quarter' | 'year')}
                 className="px-3 py-1 border rounded-md text-sm"
               >
                 <option value="month">Last Month</option>

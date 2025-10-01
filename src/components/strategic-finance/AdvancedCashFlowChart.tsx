@@ -5,6 +5,15 @@ import { TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../design-system/components';
 import type { CashFlowPrediction } from '../../services/api/strategic-finance.service';
 
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: CashFlowPrediction;
+    value: number;
+  }>;
+  label?: string;
+}
+
 interface AdvancedCashFlowChartProps {
   predictions: CashFlowPrediction[];
 }
@@ -27,7 +36,7 @@ export const AdvancedCashFlowChart: React.FC<AdvancedCashFlowChartProps> = ({ pr
   const criticalMonths = predictions.filter(p => p.cashFlowStatus === 'critical' || p.cashFlowStatus === 'tight');
   const minimumBalance = Math.min(...predictions.map(p => p.minimumBalanceAmount || 0).filter(Boolean));
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (

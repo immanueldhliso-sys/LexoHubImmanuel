@@ -356,7 +356,7 @@ class NLPProcessor {
     for (const { pattern, offset, confidence } of patterns) {
       const match = text.match(pattern);
       if (match) {
-        let targetDate = new Date(today);
+        const targetDate = new Date(today);
         
         if (offset !== null) {
           targetDate.setDate(today.getDate() + offset);
@@ -395,7 +395,7 @@ class NLPProcessor {
 
     for (const [category, keywords] of Object.entries(this.workTypeKeywords)) {
       let score = 0;
-      let matchedKeywords: string[] = [];
+      const matchedKeywords: string[] = [];
 
       for (const keyword of keywords) {
         if (lowerText.includes(keyword)) {

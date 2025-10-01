@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '../../design-system/components';
 import { NewMatterModal, MatterPrepopulationData } from './NewMatterModal';
-import { BarAssociation, ClientType, FeeType, RiskLevel } from '../../types';
+import { BarAssociation, ClientType, FeeType, RiskLevel, Matter } from '../../types';
 
 /**
  * Test component to demonstrate NewMatterModal prepopulation functionality
@@ -54,7 +54,7 @@ export const NewMatterModalTest: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleMatterCreated = (matter: any) => {
+  const handleMatterCreated = (matter: Matter) => {
     console.log('Matter created:', matter);
     setIsModalOpen(false);
   };
@@ -128,3 +128,7 @@ export const NewMatterModalTest: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onMatterCreated={handleMatterCreated}
         initialData={testData[testScenario]}
+      />
+    </div>
+  );
+};

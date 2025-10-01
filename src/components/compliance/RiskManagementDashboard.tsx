@@ -13,6 +13,7 @@ import { Card, CardHeader, CardContent, Button } from '../../design-system/compo
 import { useAuth } from '@/contexts/AuthContext';
 import { matterApiService } from '@/services/api';
 import { toast } from 'react-hot-toast';
+import { Matter } from '@/types';
 
 export const RiskManagementDashboard: React.FC = () => {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -86,8 +87,8 @@ export const RiskManagementDashboard: React.FC = () => {
         const matters = res.error ? [] : (res.data || []);
 
         const total = matters.length || 1; // avoid division by zero
-        const ethicsCompleted = matters.filter((m: any) => m.conflict_check_completed).length;
-        const trustOk = matters.filter((m: any) => (m.trust_balance ?? 0) >= 0).length;
+        const ethicsCompleted = matters.filter((m: Matter) => m.conflict_check_completed).length;
+  const trustOk = matters.filter((m: Matter) => m.trust_balance >= 0).length;
 
         const ethicsCompliance = Math.round((ethicsCompleted / total) * 100);
         const trustAccountCompliance = Math.round((trustOk / total) * 100);

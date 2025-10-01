@@ -7,6 +7,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AdvancedFeaturesSettings } from '../AdvancedFeaturesSettings';
 import { userPreferencesService } from '../../../services/api/user-preferences.service';
 import { featureToggleService } from '../../../services/feature-toggle.service';
+import { ErrorType } from '../../../services/api/base-api.service';
 
 // Mock services
 vi.mock('../../../services/api/user-preferences.service');
@@ -182,7 +183,12 @@ describe('AdvancedFeaturesSettings', () => {
       
       vi.mocked(userPreferencesService.updateCurrentUserPreferences).mockResolvedValue({
         data: null,
-        error: { message: 'Save failed', type: 'DATABASE_ERROR' } as any
+        error: { 
+          message: 'Save failed', 
+          type: ErrorType.DATABASE_ERROR,
+          timestamp: new Date(),
+          requestId: 'test-request-id'
+        }
       });
       
       render(<AdvancedFeaturesSettings />);
