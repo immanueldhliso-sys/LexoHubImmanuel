@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Plus, Save, RotateCcw, Zap } from 'lucide-react';
+import { X, Plus, Save, RotateCcw, Zap, Download } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
 import { toast } from 'react-hot-toast';
 import { AdvancedFeaturesSettings } from '../components/settings/AdvancedFeaturesSettings';
+import { DataExportModal } from '../components/data-export';
 
 const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'templates' | 'advanced-features'>('practice');
@@ -18,6 +19,7 @@ const SettingsPage: React.FC = () => {
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const handlePracticeSettingChange = (key: keyof typeof practiceSettings, value: string | number | string[]) => {
     setPracticeSettings(prev => ({ ...prev, [key]: value }));
@@ -272,6 +274,40 @@ const SettingsPage: React.FC = () => {
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
                   </select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Data Export Section */}
+            <Card>
+              <CardHeader>
+                <h2 className="text-xl font-semibold text-neutral-900">Liberate Your Data</h2>
+                <p className="text-sm text-neutral-600">Export your complete practice data for backup, migration, or analysis</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start space-x-4 p-4 bg-mpondo-gold-50 border border-mpondo-gold-200 rounded-lg">
+                  <Download className="h-5 w-5 text-mpondo-gold-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-neutral-900 mb-1">Complete Data Export</h4>
+                    <p className="text-sm text-neutral-600 mb-3">
+                      Export all your matters, time entries, invoices, payments, documents, and notes in your preferred format. 
+                      Perfect for data portability, backup, or transitioning to another system.
+                    </p>
+                    <ul className="text-xs text-neutral-500 space-y-1 mb-4">
+                      <li>• Comprehensive matter records with all metadata</li>
+                      <li>• Time tracking and billing data</li>
+                      <li>• Financial records and payment history</li>
+                      <li>• Document references and notes</li>
+                      <li>• Multiple export formats (CSV, Excel, JSON)</li>
+                    </ul>
+                    <Button
+                      onClick={() => setIsExportModalOpen(true)}
+                      className="bg-mpondo-gold-600 hover:bg-mpondo-gold-700 text-white"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Practice Data
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -733,6 +769,12 @@ const SettingsPage: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Data Export Modal */}
+      <DataExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
     </div>
   );
 };

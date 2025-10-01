@@ -217,6 +217,16 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
   const [errors, setErrors] = useState<Partial<Record<keyof NewMatterFormData, string>>>({});
   const [currentStep, setCurrentStep] = useState(1);
 
+  // Conflict check state
+  const [conflictCheckResults, setConflictCheckResults] = useState<{
+    hasConflict: boolean;
+    conflictingMatters: Matter[];
+    conflictReason?: string;
+  } | null>(null);
+  const [manualConflictCheck, setManualConflictCheck] = useState('');
+  const [isPerformingConflictCheck, setIsPerformingConflictCheck] = useState(false);
+  const [conflictCheckCompleted, setConflictCheckCompleted] = useState(false);
+
   // Template functionality state
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
@@ -249,6 +259,10 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
       setCurrentStep(1);
       setErrors({});
       setSelectedServices([]);
+      // Reset conflict check state
+      setConflictCheckResults(null);
+      setManualConflictCheck('');
+      setConflictCheckCompleted(false);
     }
   }, [isOpen, initialData]);
 
@@ -585,9 +599,46 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  // Perform conflict check
+  const performConflictCheck = async () => {
+    if (!user?.id || !formData.client_name.trim()) {
+      toast.error('Client name is required for conflict check');
+      return;
+    }
+
+    setIsPerformingConflictCheck(true);
+    try {
+      const response = await matterApiService.performConflictCheck(
+        user.id,
+        formData.client_name.trim(),
+        [] // Could extract opposing parties from description in future
+      );
+
+      if (response.error) {
+        toast.error('Failed to perform conflict check');
+        console.error('Conflict check error:', response.error);
+        return;
+      }
+
+      setConflictCheckResults(response.data);
+      setConflictCheckCompleted(true);
+      
+      if (response.data?.hasConflict) {
+        toast.warning('Potential conflicts detected. Please review and provide manual verification.');
+      } else {
+        toast.success('No conflicts detected.');
+      }
+    } catch (error) {
+      console.error('Error performing conflict check:', error);
+      toast.error('Failed to perform conflict check');
+    } finally {
+      setIsPerformingConflictCheck(false);
+    }
+  };
+
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 3));
+      setCurrentStep(prev => Math.min(prev + 1, 4)); // Updated to 4 steps
     }
   };
 
@@ -618,6 +669,19 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     if (!v3) {
       setCurrentStep(3);
       toast.error('Please fix fee/risk inputs on Step 3');
+      return;
+    }
+    
+    // Validate conflict check step
+    if (!conflictCheckCompleted) {
+      setCurrentStep(4);
+      toast.error('Please complete the conflict check before creating the matter');
+      return;
+    }
+    
+    if (!manualConflictCheck.trim()) {
+      setCurrentStep(4);
+      toast.error('Please describe the manual conflict checks performed');
       return;
     }
     
@@ -1091,6 +1155,109 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     </div>
   );
 
+  const renderStep4 = () => (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-neutral-900 mb-4">Conflict Check</h3>
+      
+      {/* Automated Conflict Check */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-medium text-gray-900">Automated Conflict Check</h4>
+          <Button
+            onClick={performConflictCheck}
+            disabled={isPerformingConflictCheck || !formData.client_name.trim()}
+            variant="outline"
+            size="sm"
+          >
+            {isPerformingConflictCheck ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-mpondo-gold mr-2"></div>
+                Checking...
+              </>
+            ) : (
+              'Run Conflict Check'
+            )}
+          </Button>
+        </div>
+        
+        {!conflictCheckCompleted && (
+          <p className="text-sm text-gray-600">
+            Click "Run Conflict Check" to automatically scan for potential conflicts with existing matters.
+          </p>
+        )}
+        
+        {conflictCheckCompleted && conflictCheckResults && (
+          <div className={`p-3 rounded-md ${
+            conflictCheckResults.hasConflict 
+              ? 'bg-amber-50 border border-amber-200' 
+              : 'bg-green-50 border border-green-200'
+          }`}>
+            <div className="flex items-center">
+              {conflictCheckResults.hasConflict ? (
+                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2" />
+              ) : (
+                <div className="h-5 w-5 bg-green-600 rounded-full flex items-center justify-center mr-2">
+                  <div className="h-2 w-2 bg-white rounded-full"></div>
+                </div>
+              )}
+              <span className={`font-medium ${
+                conflictCheckResults.hasConflict ? 'text-amber-800' : 'text-green-800'
+              }`}>
+                {conflictCheckResults.hasConflict 
+                  ? `Potential conflicts detected: ${conflictCheckResults.conflictReason}`
+                  : 'No conflicts detected'
+                }
+              </span>
+            </div>
+            
+            {conflictCheckResults.hasConflict && conflictCheckResults.conflictingMatters.length > 0 && (
+              <div className="mt-3">
+                <p className="text-sm font-medium text-amber-800 mb-2">Conflicting matters:</p>
+                <ul className="space-y-1">
+                  {conflictCheckResults.conflictingMatters.map((matter) => (
+                    <li key={matter.id} className="text-sm text-amber-700">
+                      • {matter.title} (Client: {matter.client_name})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Mandatory Manual Verification */}
+      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <h4 className="font-medium text-blue-900 mb-3">Manual Conflict Verification (Required)</h4>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-blue-800">
+            What manual conflict checks were also performed? *
+          </label>
+          <textarea
+            value={manualConflictCheck}
+            onChange={(e) => setManualConflictCheck(e.target.value)}
+            placeholder="Describe the manual conflict checks you performed (e.g., checked client database, reviewed previous matters, consulted with colleagues, etc.)"
+            rows={4}
+            className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            required
+          />
+          {!manualConflictCheck.trim() && (
+            <p className="text-sm text-blue-700">
+              This field is mandatory. Please describe the manual conflict checks you performed to ensure professional compliance.
+            </p>
+          )}
+        </div>
+      </div>
+      
+      {/* Professional Reminder */}
+      <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
+        <p className="text-sm text-yellow-800">
+          <strong>Professional Reminder:</strong> Automated conflict checks are a tool to assist you, but they cannot replace your professional judgment and due diligence. Always perform manual verification to ensure compliance with professional conduct rules.
+        </p>
+      </div>
+    </div>
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -1166,7 +1333,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
         {/* Progress indicator */}
         <div className="flex items-center justify-center mb-6">
           <div className="flex items-center space-x-4">
-            {[1, 2, 3].map((step) => (
+            {[1, 2, 3, 4].map((step) => (
               <div key={step} className="flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -1179,7 +1346,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
                 >
                   {step}
                 </div>
-                {step < 3 && (
+                {step < 4 && (
                   <div
                     className={`w-12 h-0.5 mx-2 ${
                       step < currentStep ? 'bg-green-500' : 'bg-neutral-200'
@@ -1196,6 +1363,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
           {currentStep === 1 && renderStep1()}
           {currentStep === 2 && renderStep2()}
           {currentStep === 3 && renderStep3()}
+          {currentStep === 4 && renderStep4()}
         </div>
       </ModalBody>
 
@@ -1222,7 +1390,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
               Cancel
             </Button>
             
-            {currentStep < 3 ? (
+            {currentStep < 4 ? (
               <Button
                 variant="primary"
                 onClick={handleNext}
