@@ -339,3 +339,21 @@
     }
   }
 }
+@layer utilities {
+  /* Safe viewport min-height utility: handles vh, svh, and dvh */
+  .min-h-viewport { min-height: 100vh; }
+  @supports (height: 100svh) {
+    .min-h-viewport { min-height: 100svh; }
+  }
+  @supports (height: 100dvh) {
+    .min-h-viewport { min-height: 100dvh; }
+  }
+
+  /* Convenient safe-area padding utility */
+  .safe-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}

@@ -18,9 +18,7 @@ export const NewMatterModalTest: React.FC = () => {
       title: 'Smith v Jones Commercial Dispute',
       client_name: 'John Smith',
       matter_type: 'Commercial Litigation',
-      description: 'Contract dispute regarding software licensing agreement'
-    },
-
+      description: 'Contract dispute regarding software licensing agreement',
       tags: ['urgent', 'ip', 'research']
     },
     full: {

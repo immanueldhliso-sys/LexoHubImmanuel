@@ -1,0 +1,270 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'LexoHub Phase 1 - Core Storage Infrastructure (S3, DynamoDB, IAM)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Environment name
+
+Resources:
+  DocumentStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'lexohub-documents-${Environment}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: IntelligentTieringTransition
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 0
+                StorageClass: INTELLIGENT_TIERING
+          - Id: GlacierArchive
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: LexoHub
+        - Key: CostCenter
+          Value: DocumentProcessing
+
+  DocumentMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'lexohub-document-metadata-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: documentId
+          AttributeType: S
+        - AttributeName: matterID
+          AttributeType: S
+        - AttributeName: uploadTimestamp
+          AttributeType: N
+        - AttributeName: processingStatus
+          AttributeType: S
+      KeySchema:
+        - AttributeName: documentId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: MatterIndex
+          KeySchema:
+            - AttributeName: matterID
+              KeyType: HASH
+            - AttributeName: uploadTimestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: processingStatus
+              KeyType: HASH
+            - AttributeName: uploadTimestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: LexoHub
+
+  TemplateCacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'lexohub-template-cache-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: structuralHash
+          AttributeType: S
+        - AttributeName: templateVersion
+          AttributeType: N
+      KeySchema:
+        - AttributeName: structuralHash
+          KeyType: HASH
+        - AttributeName: templateVersion
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: LexoHub
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'lexohub-lambda-execution-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                Resource: !Sub '${DocumentStorageBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt DocumentStorageBucket.Arn
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt DocumentMetadataTable.Arn
+                  - !Sub '${DocumentMetadataTable.Arn}/index/*'
+                  - !GetAtt TemplateCacheTable.Arn
+                  - !Sub '${TemplateCacheTable.Arn}/index/*'
+        - PolicyName: TextractAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - textract:DetectDocumentText
+                  - textract:StartDocumentTextDetection
+                  - textract:GetDocumentTextDetection
+                  - textract:StartDocumentAnalysis
+                  - textract:GetDocumentAnalysis
+                Resource: '*'
+        - PolicyName: SQSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: '*'
+        - PolicyName: SNSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: '*'
+
+  EventBridgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'lexohub-eventbridge-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: '*'
+
+Outputs:
+  DocumentBucketName:
+    Description: S3 bucket for document storage
+    Value: !Ref DocumentStorageBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentBucket'
+
+  DocumentBucketArn:
+    Description: ARN of document storage bucket
+    Value: !GetAtt DocumentStorageBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentBucketArn'
+
+  MetadataTableName:
+    Description: DynamoDB table for document metadata
+    Value: !Ref DocumentMetadataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-MetadataTable'
+
+  MetadataTableArn:
+    Description: ARN of metadata table
+    Value: !GetAtt DocumentMetadataTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-MetadataTableArn'
+
+  MetadataTableStreamArn:
+    Description: Stream ARN for metadata table
+    Value: !GetAtt DocumentMetadataTable.StreamArn
+    Export:
+      Name: !Sub '${AWS::StackName}-MetadataTableStreamArn'
+
+  TemplateCacheTableName:
+    Description: DynamoDB table for template cache
+    Value: !Ref TemplateCacheTable
+    Export:
+      Name: !Sub '${AWS::StackName}-TemplateCacheTable'
+
+  LambdaExecutionRoleArn:
+    Description: IAM role for Lambda functions
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRole'
+
+  EventBridgeRoleArn:
+    Description: IAM role for EventBridge
+    Value: !GetAtt EventBridgeRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EventBridgeRole'

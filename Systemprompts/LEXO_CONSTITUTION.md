@@ -258,6 +258,7 @@ The following are **STRICTLY PROHIBITED**:
 13. **Function hoisting violations** - Always define `useCallback` functions before `useEffect` dependencies
 14. **Service instantiation errors** - Use static service methods, not `new ServiceClass()`
 15. **Missing error boundaries** - All async operations must have proper error handling
+16. **MOCK DATA GENERATION** - **ABSOLUTELY PROHIBITED**: You must NEVER generate, include, suggest, or provide any mock data, sample data, placeholder data, dummy data, fake data, or test data in any form. This includes but is not limited to: mock user accounts, sample invoices, placeholder matters, dummy time entries, fake client information, example financial data, test records, or any other simulated data. All data must come from actual user input, existing database records, or be explicitly requested by the user. When demonstrating features or providing examples, use descriptive text or empty states instead of mock data.
 
 ## Design System Migration Guidelines
 
@@ -391,16 +392,21 @@ import { PaymentTrackingDashboard } from '../components/invoices';
 ### Core Technology Stack
 - **Frontend**: React 18 with TypeScript, Tailwind CSS, React Query
 - **Backend**: Supabase (PostgreSQL, Authentication, Real-time subscriptions)
+- **Cloud Infrastructure**: AWS (S3, Lambda, DynamoDB, Textract, Bedrock, SQS, SNS, EventBridge)
+- **Infrastructure as Code**: AWS SAM (Serverless Application Model) - **MANDATORY DEPLOYMENT METHOD**
 - **AI Integration**: AWS Bedrock Claude 3.5 Sonnet (anthropic.claude-3-5-sonnet-20241022-v2:0)
 - **Voice Processing**: Web Speech API, Real-time audio visualization
 - **State Management**: React Context, React Query for server state
 - **Design System**: Custom component library with accessibility compliance
 
-### AWS Bedrock Integration Architecture
-```
-Voice Input → Web Speech API → AWS Claude → NLP Processor → Time Entry
-     ↓              ↓              ↓           ↓            ↓
-  Audio Levels → Transcription → Extraction → Validation → Database
+### AWS Infrastructure Deployment Standard
+**CRITICAL**: All AWS infrastructure MUST be deployed using AWS SAM (Serverless Application Model).
+- **No CloudFormation templates** - Convert to SAM templates
+- **No CDK** - Use SAM for all infrastructure definitions
+- **No manual AWS CLI deployments** - Use `sam deploy` commands
+- **SAM Template Format**: Use `template.yaml` with SAM-specific resource types
+- **Deployment Commands**: `sam build`, `sam deploy --guided`, `sam deploy`
+- **Local Testing**: Use `sam local invoke` and `sam local start-api` for testing
 ```
 
 **AWS Bedrock Service Features:**

@@ -322,21 +322,8 @@ export const MegaMenu: React.FC<MegaMenuProps> = ({
 
       {/* Footer Actions */}
       <div className="mt-8 pt-6 border-t border-neutral-200">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-neutral-500">
-            Explore all {category.label.toLowerCase()} features
-          </div>
-          {category.page && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onItemClick(category.page!)}
-              className="text-xs"
-            >
-              View All
-              <ArrowRight className="w-3 h-3 ml-1" />
-            </Button>
-          )}
+        <div className="text-xs text-neutral-500">
+          Explore all {category.label.toLowerCase()} features
         </div>
       </div>
     </div>

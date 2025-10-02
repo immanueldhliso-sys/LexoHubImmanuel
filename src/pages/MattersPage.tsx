@@ -15,12 +15,14 @@ import {
   HelpCircle,
   Zap,
   Search,
-  Link
+  Link,
+  Upload
 } from 'lucide-react';
 import { Card, CardContent, Button, CardHeader, Icon } from '../design-system/components';
 import { InvoiceGenerationModal } from '../components/invoices/InvoiceGenerationModal';
 import { NewMatterModal } from '../components/matters/NewMatterModal';
 import { ProFormaLinkModal } from '../components/matters/ProFormaLinkModal';
+import { DocumentProcessingModal } from '../components/matters/DocumentProcessingModal';
 import { InvoiceService } from '../services/api/invoices.service';
 import { matterApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,6 +42,7 @@ const MattersPage: React.FC<MattersPageProps> = ({ onNavigate }) => {
   const [showNewMatterModal, setShowNewMatterModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showProFormaLinkModal, setShowProFormaLinkModal] = useState(false);
+  const [showDocumentProcessingModal, setShowDocumentProcessingModal] = useState(false);
   const [selectedMatter, setSelectedMatter] = useState<Matter | null>(null);
   const [matterInvoices, setMatterInvoices] = useState<Record<string, Invoice[]>>({});
   const [matters, setMatters] = useState<Matter[]>([]);
@@ -432,10 +435,23 @@ const MattersPage: React.FC<MattersPageProps> = ({ onNavigate }) => {
                       </Button>
                       
                       <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMatter(matter);
+                          setShowDocumentProcessingModal(true);
+                        }}
+                        className="flex items-center gap-2"
+                        title="Process document with AI"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Process Doc
+                      </Button>
+                      
+                      <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          // Navigate to matter details
                           toast('Matter details view coming soon');
                         }}
                         className="flex items-center gap-2"
@@ -484,6 +500,23 @@ const MattersPage: React.FC<MattersPageProps> = ({ onNavigate }) => {
         isOpen={showProFormaLinkModal}
         onClose={() => setShowProFormaLinkModal(false)}
       />
+
+      {/* Document Processing Modal */}
+      {showDocumentProcessingModal && selectedMatter && (
+        <DocumentProcessingModal
+          isOpen={showDocumentProcessingModal}
+          onClose={() => {
+            setShowDocumentProcessingModal(false);
+            setSelectedMatter(null);
+          }}
+          matterId={selectedMatter.id}
+          matterTitle={selectedMatter.title}
+          onDocumentProcessed={(documentId, extractedData) => {
+            toast.success('Document processed successfully!');
+            console.log('Processed document:', documentId, extractedData);
+          }}
+        />
+      )}
     </div>
   );
 };

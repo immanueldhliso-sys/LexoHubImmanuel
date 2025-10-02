@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Save, FileText, CheckCircle, Circle, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle, Circle, AlertTriangle } from 'lucide-react';
 import { Button, Card, CardContent } from '../design-system/components';
-import { Page, BarAssociation, FeeType, RiskLevel, ClientType, Matter, NewMatterForm } from '../types';
+import { BarAssociation, FeeType, RiskLevel, ClientType, Matter, NewMatterForm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { matterApiService } from '../services/api';
 import { authService } from '../services/auth.service';
@@ -348,7 +348,7 @@ export const MatterWorkbenchPage: React.FC<MatterWorkbenchPageProps> = ({
               fee_cap: errors.fee_cap,
               tags: errors.tags
             }}
-            onInputChange={handleInputChange}
+            onInputChange={(field, value) => handleInputChange(field as keyof NewMatterFormData, value)}
           />
         );
       
@@ -364,7 +364,7 @@ export const MatterWorkbenchPage: React.FC<MatterWorkbenchPageProps> = ({
               settlement_probability: errors.settlement_probability,
               expected_completion_date: errors.expected_completion_date
             }}
-            onInputChange={handleInputChange}
+            onInputChange={(field, value) => handleInputChange(field as keyof NewMatterFormData, value)}
           />
         );
       
@@ -445,45 +445,6 @@ export const MatterWorkbenchPage: React.FC<MatterWorkbenchPageProps> = ({
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Header */}
-      <div className="bg-white border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onNavigateBack}
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Matters</span>
-              </Button>
-              <div className="h-6 w-px bg-neutral-300" />
-              <div>
-                <h1 className="text-xl font-semibold text-neutral-900">Matter Workbench</h1>
-                <p className="text-sm text-neutral-600">Create a new matter with guided workflow</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm" disabled>
-                <FileText className="h-4 w-4 mr-2" />
-                Save Draft
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={handleSubmit}
-                disabled={isLoading || currentSection !== 5}
-                loading={isLoading}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Create Matter
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Navigation Sidebar */}

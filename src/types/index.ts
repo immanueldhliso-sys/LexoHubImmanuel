@@ -4,17 +4,24 @@ export type Page =
   | 'ai-analytics'
   | 'matters'
   | 'matter-templates'
+  | 'matter-workbench'
   | 'invoices'
+  | 'invoice-designer'
   | 'proforma'
   | 'reports'
   | 'practice-growth'
   | 'strategic-finance'
   | 'workflow-integrations'
+  | 'api-integrations'
+  | 'compliance'
   | 'settings'
   | 'design-system'
   | 'matter-details'
   | 'pricing-management'
   | 'profile';
+
+// Export integration types
+export * from './integrations';
 
 export type ModalType =
   | 'new-brief'
@@ -1485,22 +1492,3 @@ export interface ComplianceAuditLog {
   user_agent?: string;
   created_at: string;
 }
-
-// Add compliance page to the Page type
-export type Page =
-  | 'dashboard'
-  | 'ai-analytics'
-  | 'matters'
-  | 'matter-workbench'
-  | 'invoices'
-  | 'proforma'
-  | 'reports'
-  | 'practice-growth'
-  | 'strategic-finance'
-  | 'workflow-integrations'
-  | 'compliance'
-  | 'settings'
-  | 'design-system'
-  | 'matter-details'
-  | 'pricing-management'
-  | 'profile';

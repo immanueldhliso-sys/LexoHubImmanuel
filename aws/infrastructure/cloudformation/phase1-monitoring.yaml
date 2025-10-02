@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'LexoHub Phase 1 - CloudWatch Monitoring Dashboard and Alarms'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Environment name
+
+  Lambda0FunctionName:
+    Type: String
+    Description: Name of Lambda 0 classification function
+
+  Tier1FunctionName:
+    Type: String
+    Description: Name of Tier 1 extraction function
+
+  Tier0QueueName:
+    Type: String
+    Description: Name of Tier 0 SQS queue
+
+  Tier1QueueName:
+    Type: String
+    Description: Name of Tier 1 SQS queue
+
+  Tier2QueueName:
+    Type: String
+    Description: Name of Tier 2 SQS queue
+
+  Tier3QueueName:
+    Type: String
+    Description: Name of Tier 3 SQS queue
+
+Resources:
+  LexoHubDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'LexoHub-DocumentProcessing-${Environment}'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Invocations", {"stat": "Sum", "label": "Lambda 0 Invocations"}],
+                  [".", ".", {"stat": "Sum", "label": "Tier 1 Invocations"}]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Lambda Invocations",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Duration", {"stat": "Average", "label": "Lambda 0 Duration"}],
+                  [".", ".", {"stat": "Average", "label": "Tier 1 Duration"}]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "Lambda Duration (ms)",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Errors", {"stat": "Sum", "label": "Lambda 0 Errors"}],
+                  [".", ".", {"stat": "Sum", "label": "Tier 1 Errors"}]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Lambda Errors",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Throttles", {"stat": "Sum", "label": "Lambda 0 Throttles"}],
+                  [".", ".", {"stat": "Sum", "label": "Tier 1 Throttles"}]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Lambda Throttles",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/SQS", "ApproximateNumberOfMessagesVisible", {"stat": "Average", "label": "Tier 0 Queue Depth"}],
+                  [".", ".", {"stat": "Average", "label": "Tier 1 Queue Depth"}],
+                  [".", ".", {"stat": "Average", "label": "Tier 2 Queue Depth"}],
+                  [".", ".", {"stat": "Average", "label": "Tier 3 Queue Depth"}]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "SQS Queue Depth",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/SQS", "NumberOfMessagesSent", {"stat": "Sum", "label": "Messages Sent"}],
+                  [".", "NumberOfMessagesReceived", {"stat": "Sum", "label": "Messages Received"}],
+                  [".", "NumberOfMessagesDeleted", {"stat": "Sum", "label": "Messages Deleted"}]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "SQS Message Flow",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+
+  Lambda0ThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-Lambda0-Throttle-${Environment}'
+      AlarmDescription: Alert when Lambda 0 is being throttled
+      MetricName: Throttles
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref Lambda0FunctionName
+      TreatMissingData: notBreaching
+
+  Lambda0ErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-Lambda0-ErrorRate-${Environment}'
+      AlarmDescription: Alert when Lambda 0 error rate is high
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref Lambda0FunctionName
+      TreatMissingData: notBreaching
+
+  Tier1ThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-Tier1-Throttle-${Environment}'
+      AlarmDescription: Alert when Tier 1 Lambda is being throttled
+      MetricName: Throttles
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref Tier1FunctionName
+      TreatMissingData: notBreaching
+
+  Tier1ErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-Tier1-ErrorRate-${Environment}'
+      AlarmDescription: Alert when Tier 1 error rate is high
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref Tier1FunctionName
+      TreatMissingData: notBreaching
+
+  QueueDepthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-QueueDepth-High-${Environment}'
+      AlarmDescription: Alert when queue depth is unusually high
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lexohub/${Environment}'
+      RetentionInDays: 30
+
+  Lambda0LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Lambda0FunctionName}'
+      RetentionInDays: 30
+
+  Tier1LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Tier1FunctionName}'
+      RetentionInDays: 30
+
+Outputs:
+  DashboardURL:
+    Description: URL to CloudWatch Dashboard
+    Value: !Sub 'https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=LexoHub-DocumentProcessing-${Environment}'
+
+  LogGroupName:
+    Description: CloudWatch Log Group name
+    Value: !Ref LogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroup'

@@ -189,8 +189,15 @@ const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({
     return acc;
   }, {} as Record<SearchCategory, SearchResult[]>);
 
+  const containerWidthClasses = searchState.isOpen
+    ? 'w-[24rem] sm:w-[28rem] md:w-[32rem]'
+    : 'w-48 sm:w-64 md:w-72';
+
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
+    <div
+      className={`relative ${containerWidthClasses} transition-[width] duration-200 ${className}`}
+      ref={dropdownRef}
+    >
       {/* Search Input */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

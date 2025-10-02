@@ -1,0 +1,256 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'LexoHub Phase 1 - SQS Queues and EventBridge Configuration'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Environment name
+
+  Lambda0FunctionArn:
+    Type: String
+    Description: ARN of Lambda 0 classification function
+
+Resources:
+  Tier0Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier0-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '0'
+        - Key: CostCenter
+          Value: DocumentProcessing
+
+  Tier1Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier1-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '1'
+        - Key: CostCenter
+          Value: DocumentProcessing
+
+  Tier2Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier2-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '2'
+        - Key: CostCenter
+          Value: DocumentProcessing
+
+  Tier3Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier3-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '3'
+        - Key: CostCenter
+          Value: DocumentProcessing
+
+  ValidationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-validation-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: Validation
+        - Key: CostCenter
+          Value: DocumentProcessing
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-dlq-${Environment}'
+      MessageRetentionPeriod: 1209600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: DeadLetterQueue
+
+  TextractCompletionTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'lexohub-textract-completion-${Environment}'
+      DisplayName: LexoHub Textract Completion Notifications
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  TextractTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref TextractCompletionTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: textract.amazonaws.com
+            Action:
+              - sns:Publish
+            Resource: !Ref TextractCompletionTopic
+
+  S3EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'lexohub-s3-document-upload-${Environment}'
+      Description: Trigger Lambda 0 when documents are uploaded to S3
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Sub 'lexohub-documents-${Environment}'
+          object:
+            key:
+              - prefix: matters/
+      State: ENABLED
+      Targets:
+        - Arn: !Ref Lambda0FunctionArn
+          Id: Lambda0Target
+
+  Lambda0InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Lambda0FunctionArn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt S3EventRule.Arn
+
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-DLQ-Messages-${Environment}'
+      AlarmDescription: Alert when messages appear in DLQ
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeadLetterQueue.QueueName
+      TreatMissingData: notBreaching
+
+Outputs:
+  Tier0QueueUrl:
+    Description: URL of Tier 0 queue
+    Value: !Ref Tier0Queue
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier0QueueUrl'
+
+  Tier0QueueArn:
+    Description: ARN of Tier 0 queue
+    Value: !GetAtt Tier0Queue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier0QueueArn'
+
+  Tier1QueueUrl:
+    Description: URL of Tier 1 queue
+    Value: !Ref Tier1Queue
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier1QueueUrl'
+
+  Tier1QueueArn:
+    Description: ARN of Tier 1 queue
+    Value: !GetAtt Tier1Queue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier1QueueArn'
+
+  Tier2QueueUrl:
+    Description: URL of Tier 2 queue
+    Value: !Ref Tier2Queue
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier2QueueUrl'
+
+  Tier2QueueArn:
+    Description: ARN of Tier 2 queue
+    Value: !GetAtt Tier2Queue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier2QueueArn'
+
+  Tier3QueueUrl:
+    Description: URL of Tier 3 queue
+    Value: !Ref Tier3Queue
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier3QueueUrl'
+
+  Tier3QueueArn:
+    Description: ARN of Tier 3 queue
+    Value: !GetAtt Tier3Queue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier3QueueArn'
+
+  ValidationQueueUrl:
+    Description: URL of validation queue
+    Value: !Ref ValidationQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-ValidationQueueUrl'
+
+  DeadLetterQueueUrl:
+    Description: URL of dead letter queue
+    Value: !Ref DeadLetterQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-DLQUrl'
+
+  TextractTopicArn:
+    Description: ARN of Textract completion SNS topic
+    Value: !Ref TextractCompletionTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-TextractTopicArn'

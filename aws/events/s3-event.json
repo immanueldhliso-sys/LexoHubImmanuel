@@ -1,0 +1,28 @@
+{
+  "Records": [
+    {
+      "eventVersion": "2.1",
+      "eventSource": "aws:s3",
+      "awsRegion": "us-east-1",
+      "eventTime": "2025-10-02T08:00:00.000Z",
+      "eventName": "ObjectCreated:Put",
+      "source": "aws.s3",
+      "detail-type": "Object Created",
+      "detail": {
+        "version": "0",
+        "bucket": {
+          "name": "lexohub-documents-production"
+        },
+        "object": {
+          "key": "matters/test-matter-001/documents/sample-invoice.pdf",
+          "size": 102400,
+          "etag": "d41d8cd98f00b204e9800998ecf8427e",
+          "sequencer": "0A1B2C3D4E5F678901"
+        },
+        "request-id": "C3D4E5F6A7B8C9D0",
+        "requester": "123456789012",
+        "source-ip-address": "192.0.2.1"
+      }
+    }
+  ]
+}

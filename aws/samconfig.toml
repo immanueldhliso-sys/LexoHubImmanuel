@@ -1,0 +1,49 @@
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "lexohub-phase1"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-east-1"
+parameter_overrides = "Environment=production"
+
+[default.package.parameters]
+resolve_s3 = true
+
+[default.sync.parameters]
+watch = true
+
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+
+[default.local_start_lambda.parameters]
+warm_containers = "EAGER"
+
+[development]
+[development.deploy.parameters]
+stack_name = "lexohub-phase1-dev"
+parameter_overrides = "Environment=development"
+confirm_changeset = false
+
+[staging]
+[staging.deploy.parameters]
+stack_name = "lexohub-phase1-staging"
+parameter_overrides = "Environment=staging"
+confirm_changeset = true
+
+[production]
+[production.deploy.parameters]
+stack_name = "lexohub-phase1-prod"
+parameter_overrides = "Environment=production"
+confirm_changeset = true

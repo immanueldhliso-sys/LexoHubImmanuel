@@ -413,9 +413,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : invoiceMetrics.totalProFormas}
           </h3>
-          <p className="text-sm text-neutral-600">Pro Formas</p>
+          <p className="text-sm text-neutral-600">Pro Forma Invoices</p>
           <div className="mt-2 text-xs text-judicial-blue-600 flex items-center justify-center">
-            View Pro Formas <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
+            View Pro Forma <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
           </div>
         </CardContent>
       </Card>

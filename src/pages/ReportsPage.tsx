@@ -1020,7 +1020,7 @@ const ReportsPage: React.FC = () => {
                 </h3>
                 <p className="text-sm text-neutral-600">Pending Conversion</p>
                 <div className="text-xs text-neutral-500 mt-1">
-                  Active pro formas
+                  Active pro forma
                 </div>
               </CardContent>
             </Card>
@@ -1077,7 +1077,7 @@ const ReportsPage: React.FC = () => {
                         <span className="text-neutral-700">
                           {invoiceData.conversionMetrics.conversionRate > 80 
                             ? 'Excellent conversion rate! Consider automating the process.'
-                            : 'Consider following up on pending pro formas to improve conversion rate.'
+                            : 'Consider following up on pending pro forma to improve conversion rate.'
                           }
                         </span>
                       </div>

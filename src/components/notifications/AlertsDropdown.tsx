@@ -44,14 +44,15 @@ export const AlertsDropdown: React.FC<AlertsDropdownProps> = ({ onNavigate, onCl
       smartNotificationsService.markAsRead(n.id);
       onClose?.();
     } else if (primary.action === 'api_call' && primary.parameters?.service && primary.parameters?.method) {
-      // Best-effort demo call; integrate with real service registry if needed
       try {
         const svc = (smartNotificationsService as any);
         if (svc && typeof svc[primary.parameters.service]?.[primary.parameters.method] === 'function') {
           svc[primary.parameters.service][primary.parameters.method](primary.parameters.args);
           smartNotificationsService.markAsRead(n.id);
         }
-      } catch {}
+      } catch (err) {
+        console.warn('AlertsDropdown api_call failed', err);
+      }
     } else if (primary.action === 'dismiss') {
       smartNotificationsService.removeNotification(n.id);
     } else if (primary.action === 'snooze') {

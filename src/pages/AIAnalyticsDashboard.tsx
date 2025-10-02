@@ -86,6 +86,23 @@ export const AIAnalyticsDashboard: React.FC = () => {
     }
   }, [authLoading, isAuthenticated]);
 
+  // Helper: stage progress reporter
+  const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(n, max));
+  const makeStageReporter = (start: number, end: number) => {
+    const span = Math.max(end - start, 1);
+    let lastUpdate = 0;
+    return (fraction: number, message?: string) => {
+      const now = Date.now();
+      // Throttle to ~10 updates/second unless completion
+      const isBoundary = fraction <= 0 || fraction >= 1;
+      if (!isBoundary && now - lastUpdate < 100) return;
+      lastUpdate = now;
+      const pct = Math.round(start + clamp(fraction, 0, 1) * span);
+      setLoadingProgress(pct);
+      if (message) setLoadingMessage(message);
+    };
+  };
+
   const loadAIAnalytics = async () => {
     setLoading(true);
     setLoadingMessage('Initializing AI analytics...');
@@ -93,23 +110,27 @@ export const AIAnalyticsDashboard: React.FC = () => {
     try {
       // Load practice metrics
       setLoadingMessage('Gathering practice metrics...');
-      setLoadingProgress(20);
-      await loadPracticeMetrics();
+      const reportPractice = makeStageReporter(5, 35);
+      reportPractice(0.05);
+      await loadPracticeMetrics(reportPractice);
       
       // Load AI insights
       setLoadingMessage('Generating AI insights...');
-      setLoadingProgress(45);
-      await loadAIInsights();
+      const reportInsights = makeStageReporter(35, 60);
+      reportInsights(0.05);
+      await loadAIInsights(reportInsights);
       
       // Load predictive analytics
       setLoadingMessage('Running predictive models...');
-      setLoadingProgress(70);
-      await loadPredictiveAnalytics();
+      const reportPredictive = makeStageReporter(60, 85);
+      reportPredictive(0.05);
+      await loadPredictiveAnalytics(reportPredictive);
       
       // Load integration status
       setLoadingMessage('Checking integrations...');
-      setLoadingProgress(85);
-      await loadIntegrationStatus();
+      const reportIntegrations = makeStageReporter(85, 95);
+      reportIntegrations(0.2);
+      await loadIntegrationStatus(reportIntegrations);
       
       setLoadingMessage('Finalizing dashboard...');
       setLoadingProgress(95);
@@ -123,7 +144,7 @@ export const AIAnalyticsDashboard: React.FC = () => {
     }
   };
 
-  const loadPracticeMetrics = async () => {
+  const loadPracticeMetrics = async (report?: (fraction: number, message?: string) => void) => {
     if (!user?.id) {
       setPracticeMetrics({
         totalMatters: 0,
@@ -134,6 +155,7 @@ export const AIAnalyticsDashboard: React.FC = () => {
         optimizationPotential: 0,
         averageSettlementProbability: 0
       });
+      report?.(1);
       return;
     }
 
@@ -141,6 +163,8 @@ export const AIAnalyticsDashboard: React.FC = () => {
       matterApiService.getByAdvocate(user.id),
       matterApiService.getStats(user.id)
     ]);
+
+    report?.(0.2, 'Computing practice metrics...');
 
     const totalMatters = (matters || []).length;
     const totalWIP = (stats?.totalWipValue as number) || 0;
@@ -152,9 +176,12 @@ export const AIAnalyticsDashboard: React.FC = () => {
     let aiAccuracy = 0;
     if (sample.length > 0) {
       try {
-        const predictions = await Promise.all(
-          sample.map(m => PredictiveAnalyticsService.predictSettlement(m))
-        );
+        const predictions: SettlementPrediction[] = [];
+        for (let i = 0; i < sample.length; i++) {
+          const p = await PredictiveAnalyticsService.predictSettlement(sample[i]);
+          predictions.push(p);
+          report?.(0.3 + ((i + 1) / sample.length) * 0.6, `Analyzing sample ${i + 1}/${sample.length}...`);
+        }
         const avgConfidence = predictions.reduce((sum, p) => sum + (p.confidence || 0), 0) / predictions.length;
         aiAccuracy = Math.round(avgConfidence * 100);
       } catch (e) {
@@ -181,54 +208,76 @@ export const AIAnalyticsDashboard: React.FC = () => {
       optimizationPotential,
       averageSettlementProbability
     });
+
+    report?.(1, 'Practice metrics complete');
   };
 
-  const loadAIInsights = async () => {
+  const loadAIInsights = async (report?: (fraction: number, message?: string) => void) => {
     if (!user?.id) {
       setAiInsights([]);
+      report?.(1);
       return;
     }
     const { data: matters } = await matterApiService.getByAdvocate(user.id);
     const topMatters = (matters || []).slice(0, 5);
-    const insights: AIInsight[] = topMatters.map((m) => ({
-      id: m.id,
-      type: 'prediction',
-      title: `Settlement Probability: ${m.title}`,
-      description: `${m.clientName || 'Client'} matter shows ${Math.round((m.settlementProbability || 0))}% settlement probability`,
-      impact: (m.settlementProbability || 0) > 70 ? 'high' : (m.settlementProbability || 0) > 40 ? 'medium' : 'low',
-      confidence: ((m.settlementProbability || 0) / 100),
-      actionable: true,
-      estimatedValue: m.estimatedFee || m.wipValue || 0,
-      timeframe: '2-8 weeks'
-    }));
+    const insights: AIInsight[] = [];
+    for (let i = 0; i < topMatters.length; i++) {
+      const m = topMatters[i];
+      insights.push({
+        id: m.id,
+        type: 'prediction',
+        title: `Settlement Probability: ${m.title}`,
+        description: `${m.clientName || 'Client'} matter shows ${Math.round((m.settlementProbability || 0))}% settlement probability`,
+        impact: (m.settlementProbability || 0) > 70 ? 'high' : (m.settlementProbability || 0) > 40 ? 'medium' : 'low',
+        confidence: ((m.settlementProbability || 0) / 100),
+        actionable: true,
+        estimatedValue: m.estimatedFee || m.wipValue || 0,
+        timeframe: '2-8 weeks'
+      });
+      report?.((i + 1) / Math.max(topMatters.length, 1), `Generating insight ${i + 1}/${topMatters.length}...`);
+    }
     setAiInsights(insights);
   };
 
-  const loadPredictiveAnalytics = async () => {
+  const loadPredictiveAnalytics = async (report?: (fraction: number, message?: string) => void) => {
     try {
       if (!user?.id) {
         setSettlementPredictions([]);
         setOutcomeAnalysis([]);
         setFeeOptimizations([]);
+        report?.(1);
         return;
       }
 
       const { data: matters } = await matterApiService.getByAdvocate(user.id);
       const selected = (matters || []).slice(0, 5);
+      const predictions: SettlementPrediction[] = [];
+      const outcomes: CaseOutcomePrediction[] = [];
+      const optimizations: FeeOptimizationRecommendation[] = [];
 
-      const predictions = await Promise.all(
-        selected.map(matter => PredictiveAnalyticsService.predictSettlement(matter))
-      );
+      // Process sequentially to report granular progress
+      for (let i = 0; i < selected.length; i++) {
+        const matter = selected[i];
+        const p = await PredictiveAnalyticsService.predictSettlement(matter);
+        predictions.push(p);
+        report?.((i + 1) / (selected.length * 3), `Predicting settlements ${i + 1}/${selected.length}...`);
+      }
       setSettlementPredictions(predictions);
 
-      const outcomes = await Promise.all(
-        selected.map(matter => PredictiveAnalyticsService.predictCaseOutcome(matter, []))
-      );
+      for (let i = 0; i < selected.length; i++) {
+        const matter = selected[i];
+        const o = await PredictiveAnalyticsService.predictCaseOutcome(matter, []);
+        outcomes.push(o);
+        report?.((selected.length + i + 1) / (selected.length * 3), `Analyzing case outcomes ${i + 1}/${selected.length}...`);
+      }
       setOutcomeAnalysis(outcomes);
 
-      const optimizations = await Promise.all(
-        selected.map(matter => PredictiveAnalyticsService.optimizeFeeStructure(matter))
-      );
+      for (let i = 0; i < selected.length; i++) {
+        const matter = selected[i];
+        const opt = await PredictiveAnalyticsService.optimizeFeeStructure(matter);
+        optimizations.push(opt);
+        report?.((selected.length * 2 + i + 1) / (selected.length * 3), `Optimizing fees ${i + 1}/${selected.length}...`);
+      }
       setFeeOptimizations(optimizations);
 
     } catch (error) {
@@ -236,10 +285,11 @@ export const AIAnalyticsDashboard: React.FC = () => {
     }
   };
 
-  const loadIntegrationStatus = async () => {
+  const loadIntegrationStatus = async (report?: (fraction: number, message?: string) => void) => {
     try {
       const status = await ExternalAPIService.getIntegrationStatus();
       setIntegrationStatus(status);
+      report?.(1, 'Integrations checked');
     } catch (error) {
       console.error('Error loading integration status:', error);
     }

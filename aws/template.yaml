@@ -1,0 +1,427 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'LexoHub Phase 1 - Intelligent Document Processing Infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Environment name
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 300
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        POWERTOOLS_SERVICE_NAME: lexohub
+        LOG_LEVEL: INFO
+
+Resources:
+  DocumentStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'lexohub-documents-${Environment}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: IntelligentTieringTransition
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 0
+                StorageClass: INTELLIGENT_TIERING
+          - Id: GlacierArchive
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: LexoHub
+
+  DocumentMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'lexohub-document-metadata-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: documentId
+          AttributeType: S
+        - AttributeName: matterID
+          AttributeType: S
+        - AttributeName: uploadTimestamp
+          AttributeType: N
+        - AttributeName: processingStatus
+          AttributeType: S
+      KeySchema:
+        - AttributeName: documentId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: MatterIndex
+          KeySchema:
+            - AttributeName: matterID
+              KeyType: HASH
+            - AttributeName: uploadTimestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: processingStatus
+              KeyType: HASH
+            - AttributeName: uploadTimestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  TemplateCacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'lexohub-template-cache-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: structuralHash
+          AttributeType: S
+        - AttributeName: templateVersion
+          AttributeType: N
+      KeySchema:
+        - AttributeName: structuralHash
+          KeyType: HASH
+        - AttributeName: templateVersion
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  Tier0Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier0-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '0'
+
+  Tier1Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier1-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '1'
+
+  Tier2Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier2-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '2'
+
+  Tier3Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-tier3-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: '3'
+
+  ValidationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-validation-queue-${Environment}'
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'lexohub-dlq-${Environment}'
+      MessageRetentionPeriod: 1209600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  TextractCompletionTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'lexohub-textract-completion-${Environment}'
+      DisplayName: LexoHub Textract Completion Notifications
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  TextractTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref TextractCompletionTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: textract.amazonaws.com
+            Action:
+              - sns:Publish
+            Resource: !Ref TextractCompletionTopic
+
+  Lambda0ClassificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'lexohub-lambda0-classification-${Environment}'
+      CodeUri: lambda/lambda0-classification/
+      Handler: index.lambda_handler
+      MemorySize: 512
+      Timeout: 300
+      Environment:
+        Variables:
+          TEMPLATE_CACHE_TABLE: !Ref TemplateCacheTable
+          DOCUMENT_BUCKET: !Ref DocumentStorageBucket
+          TIER0_QUEUE_URL: !Ref Tier0Queue
+          TIER1_QUEUE_URL: !Ref Tier1Queue
+          TIER2_QUEUE_URL: !Ref Tier2Queue
+          TIER3_QUEUE_URL: !Ref Tier3Queue
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DocumentStorageBucket
+        - DynamoDBReadPolicy:
+            TableName: !Ref TemplateCacheTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt Tier0Queue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt Tier1Queue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt Tier2Queue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt Tier3Queue.QueueName
+      Events:
+        S3Event:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - aws.s3
+              detail-type:
+                - Object Created
+              detail:
+                bucket:
+                  name:
+                    - !Ref DocumentStorageBucket
+                object:
+                  key:
+                    - prefix: matters/
+      AutoPublishAlias: live
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: 2
+
+  Tier1ExtractionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'lexohub-tier1-extraction-${Environment}'
+      CodeUri: lambda/tier1-simple-extraction/
+      Handler: index.lambda_handler
+      MemorySize: 1024
+      Timeout: 900
+      Environment:
+        Variables:
+          METADATA_TABLE: !Ref DocumentMetadataTable
+          DOCUMENT_BUCKET: !Ref DocumentStorageBucket
+          SNS_TOPIC_ARN: !Ref TextractCompletionTopic
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DocumentStorageBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DocumentMetadataTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - textract:StartDocumentTextDetection
+                - textract:GetDocumentTextDetection
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref TextractCompletionTopic
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt Tier1Queue.Arn
+            BatchSize: 10
+
+  Tier1CompletionSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref TextractCompletionTopic
+      Endpoint: !GetAtt Tier1Queue.Arn
+
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-DLQ-Messages-${Environment}'
+      AlarmDescription: Alert when messages appear in DLQ
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeadLetterQueue.QueueName
+
+  Lambda0ThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-Lambda0-Throttle-${Environment}'
+      AlarmDescription: Alert when Lambda 0 is being throttled
+      MetricName: Throttles
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref Lambda0ClassificationFunction
+
+  Lambda0ErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'LexoHub-Lambda0-ErrorRate-${Environment}'
+      AlarmDescription: Alert when Lambda 0 error rate is high
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref Lambda0ClassificationFunction
+
+Outputs:
+  DocumentBucketName:
+    Description: S3 bucket for document storage
+    Value: !Ref DocumentStorageBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentBucket'
+
+  MetadataTableName:
+    Description: DynamoDB table for document metadata
+    Value: !Ref DocumentMetadataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-MetadataTable'
+
+  TemplateCacheTableName:
+    Description: DynamoDB table for template cache
+    Value: !Ref TemplateCacheTable
+    Export:
+      Name: !Sub '${AWS::StackName}-TemplateCacheTable'
+
+  Lambda0FunctionArn:
+    Description: ARN of Lambda 0 classification function
+    Value: !GetAtt Lambda0ClassificationFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-Lambda0Arn'
+
+  Tier1FunctionArn:
+    Description: ARN of Tier 1 extraction function
+    Value: !GetAtt Tier1ExtractionFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-Tier1Arn'
+
+  Tier0QueueUrl:
+    Description: URL of Tier 0 queue
+    Value: !Ref Tier0Queue
+
+  Tier1QueueUrl:
+    Description: URL of Tier 1 queue
+    Value: !Ref Tier1Queue
+
+  Tier2QueueUrl:
+    Description: URL of Tier 2 queue
+    Value: !Ref Tier2Queue
+
+  Tier3QueueUrl:
+    Description: URL of Tier 3 queue
+    Value: !Ref Tier3Queue

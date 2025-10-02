@@ -20,11 +20,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredPermission,
   fallback 
 }) => {
-  const { user, loading, isAuthenticated, hasPermission } = useAuth();
+  const { user, loading, isInitializing, isLoading, isAuthenticated, hasPermission } = useAuth();
   const pathname = window.location.pathname;
 
-  // Show loading spinner while checking auth
-  if (loading) {
+  // Show loading spinner while initializing or loading auth state
+  if (isInitializing || loading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -37,9 +37,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <WelcomePage />;
   }
 
-  // Redirect to login if not authenticated
-  // Use both user and isAuthenticated for consistency
-  if (!user || !isAuthenticated) {
+  // Redirect to login if not authenticated after initialization completes
+  if (!isAuthenticated || !user) {
     return <LoginPage />;
   }
 

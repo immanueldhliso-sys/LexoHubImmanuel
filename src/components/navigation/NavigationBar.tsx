@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Scale, Menu, X, Search, Plus, ChevronDown, Bell } from 'lucide-react';
+import { Menu, X, Search, Plus, ChevronDown, Bell } from 'lucide-react';
+import lexoLogo from '../../Public/Assets/lexo-logo.png';
 import { Button, Icon } from '../../design-system/components';
 import { MegaMenu } from './MegaMenu';
 import { MobileMegaMenu } from './MobileMegaMenu';
@@ -301,7 +302,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
           {/* Logo and Brand */}
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
-              <Icon icon={Scale} className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
+              <img src={lexoLogo} alt="LexoHub Logo" className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 object-contain" style={{ background: 'transparent' }} />
               <span className="text-lg sm:text-xl font-bold text-neutral-900">LexoHub</span>
             </div>
 

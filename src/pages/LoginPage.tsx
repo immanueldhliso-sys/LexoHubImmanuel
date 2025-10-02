@@ -22,8 +22,7 @@ import {
   Eye, 
   EyeOff, 
   TrendingUp, 
-  Shield, 
-  Scale,
+  Shield,
   Award,
   CheckCircle,
   XCircle,
@@ -34,6 +33,7 @@ import {
   MessageSquare,
   Fingerprint
 } from 'lucide-react';
+import lexoLogo from '../Public/Assets/lexo-logo.png';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import LexoHubBGhd from '../Public/Assets/LexoHubBGhd.jpg';
@@ -483,7 +483,7 @@ const LoginPage = () => {
       <div className="relative z-10 w-full h-full flex flex-col overflow-x-hidden overflow-y-auto px-1 sm:px-2 md:px-4 py-1 sm:py-2 md:py-4">
         <header className="text-center mb-2 sm:mb-3 md:mb-6 animate-in fade-in slide-in-from-top-4 duration-1000 flex-shrink-0">
             <div className="flex items-center justify-center gap-2 md:gap-3 mb-1 sm:mb-2 md:mb-3 group">
-                <Scale className="w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 text-yellow-400 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110 drop-shadow-sm" />
+                <img src={lexoLogo} alt="LexoHub Logo" className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 object-contain transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110 drop-shadow-lg" style={{ background: 'transparent' }} />
                 <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white tracking-wider drop-shadow-sm">lexo</h1>
             </div>
             <p className="text-sm md:text-base text-slate-200 leading-tight px-2 font-medium hidden sm:block">Where Strategy Meets Practice.</p>

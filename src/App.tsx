@@ -33,6 +33,7 @@ import {
 import { TemplateManagementPage } from './pages/TemplateManagementPage';
 import { PracticeGrowthPage } from './pages/PracticeGrowthPage';
 import { StrategicFinancePage } from './pages/StrategicFinancePage';
+import { InvoiceDesignerPage } from './pages/InvoiceDesignerPage';
 import { FeatureDiscoveryNotification } from './components/notifications/FeatureDiscoveryNotification';
 
 // Create Query Client with proper configuration
@@ -279,7 +280,9 @@ const AppContent: React.FC = () => {
       case 'compliance':
         return <CompliancePage />;
       case 'settings':
-        return <SettingsPage />;
+        return <SettingsPage onNavigate={handlePageChange} />;
+      case 'invoice-designer':
+        return <InvoiceDesignerPage />;
       case 'academy':
         return (
           <Suspense fallback={<LoadingSpinner />}>

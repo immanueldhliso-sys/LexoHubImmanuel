@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Save, RotateCcw, Download, FileText } from 'lucide-react';
-import { Card, CardHeader, CardContent, Button, Icon } from '../design-system/components';
+import { Card, CardHeader, CardContent, Button } from '../design-system/components';
 import { toast } from 'react-hot-toast';
 import { DataExportModal } from '../components/data-export';
+import { matterTemplatesService } from '../services/api/matter-templates.service';
+import type { Page } from '../types';
 
-const SettingsPage: React.FC = () => {
+interface SettingsPageProps {
+  onNavigate?: (page: Page) => void;
+}
+
+const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'templates'>('practice');
   const [practiceSettings, setPracticeSettings] = useState({
     firmName: 'Mpondo & Associates',
@@ -19,6 +25,42 @@ const SettingsPage: React.FC = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const [templateSettings, setTemplateSettings] = useState({
+    defaultCategory: 'General',
+    autoSaveTemplates: false,
+    templateSharing: false
+  });
+
+  const [templateStats, setTemplateStats] = useState({
+    total: 0,
+    shared: 0,
+    mostUsed: ''
+  });
+
+  const [categoryStats, setCategoryStats] = useState([
+    { name: 'General', count: 3, description: 'General purpose matter templates' },
+    { name: 'Commercial', count: 4, description: 'Commercial litigation and contracts' },
+    { name: 'Employment', count: 2, description: 'Employment law matters' },
+    { name: 'Mining', count: 2, description: 'Mining law and regulations' },
+    { name: 'Personal', count: 1, description: 'Personal legal matters' }
+  ]);
+
+  const [integrations, setIntegrations] = useState([
+    { name: 'QuickBooks', description: 'Sync financial data and invoices', connected: true, icon: '📊' },
+    { name: 'Xero', description: 'Accounting and bookkeeping integration', connected: false, icon: '💼' },
+    { name: 'DocuSign', description: 'Electronic signature management', connected: true, icon: '✍️' },
+    { name: 'Microsoft 365', description: 'Email and document collaboration', connected: true, icon: '📧' },
+    { name: 'Slack', description: 'Team communication and notifications', connected: false, icon: '💬' },
+    { name: 'Zoom', description: 'Video conferencing integration', connected: false, icon: '📹' }
+  ]);
+
+  const [paymentMethods, setPaymentMethods] = useState([
+    { name: 'Bank Transfer', enabled: true, description: 'Direct bank transfers' },
+    { name: 'Credit Card', enabled: true, description: 'Visa, Mastercard, American Express' },
+    { name: 'PayPal', enabled: false, description: 'PayPal payments' },
+    { name: 'Cryptocurrency', enabled: false, description: 'Bitcoin, Ethereum' }
+  ]);
 
   const handlePracticeSettingChange = (key: keyof typeof practiceSettings, value: string | number | string[]) => {
     setPracticeSettings(prev => ({ ...prev, [key]: value }));
@@ -74,6 +116,90 @@ const SettingsPage: React.FC = () => {
       practiceAreas: prev.practiceAreas.filter((_, i) => i !== index)
     }));
     setHasUnsavedChanges(true);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'templates') {
+      loadTemplateData();
+    }
+  }, [activeTab]);
+
+  const loadTemplateData = async () => {
+    try {
+      const response = await matterTemplatesService.getUserTemplates();
+      if (response.data) {
+        const total = response.data.length;
+        const shared = response.data.filter(t => t.is_shared).length;
+        const sortedByUsage = [...response.data].sort((a, b) => b.usage_count - a.usage_count);
+        const mostUsed = sortedByUsage[0]?.name || 'N/A';
+        
+        setTemplateStats({ total, shared, mostUsed });
+        
+        const categoryCounts: Record<string, number> = {};
+        response.data.forEach(template => {
+          categoryCounts[template.category] = (categoryCounts[template.category] || 0) + 1;
+        });
+        
+        setCategoryStats(prev => prev.map(cat => ({
+          ...cat,
+          count: categoryCounts[cat.name] || 0
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading template data:', error);
+    }
+  };
+
+  const handleTemplateSettingChange = (key: keyof typeof templateSettings, value: any) => {
+    setTemplateSettings(prev => ({ ...prev, [key]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleManageTemplates = () => {
+    if (onNavigate) {
+      onNavigate('matter-templates');
+    }
+  };
+
+  const handleManageCategory = () => {
+    if (onNavigate) {
+      onNavigate('matter-templates');
+    }
+  };
+
+  const handleToggleIntegration = (integrationName: string) => {
+    setIntegrations(prev => prev.map(integration => {
+      if (integration.name === integrationName) {
+        const newConnected = !integration.connected;
+        toast.success(`${integrationName} ${newConnected ? 'connected' : 'disconnected'} successfully`);
+        return { ...integration, connected: newConnected };
+      }
+      return integration;
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleRegenerateApiKey = () => {
+    if (window.confirm('Are you sure you want to regenerate your API key? The old key will stop working immediately.')) {
+      toast.success('API key regenerated successfully');
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleTogglePaymentMethod = (methodName: string) => {
+    setPaymentMethods(prev => prev.map(method => {
+      if (method.name === methodName) {
+        const newEnabled = !method.enabled;
+        toast.success(`${methodName} ${newEnabled ? 'enabled' : 'disabled'}`);
+        return { ...method, enabled: newEnabled };
+      }
+      return method;
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleEnable2FA = () => {
+    toast.success('Two-factor authentication setup initiated. Check your email for instructions.');
   };
 
   return (
@@ -313,14 +439,7 @@ const SettingsPage: React.FC = () => {
                 <h2 className="text-xl font-semibold text-neutral-900">Available Integrations</h2>
               </CardHeader>
               <CardContent className="space-y-4">
-                {[
-                  { name: 'QuickBooks', description: 'Sync financial data and invoices', connected: true, icon: '📊' },
-                  { name: 'Xero', description: 'Accounting and bookkeeping integration', connected: false, icon: '💼' },
-                  { name: 'DocuSign', description: 'Electronic signature management', connected: true, icon: '✍️' },
-                  { name: 'Microsoft 365', description: 'Email and document collaboration', connected: true, icon: '📧' },
-                  { name: 'Slack', description: 'Team communication and notifications', connected: false, icon: '💬' },
-                  { name: 'Zoom', description: 'Video conferencing integration', connected: false, icon: '📹' }
-                ].map((integration, index) => (
+                {integrations.map((integration, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <span className="text-2xl">{integration.icon}</span>
@@ -340,6 +459,7 @@ const SettingsPage: React.FC = () => {
                       <Button
                         variant={integration.connected ? 'secondary' : 'primary'}
                         size="sm"
+                        onClick={() => handleToggleIntegration(integration.name)}
                       >
                         {integration.connected ? 'Disconnect' : 'Connect'}
                       </Button>
@@ -365,7 +485,11 @@ const SettingsPage: React.FC = () => {
                       readOnly
                       className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg bg-neutral-50"
                     />
-                    <Button variant="secondary" size="sm">
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={handleRegenerateApiKey}
+                    >
                       Regenerate
                     </Button>
                   </div>
@@ -450,7 +574,13 @@ const SettingsPage: React.FC = () => {
                     </label>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-neutral-600">Secure your account with 2FA</span>
-                      <Button variant="primary" size="sm">Enable</Button>
+                      <Button 
+                        variant="primary" 
+                        size="sm"
+                        onClick={handleEnable2FA}
+                      >
+                        Enable
+                      </Button>
                     </div>
                   </div>
                   <div>
@@ -494,6 +624,31 @@ const SettingsPage: React.FC = () => {
 
       {activeTab === 'billing' && (
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <h2 className="text-xl font-semibold text-neutral-900">Invoice & Pro Forma Design</h2>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start space-x-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <FileText className="w-6 h-6 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium text-neutral-900 mb-1">Customize Your PDF Design</h4>
+                  <p className="text-sm text-neutral-600 mb-3">
+                    Design professional invoices and pro forma with custom colors, fonts, branding, and layout options.
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => onNavigate?.('invoice-designer')}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Open PDF Designer
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -566,18 +721,14 @@ const SettingsPage: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-4">
-                  {[
-                    { name: 'Bank Transfer', enabled: true, description: 'Direct bank transfers' },
-                    { name: 'Credit Card', enabled: true, description: 'Visa, Mastercard, American Express' },
-                    { name: 'PayPal', enabled: false, description: 'PayPal payments' },
-                    { name: 'Cryptocurrency', enabled: false, description: 'Bitcoin, Ethereum' }
-                  ].map((method, index) => (
+                  {paymentMethods.map((method, index) => (
                     <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
                       <div>
                         <h4 className="font-medium text-neutral-900">{method.name}</h4>
                         <p className="text-sm text-neutral-600">{method.description}</p>
                       </div>
                       <button
+                        onClick={() => handleTogglePaymentMethod(method.name)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                           method.enabled ? 'bg-mpondo-gold-500' : 'bg-neutral-200'
                         }`}
@@ -628,7 +779,11 @@ const SettingsPage: React.FC = () => {
                   <label className="block text-sm font-medium text-neutral-700 mb-1">
                     Default Template Category
                   </label>
-                  <select className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent">
+                  <select 
+                    value={templateSettings.defaultCategory}
+                    onChange={(e) => handleTemplateSettingChange('defaultCategory', e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
+                  >
                     <option value="General">General</option>
                     <option value="Commercial">Commercial</option>
                     <option value="Employment">Employment</option>
@@ -643,6 +798,8 @@ const SettingsPage: React.FC = () => {
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
+                      checked={templateSettings.autoSaveTemplates}
+                      onChange={(e) => handleTemplateSettingChange('autoSaveTemplates', e.target.checked)}
                       className="rounded border-neutral-300 text-mpondo-gold-600 focus:ring-mpondo-gold-500"
                     />
                     <span className="text-sm text-neutral-700">
@@ -657,6 +814,8 @@ const SettingsPage: React.FC = () => {
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
+                      checked={templateSettings.templateSharing}
+                      onChange={(e) => handleTemplateSettingChange('templateSharing', e.target.checked)}
                       className="rounded border-neutral-300 text-mpondo-gold-600 focus:ring-mpondo-gold-500"
                     />
                     <span className="text-sm text-neutral-700">
@@ -675,19 +834,24 @@ const SettingsPage: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-neutral-700">Total Templates</span>
-                    <span className="text-sm text-neutral-900">12</span>
+                    <span className="text-sm text-neutral-900">{templateStats.total}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-neutral-700">Shared Templates</span>
-                    <span className="text-sm text-neutral-900">3</span>
+                    <span className="text-sm text-neutral-900">{templateStats.shared}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-neutral-700">Most Used</span>
-                    <span className="text-sm text-neutral-900">Commercial Litigation</span>
+                    <span className="text-sm text-neutral-900">{templateStats.mostUsed}</span>
                   </div>
                 </div>
                 <div className="pt-4 border-t border-neutral-200">
-                  <Button variant="outline" size="sm" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={handleManageTemplates}
+                  >
                     <FileText className="w-4 h-4 mr-2" />
                     Manage Templates
                   </Button>
@@ -702,13 +866,7 @@ const SettingsPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  { name: 'General', count: 3, description: 'General purpose matter templates' },
-                  { name: 'Commercial', count: 4, description: 'Commercial litigation and contracts' },
-                  { name: 'Employment', count: 2, description: 'Employment law matters' },
-                  { name: 'Mining', count: 2, description: 'Mining law and regulations' },
-                  { name: 'Personal', count: 1, description: 'Personal legal matters' }
-                ].map((category, index) => (
+                {categoryStats.map((category, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
                     <div>
                       <h4 className="font-medium text-neutral-900">{category.name}</h4>
@@ -718,7 +876,11 @@ const SettingsPage: React.FC = () => {
                       <span className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded-full">
                         {category.count} templates
                       </span>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={handleManageCategory}
+                      >
                         Manage
                       </Button>
                     </div>
