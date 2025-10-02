@@ -3,6 +3,7 @@ export type Page =
   | 'dashboard'
   | 'ai-analytics'
   | 'matters'
+  | 'matter-templates'
   | 'invoices'
   | 'proforma'
   | 'reports'
@@ -17,7 +18,6 @@ export type Page =
 
 export type ModalType =
   | 'new-brief'
-  | 'voice-capture'
   | 'edit-matter'
   | 'confirm-delete'
   | null;
@@ -116,8 +116,6 @@ export interface QuickActionsState {
 export interface CommandBarState {
   search: SearchState;
   quickActions: QuickActionsState;
-  voiceEnabled: boolean;
-  isListening: boolean;
 }
 
 export interface KeyboardShortcut {
@@ -137,6 +135,9 @@ export enum UserTier {
   SENIOR_ADVOCATE = 'senior_advocate',
   CHAMBERS_ENTERPRISE = 'chambers_enterprise'
 }
+
+export type { UserRole, Permission, RolePermissions, FeatureAccess, RestrictedAction } from './rbac';
+export { ROLE_PERMISSIONS, FEATURE_ACCESS_MATRIX, RESTRICTED_ACTIONS } from './rbac';
 
 // Navigation State Types
 export interface NavigationState {
@@ -199,7 +200,6 @@ export enum RiskLevel {
 
 export enum TimeEntryMethod {
   MANUAL = 'manual',
-  VOICE = 'voice',
   TIMER = 'timer',
   AI_SUGGESTED = 'ai_suggested'
 }
@@ -324,8 +324,8 @@ export interface Invoice {
   matter_id: string;
   advocate_id: string;
   invoice_number: string;
-  invoice_date: string;
-  due_date: string;
+  dateIssued: string;
+  dateDue: string;
   bar: BarAssociation;
   fees_amount: number;
   disbursements_amount: number;
@@ -336,7 +336,7 @@ export interface Invoice {
   status: InvoiceStatus;
   amount_paid: number;
   balance_due: number;
-  date_paid?: string;
+  datePaid?: string;
   payment_method?: PaymentMethod;
   payment_reference?: string;
   fee_narrative: string;
@@ -368,8 +368,6 @@ export interface TimeEntry {
   rate: number;
   amount: number;
   recording_method: TimeEntryMethod;
-  voice_transcription?: string;
-  voice_recording_url?: string;
   billed: boolean;
   write_off: boolean;
   write_off_reason?: string;
@@ -764,22 +762,7 @@ export interface SuccessFeeCalculation {
   notes?: string;
 }
 
-// Voice Recording Types
-export interface VoiceRecording {
-  id: string;
-  userId: string;
-  matterId?: string;
-  audioBlob?: Blob;
-  audioUrl?: string;
-  duration: number; // in seconds
-  transcription?: string;
-  extractedData?: ExtractedTimeEntryData;
-  processingStatus: 'pending' | 'processing' | 'completed' | 'error';
-  confidence?: number;
-  language?: string;
-  createdAt: string;
-  processedAt?: string;
-}
+
 
 export interface ExtractedTimeEntryData {
   matterId?: string;
@@ -798,21 +781,7 @@ export interface ExtractedTimeEntryData {
   };
 }
 
-export interface VoiceRecordingState {
-  isRecording: boolean;
-  isPaused: boolean;
-  duration: number;
-  audioLevel: number;
-  error?: string;
-}
 
-export interface TranscriptionResult {
-  text: string;
-  confidence: number;
-  language: string;
-  alternatives?: string[];
-  processingTime: number;
-}
 
 // Workflow & Integration Types
 export interface CourtRegistry {
@@ -885,19 +854,7 @@ export interface JudgeAnalytics {
   periodsAnalyzed: number;
 }
 
-export interface VoiceQuery {
-  id: string;
-  advocateId: string;
-  queryText: string;
-  queryLanguage: string;
-  intent?: string;
-  confidenceScore?: number;
-  extractedEntities?: Record<string, unknown>;
-  responseText?: string;
-  responseActions?: Record<string, unknown>;
-  processingTimeMs?: number;
-  createdAt: string;
-}
+
 
 export interface LanguageTranslation {
   id: string;
@@ -1123,7 +1080,7 @@ export interface CashFlowPrediction {
 }
 
 // Workflow Page Types
-export type WorkflowPage = 'court-diary' | 'judge-analytics' | 'voice-assistant' | 'integrations';
+export type WorkflowPage = 'court-diary' | 'judge-analytics' | 'integrations';
 
 // Enhanced Invoice Generation Types
 export interface InvoiceGenerationOptions {
@@ -1534,6 +1491,7 @@ export type Page =
   | 'dashboard'
   | 'ai-analytics'
   | 'matters'
+  | 'matter-workbench'
   | 'invoices'
   | 'proforma'
   | 'reports'

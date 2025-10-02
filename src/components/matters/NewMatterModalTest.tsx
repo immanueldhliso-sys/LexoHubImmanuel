@@ -9,7 +9,7 @@ import { BarAssociation, ClientType, FeeType, RiskLevel, Matter } from '../../ty
  */
 export const NewMatterModalTest: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [testScenario, setTestScenario] = useState<'empty' | 'basic' | 'voice' | 'full'>('empty');
+  const [testScenario, setTestScenario] = useState<'empty' | 'basic' | 'full'>('empty');
 
   // Test data scenarios
   const testData: Record<string, MatterPrepopulationData | undefined> = {
@@ -20,14 +20,7 @@ export const NewMatterModalTest: React.FC = () => {
       matter_type: 'Commercial Litigation',
       description: 'Contract dispute regarding software licensing agreement'
     },
-    voice: {
-      // Voice integration format example
-      client: 'ABC Corporation', // Uses alias
-      attorney: 'Sarah Johnson', // Uses alias
-      work_type: 'research', // Maps to matter_type
-      description: 'Legal research on intellectual property rights',
-      billable: true, // Maps to fee_type
-      duration: '5', // Could be used for estimated_fee
+
       tags: ['urgent', 'ip', 'research']
     },
     full: {
@@ -85,14 +78,7 @@ export const NewMatterModalTest: React.FC = () => {
           <span className="text-sm text-gray-500">Title, client, type</span>
         </Button>
 
-        <Button
-          onClick={() => handleOpenModal('voice')}
-          variant="outline"
-          className="h-20 flex flex-col items-center justify-center"
-        >
-          <span className="font-medium">Voice Format</span>
-          <span className="text-sm text-gray-500">Aliases & mapping</span>
-        </Button>
+
 
         <Button
           onClick={() => handleOpenModal('full')}
@@ -118,7 +104,6 @@ export const NewMatterModalTest: React.FC = () => {
           <li>• "Pre-filled data" indicator should appear in modal header</li>
           <li>• "Clear Pre-filled" button should be visible when data is prepopulated</li>
           <li>• Field aliases should map correctly (client → client_name, attorney → instructing_attorney)</li>
-          <li>• Voice integration fields should map (work_type → matter_type, billable → fee_type)</li>
           <li>• Form validation should work normally for prepopulated fields</li>
         </ul>
       </div>

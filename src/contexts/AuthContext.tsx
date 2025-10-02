@@ -2,33 +2,16 @@
  * Authentication Context
  * Provides authentication state and methods throughout the application
  */
-
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import React from 'react';
 import { authService, type ExtendedUser, type UserMetadata } from '../services/auth.service';
 import type { AuthError } from '@supabase/supabase-js';
-
-// Rate limiter utility
-const createRateLimiter = (maxAttempts: number, windowMs: number) => {
-  const attempts = new Map<string, number[]>();
-  
-  return (key: string): boolean => {
-    const now = Date.now();
-    const userAttempts = attempts.get(key) || [];
-    const recentAttempts = userAttempts.filter(time => now - time < windowMs);
-    
-    if (recentAttempts.length >= maxAttempts) {
-      return false;
-    }
-    
-    attempts.set(key, [...recentAttempts, now]);
-    return true;
-  };
-};
 
 export interface AuthContextType {
   user: ExtendedUser | null;
   loading: boolean;
   isLoading: boolean;
+  isInitializing: boolean;
   operationLoading: {
     signIn: boolean;
     signUp: boolean;
@@ -65,14 +48,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateProfile: false,
   });
   const [sessionError, setSessionError] = useState<Error | null>(null);
-
-  // Rate limiters (configurable via environment variables)
-  const signInMaxAttempts = Number(import.meta.env.VITE_AUTH_SIGNIN_MAX_ATTEMPTS ?? 5);
-  const signInWindowMs = Number(import.meta.env.VITE_AUTH_SIGNIN_WINDOW_MS ?? 60_000);
-  const signUpMaxAttempts = Number(import.meta.env.VITE_AUTH_SIGNUP_MAX_ATTEMPTS ?? 3);
-  const signUpWindowMs = Number(import.meta.env.VITE_AUTH_SIGNUP_WINDOW_MS ?? 300_000);
-  const signInRateLimiter = createRateLimiter(signInMaxAttempts, signInWindowMs);
-  const signUpRateLimiter = createRateLimiter(signUpMaxAttempts, signUpWindowMs);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Initialize auth with retry logic
   const initializeAuth = useCallback(async () => {
@@ -160,20 +136,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const initialize = async () => {
       try {
+        setIsInitializing(true);
         const cleanup = await initializeAuth();
         
         if (mounted) {
-          // Set initial user state from auth service
           const currentUser = authService.getCurrentUser();
           setUser(currentUser);
           isInitialized = true;
           setLoading(false);
+          setIsInitializing(false);
           
-          // Subscribe to auth state changes
           unsubscribe = authService.onAuthStateChange((user) => {
             if (mounted) {
               setUser(user);
-              // Only set loading to false after initial auth is complete
               if (isInitialized) {
                 setLoading(false);
               }
@@ -186,6 +161,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Auth initialization failed:', error);
         if (mounted) {
           setLoading(false);
+          setIsInitializing(false);
           setSessionError(error as Error);
         }
       }
@@ -193,7 +169,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initialize();
 
-    // Auto-refresh session every 15 minutes
     const refreshInterval = setInterval(async () => {
       if (mounted && isInitialized) {
         try {
@@ -212,10 +187,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [initializeAuth, refreshSession]);
 
   const signIn = async (email: string, password: string) => {
-    if (!signInRateLimiter(email)) {
-      return { error: new Error('Too many attempts. Please try again later.') };
-    }
-
     setOperationLoading(prev => ({ ...prev, signIn: true }));
     try {
       const { error } = await authService.signIn(email, password);
@@ -226,9 +197,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signInWithMagicLink = async (email: string) => {
-    if (!signInRateLimiter(email)) {
-      return { error: new Error('Too many attempts. Please try again later.') };
-    }
     setOperationLoading(prev => ({ ...prev, signIn: true }));
     try {
       const { error } = await authService.signInWithMagicLink(email);
@@ -239,10 +207,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signUp = async (email: string, password: string, metadata: UserMetadata) => {
-    if (!signUpRateLimiter(email)) {
-      return { error: new Error('Too many registration attempts. Please try again later.') };
-    }
-
     setOperationLoading(prev => ({ ...prev, signUp: true }));
     try {
       const { error } = await authService.signUp(email, password, metadata);
@@ -264,7 +228,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const updateProfile = async (updates: Partial<UserMetadata>) => {
     const previousUser = user;
     
-    // Optimistic update
     setUser(current => current ? { ...current, ...updates } : null);
     
     setOperationLoading(prev => ({ ...prev, updateProfile: true }));
@@ -272,7 +235,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { error } = await authService.updateAdvocateProfile(updates);
       
       if (error) {
-        // Rollback on error
         setUser(previousUser);
       }
       
@@ -295,6 +257,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     loading,
     isLoading: loading || operationLoading.signIn || operationLoading.signUp || operationLoading.signOut || operationLoading.updateProfile,
+    isInitializing,
     operationLoading,
     sessionError,
     signIn,

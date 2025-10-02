@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Mic, FileText, FolderPlus, Brain, Receipt, Zap, Clock } from 'lucide-react';
+import { Plus, FileText, FolderPlus, Brain, Receipt, Zap, Clock } from 'lucide-react';
 import { QuickAction, QuickActionsState, UserTier } from '../../types';
 import { Button, Icon } from '../../design-system/components';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -27,18 +27,6 @@ const QuickActionsMenu: React.FC<QuickActionsMenuProps> = ({
 
   // Default quick actions
   const defaultActions: QuickAction[] = [
-    {
-      id: 'voice-time-entry',
-      label: 'Start Voice Time Entry',
-      description: 'Record time using voice commands',
-      icon: Mic,
-      shortcut: 'Ctrl+Shift+V',
-      page: undefined,
-      action: () => onAction('voice-time-entry'),
-      isNew: false,
-      minTier: UserTier.ADVOCATE_PRO,
-      usageCount: 0
-    },
     {
       id: 'create-proforma',
       label: 'Create Pro Forma',
@@ -121,13 +109,6 @@ const QuickActionsMenu: React.FC<QuickActionsMenuProps> = ({
       shiftKey: true,
       description: 'Open quick actions',
       action: () => toggleMenu()
-    },
-    {
-      key: 'v',
-      ctrlKey: true,
-      shiftKey: true,
-      description: 'Start voice time entry',
-      action: () => handleActionClick('voice-time-entry')
     },
     {
       key: 'p',

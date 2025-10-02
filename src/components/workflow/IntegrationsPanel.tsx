@@ -13,6 +13,7 @@ import {
   Database
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
+import { CalendarIntegrationSettings } from '../settings/CalendarIntegrationSettings';
 import type { CourtRegistry, CourtIntegrationLog } from '../../types';
 import { format } from 'date-fns';
 
@@ -79,6 +80,9 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Calendar Integration */}
+      <CalendarIntegrationSettings />
+
       {/* Court Registry Integrations */}
       <Card>
         <CardHeader>

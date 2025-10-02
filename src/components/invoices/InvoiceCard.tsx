@@ -243,7 +243,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
           <div>
             <p className="text-xs text-neutral-500 mb-1">Date Issued</p>
             <p className="text-sm text-neutral-700">
-              {format(new Date(invoice.dateIssued), 'dd MMM yyyy')}
+              {invoice.dateIssued ? format(new Date(invoice.dateIssued), 'dd MMM yyyy') : 'N/A'}
             </p>
           </div>
           
@@ -252,7 +252,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
             <p className={`text-sm ${
               daysOverdue > 0 ? 'text-error-600 font-medium' : 'text-neutral-700'
             }`}>
-              {format(new Date(invoice.dateDue), 'dd MMM yyyy')}
+              {invoice.dateDue ? format(new Date(invoice.dateDue), 'dd MMM yyyy') : 'N/A'}
               {daysOverdue > 0 && (
                 <span className="block text-xs text-error-500">
                   {daysOverdue} days overdue

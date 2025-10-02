@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Scale, Menu, X, Search, Plus, Mic, ChevronDown, Bell } from 'lucide-react';
-import { Button } from '../../design-system/components';
+import { Scale, Menu, X, Search, Plus, ChevronDown, Bell } from 'lucide-react';
+import { Button, Icon } from '../../design-system/components';
 import { MegaMenu } from './MegaMenu';
 import { MobileMegaMenu } from './MobileMegaMenu';
 import GlobalCommandBar from './GlobalCommandBar';
 import QuickActionsMenu from './QuickActionsMenu';
 import { RealTimeTicker } from './RealTimeTicker';
-import { GlobalVoiceModal } from '../voice/GlobalVoiceModal';
+import AlertsDropdown from '../notifications/AlertsDropdown';
+
 import { navigationConfig, getFilteredNavigationConfig } from '../../config/navigation.config';
 import { useKeyboardShortcuts, useClickOutside } from '../../hooks';
 import { smartNotificationsService } from '../../services/smart-notifications.service';
@@ -19,7 +20,6 @@ import type {
   NavigationA11y 
 } from '../../types';
 import type { NotificationBadge, SmartNotification } from '../../services/smart-notifications.service';
-import type { VoiceNavigationResult } from '../../services/voice-navigation.service';
 
 interface NavigationBarProps {
   activePage: Page;
@@ -44,7 +44,6 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
 
   const [commandBarOpen, setCommandBarOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
-  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [notificationBadges, setNotificationBadges] = useState<NotificationBadge[]>([]);
   const [notifications, setNotifications] = useState<SmartNotification[]>([]);
   
@@ -128,11 +127,6 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
         handlePageNavigation('proforma');
         break;
       
-      case 'voice-time-entry':
-        // Open voice modal for time entry
-        setVoiceModalOpen(true);
-        break;
-      
       case 'add-matter':
         // Show placeholder notification for add matter
         toast.success('Add Matter feature coming soon!', {
@@ -185,34 +179,17 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
     setQuickActionsOpen(!quickActionsOpen);
   };
 
-  // Handle voice modal toggle
-  const toggleVoiceModal = () => {
-    setVoiceModalOpen(!voiceModalOpen);
-  };
+  // Alerts dropdown state
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertsRef = useRef<HTMLDivElement>(null);
+  useClickOutside(alertsRef, () => setAlertsOpen(false));
 
-  // Handle voice navigation command
-  const handleVoiceNavigationCommand = (result: VoiceNavigationResult) => {
-    if (result.success && result.page) {
-      handlePageNavigation(result.page);
-    }
-    
-    if (result.success && result.type === 'search' && result.query) {
-      // Open command bar with search query
-      setCommandBarOpen(true);
-      // You would pass the query to the command bar here
-    }
-    
-    if (result.success && result.action) {
-      // Handle quick actions
-      console.log('Voice action executed:', result.action);
-    }
-  };
+
 
   // Close all dropdowns
   const closeAllDropdowns = () => {
     setCommandBarOpen(false);
     setQuickActionsOpen(false);
-    setVoiceModalOpen(false);
     setNavigationState(prev => ({
       ...prev,
       megaMenuOpen: false,
@@ -241,20 +218,6 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
       shiftKey: true,
       action: toggleQuickActions,
       description: 'Open quick actions'
-    },
-    {
-      key: 'v',
-      ctrlKey: true,
-      shiftKey: true,
-      action: toggleVoiceModal,
-      description: 'Open voice commands'
-    },
-    {
-      key: 'v',
-      metaKey: true,
-      shiftKey: true,
-      action: toggleVoiceModal,
-      description: 'Open voice commands'
     },
     {
       key: 'Escape',
@@ -338,14 +301,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
           {/* Logo and Brand */}
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
-              <Scale className="w-8 h-8 text-mpondo-gold-600" />
-              <span className="text-xl font-bold text-neutral-900">LexoHub</span>
+              <Icon icon={Scale} className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
+              <span className="text-lg sm:text-xl font-bold text-neutral-900">LexoHub</span>
             </div>
 
             {/* Desktop Navigation Categories */}
             <div className="hidden lg:flex items-center space-x-1">
               {filteredConfig.categories.map((category) => {
-                const Icon = category.icon;
+                const CategoryIcon = category.icon;
                 const isActive = navigationState.activePage === category.page;
                 const isHovered = navigationState.hoveredCategory === category.id;
                 const a11yProps = getCategoryA11yProps(category);
@@ -362,7 +325,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                     <button
                       onClick={() => category.page && handlePageNavigation(category.page)}
                       onKeyDown={(e) => handleKeyDown(e, category.id)}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                         isActive
                           ? 'bg-mpondo-gold-100 text-mpondo-gold-900'
                           : isHovered
@@ -375,7 +338,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                       role={a11yProps.role}
                       tabIndex={a11yProps.tabIndex}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon icon={CategoryIcon} className="w-4 h-4" />
                       <span>{category.label}</span>
                       
                       {/* Notification Badge */}
@@ -394,7 +357,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                         </span>
                       )}
                       
-                      <ChevronDown 
+                      <Icon 
+                        icon={ChevronDown}
+                        noGradient
                         className={`w-3 h-3 transition-transform duration-200 ${
                           isHovered ? 'rotate-180' : ''
                         }`} 
@@ -427,57 +392,43 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
               />
             </div>
 
-            {/* Notifications Button */}
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-2"
-                aria-label="Notifications"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="hidden sm:inline">Alerts</span>
-                {notificationBadges.length > 0 && (
-                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium bg-status-error-500 text-white rounded-full">
-                    {notificationBadges.reduce((sum, badge) => sum + badge.count, 0)}
-                  </span>
-                )}
-              </Button>
-            </div>
+             {/* Notifications Button */}
+             <div className="relative" ref={alertsRef}>
+               <Button
+                 variant="ghost"
+                 size="sm"
+                 className="flex items-center gap-2"
+                 aria-label="Notifications"
+                 onClick={() => setAlertsOpen((open) => !open)}
+               >
+                 <Icon icon={Bell} className="w-4 h-4" />
+                 <span className="hidden sm:inline">Alerts</span>
+                 {notificationBadges.length > 0 && (
+                   <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium bg-status-error-500 text-white rounded-full">
+                     {notificationBadges.reduce((sum, badge) => sum + badge.count, 0)}
+                   </span>
+                 )}
+               </Button>
+               {alertsOpen && (
+                 <AlertsDropdown onNavigate={handlePageNavigation} onClose={() => setAlertsOpen(false)} />
+               )}
+             </div>
 
-            {/* Voice Command Button (if available) */}
-            {userTier !== 'junior_start' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleVoiceModal}
-                className="flex items-center gap-2"
-                aria-label="Voice commands"
-                title="Voice Commands"
-              >
-                <Mic className="w-4 h-4" />
-                <span className="hidden sm:inline">Voice</span>
-                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-xs font-mono bg-neutral-200 text-neutral-600 rounded">
-                  ⌘⇧V
-                </kbd>
-              </Button>
-            )}
-
-            {/* Mobile Menu Toggle */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleMobileMenu}
-              className="lg:hidden"
-              aria-label="Toggle mobile menu"
-              aria-expanded={navigationState.mobileMenuOpen}
-            >
-              {navigationState.mobileMenuOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <Menu className="w-5 h-5" />
-              )}
-            </Button>
+             {/* Mobile Menu Toggle */}
+             <Button
+               variant="ghost"
+               size="sm"
+               onClick={toggleMobileMenu}
+               className="lg:hidden"
+               aria-label="Toggle mobile menu"
+               aria-expanded={navigationState.mobileMenuOpen}
+             >
+               {navigationState.mobileMenuOpen ? (
+                 <Icon icon={X} className="w-5 h-5" noGradient />
+               ) : (
+                 <Icon icon={Menu} className="w-5 h-5" noGradient />
+               )}
+             </Button>
           </div>
         </div>
       </div>
@@ -509,12 +460,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
         />
       )}
 
-      {/* Global Voice Modal */}
-      <GlobalVoiceModal
-        isOpen={voiceModalOpen}
-        onClose={() => setVoiceModalOpen(false)}
-        onNavigationCommand={handleVoiceNavigationCommand}
-      />
+
     </nav>
   );
 };

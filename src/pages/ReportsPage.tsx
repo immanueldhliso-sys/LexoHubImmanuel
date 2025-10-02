@@ -9,15 +9,16 @@ import {
   Calendar,
   Calculator,
   RefreshCw,
-  Filter,
   Eye
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
 import { InvoiceService } from '../services/api/invoices.service';
+import { AnalyticsService } from '../services/api/analytics.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { matterApiService } from '@/services/api';
 import { toast } from 'react-hot-toast';
-import type { PracticeMetrics, Invoice, InvoiceStatus } from '../types';
+import type { PracticeMetrics, Invoice } from '../types';
+import { InvoiceStatus } from '../types';
 
 const ReportsPage: React.FC = () => {
   const { user } = useAuth();
@@ -82,40 +83,13 @@ const ReportsPage: React.FC = () => {
     mattersCount: 0,
   });
 
-  // Mock data for reports
-  const mockMetrics: PracticeMetrics = {
-    totalWip: 2500000,
-    totalBilled: 1800000,
-    totalCollected: 1500000,
-    outstandingInvoices: 15,
-    overdueInvoices: 7,
-    averageCollectionDays: 45,
-    settlementRate: 72,
-    monthlyBillings: [
-      { month: 'Jan', year: 2024, amount: 180000, invoiceCount: 12, collectionRate: 85 },
-      { month: 'Feb', year: 2024, amount: 220000, invoiceCount: 15, collectionRate: 78 },
-      { month: 'Mar', year: 2024, amount: 195000, invoiceCount: 13, collectionRate: 92 },
-      { month: 'Apr', year: 2024, amount: 240000, invoiceCount: 16, collectionRate: 88 },
-      { month: 'May', year: 2024, amount: 210000, invoiceCount: 14, collectionRate: 82 },
-      { month: 'Jun', year: 2024, amount: 275000, invoiceCount: 18, collectionRate: 90 }
-    ],
-    workTypeDistribution: [
-      { type: 'Commercial Litigation', percentage: 35, revenue: 875000 },
-      { type: 'Employment Law', percentage: 25, revenue: 625000 },
-      { type: 'Mining Law', percentage: 20, revenue: 500000 },
-      { type: 'Contract Disputes', percentage: 15, revenue: 375000 },
-      { type: 'Other', percentage: 5, revenue: 125000 }
-    ]
-  };
-
-  const mockCashFlowData = [
-    { month: 'Jan', inflow: 180000, outflow: 45000, net: 135000 },
-    { month: 'Feb', inflow: 220000, outflow: 52000, net: 168000 },
-    { month: 'Mar', inflow: 195000, outflow: 48000, net: 147000 },
-    { month: 'Apr', inflow: 240000, outflow: 58000, net: 182000 },
-    { month: 'May', inflow: 210000, outflow: 51000, net: 159000 },
-    { month: 'Jun', inflow: 275000, outflow: 62000, net: 213000 }
-  ];
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    billingEfficiency: 0,
+    clientSatisfaction: 0,
+    matterResolution: 0,
+    timeManagement: 0,
+    isLoading: false
+  });
 
   const collectionRate = realMetrics.totalBilled > 0 ? (realMetrics.totalCollected / realMetrics.totalBilled) * 100 : 0;
   const wipUtilization = realMetrics.totalWip > 0 ? (realMetrics.totalBilled / realMetrics.totalWip) * 100 : 0;
@@ -127,6 +101,20 @@ const ReportsPage: React.FC = () => {
   const loadReportData = async () => {
     setIsLoading(true);
     try {
+      const [performanceData, cashFlowData] = await Promise.all([
+        AnalyticsService.getPerformanceMetrics(),
+        AnalyticsService.getCashFlowAnalysis(6)
+      ]);
+      
+      setPerformanceMetrics({
+        billingEfficiency: performanceData.billingEfficiency,
+        clientSatisfaction: performanceData.clientSatisfaction,
+        matterResolution: performanceData.matterResolution,
+        timeManagement: performanceData.timeManagement,
+        isLoading: false
+      });
+      
+      setCashFlowData(cashFlowData.monthlyData);
       // Load all invoices
       const invoicesResponse = await InvoiceService.getInvoices({ 
         page: 1, 
@@ -163,7 +151,7 @@ const ReportsPage: React.FC = () => {
 
       const agingAnalysis = agingRanges.map(range => {
         const rangeInvoices = unpaidInvoices.filter(inv => {
-          const daysPastDue = Math.floor((now.getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24));
+          const daysPastDue = Math.floor((now.getTime() - new Date(inv.dateDue).getTime()) / (1000 * 60 * 60 * 24));
           return daysPastDue >= range.min && daysPastDue <= range.max;
         });
 
@@ -184,10 +172,10 @@ const ReportsPage: React.FC = () => {
       };
 
       // Calculate payment analysis
-      const paidInvoices = invoices.filter(inv => inv.status === InvoiceStatus.PAID && inv.date_paid);
+      const paidInvoices = invoices.filter(inv => inv.status === InvoiceStatus.PAID && inv.datePaid);
       const onTimePayments = paidInvoices.filter(inv => {
-        const paymentDate = new Date(inv.date_paid!);
-        const dueDate = new Date(inv.due_date);
+        const paymentDate = new Date(inv.datePaid!);
+        const dueDate = new Date(inv.dateDue);
         return paymentDate <= dueDate;
       });
 
@@ -196,7 +184,7 @@ const ReportsPage: React.FC = () => {
         latePayments: paidInvoices.length - onTimePayments.length,
         averagePaymentDays: paidInvoices.length > 0 
           ? paidInvoices.reduce((sum, inv) => {
-              const daysToPay = Math.floor((new Date(inv.date_paid!).getTime() - new Date(inv.invoice_date).getTime()) / (1000 * 60 * 60 * 24));
+              const daysToPay = Math.floor((new Date(inv.datePaid!).getTime() - new Date(inv.dateIssued).getTime()) / (1000 * 60 * 60 * 24));
               return sum + daysToPay;
             }, 0) / paidInvoices.length
           : 0,
@@ -223,7 +211,7 @@ const ReportsPage: React.FC = () => {
         const month = d.getMonth();
         const year = d.getFullYear();
         const monthInvoices = invoices.filter(inv => {
-          const created = inv.invoice_date ? new Date(inv.invoice_date) : null;
+          const created = inv.dateIssued ? new Date(inv.dateIssued) : null;
           return created ? (created.getMonth() === month && created.getFullYear() === year) : false;
         });
         const amount = monthInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
@@ -250,20 +238,6 @@ const ReportsPage: React.FC = () => {
       }));
       setWorkDistribution(distribution);
 
-      // Compute cash flow data from paid invoices
-      const cashFlow = monthsWindow.map(d => {
-        const month = d.getMonth();
-        const year = d.getFullYear();
-        const paidInMonth = invoices.filter(inv => {
-          const paidDate = inv.date_paid ? new Date(inv.date_paid) : null;
-          return paidDate ? (paidDate.getMonth() === month && paidDate.getFullYear() === year) : false;
-        });
-        const inflow = paidInMonth.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-        const outflow = 0; // No expense tracking available yet
-        const net = inflow - outflow;
-        return { month: monthNames[month], inflow, outflow, net };
-      });
-      setCashFlowData(cashFlow);
 
       // Compute real metrics for overview and financial tabs
       const totalBilled = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
@@ -273,8 +247,8 @@ const ReportsPage: React.FC = () => {
       const totalWip = (matters || []).reduce((sum: number, m: any) => sum + (m.wipValue || 0), 0);
       const averageCollectionDays = paidInvoices.length > 0
         ? Math.round(paidInvoices.reduce((sum, inv) => {
-            const invoiceDate = new Date(inv.invoice_date as string);
-            const paid = new Date(inv.date_paid as string);
+            const invoiceDate = new Date(inv.dateIssued as string);
+            const paid = new Date(inv.datePaid as string);
             const diffDays = Math.max(0, Math.round((paid.getTime() - invoiceDate.getTime()) / (1000 * 60 * 60 * 24)));
             return sum + diffDays;
           }, 0) / paidInvoices.length)
@@ -589,7 +563,7 @@ const ReportsPage: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-neutral-600">Settlement Rate</span>
                     <span className="font-bold text-status-success-600">
-                      {mockMetrics.settlementRate}%
+                      {Math.round(performanceMetrics.matterResolution)}%
                     </span>
                   </div>
                   <div className="flex justify-between items-center">

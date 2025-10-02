@@ -82,20 +82,7 @@ export interface JudgeAnalytics {
   updatedAt: string;
 }
 
-// Voice Query Types
-export interface VoiceQuery {
-  id: string;
-  advocateId: string;
-  queryText: string;
-  queryLanguage: string;
-  intent?: string;
-  confidenceScore?: number;
-  extractedEntities?: Record<string, any>;
-  responseText?: string;
-  responseActions?: Record<string, any>;
-  processingTimeMs?: number;
-  createdAt: string;
-}
+
 
 // Language Translation Types
 export interface LanguageTranslation {
@@ -292,44 +279,7 @@ export class WorkflowIntegrationsService {
     }
   }
 
-  // Voice Query Processing
-  static async processVoiceQuery(
-    advocateId: string, 
-    queryText: string, 
-    languageCode: string = 'en'
-  ): Promise<any> {
-    try {
-      const { data, error } = await supabase
-        .rpc('process_voice_query', {
-          p_advocate_id: advocateId,
-          p_query_text: queryText,
-          p_language_code: languageCode
-        });
 
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error processing voice query:', error);
-      throw new Error('Failed to process voice query');
-    }
-  }
-
-  static async getVoiceQueryHistory(advocateId: string, limit: number = 50): Promise<VoiceQuery[]> {
-    try {
-      const { data, error } = await supabase
-        .from('voice_queries')
-        .select('*')
-        .eq('advocate_id', advocateId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching voice query history:', error);
-      throw new Error('Failed to fetch voice query history');
-    }
-  }
 
   // Language Support
   static async getTranslations(languageCode: string): Promise<Record<string, string>> {

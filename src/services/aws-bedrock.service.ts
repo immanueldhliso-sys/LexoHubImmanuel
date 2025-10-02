@@ -214,10 +214,10 @@ class AWSBedrockService {
   }
 
   /**
-   * Extract time entry data from transcription with comprehensive error handling
+   * Extract time entry data from text input with comprehensive error handling
    */
   async extractTimeEntryData(
-    transcription: string,
+    textInput: string,
     availableMatters: Array<{ id: string; title: string; client_name: string; attorney: string }> = []
   ): Promise<{ success: boolean; data?: ExtractedTimeEntry; error?: string }> {
     try {
@@ -230,22 +230,22 @@ class AWSBedrockService {
       }
 
       // Validate input
-      if (!transcription || transcription.trim().length === 0) {
+      if (!textInput || textInput.trim().length === 0) {
         return {
           success: false,
-          error: 'Transcription text is required'
+          error: 'Text input is required'
         };
       }
 
-      if (transcription.length > 10000) {
+      if (textInput.length > 10000) {
         return {
           success: false,
-          error: 'Transcription text is too long (max 10,000 characters)'
+          error: 'Text input is too long (max 10,000 characters)'
         };
       }
 
       const systemPrompt = this.buildSystemPrompt(availableMatters);
-      const extractionPrompt = this.buildExtractionPrompt(transcription);
+      const extractionPrompt = this.buildExtractionPrompt(textInput);
 
       const request: ClaudeRequest = {
         anthropic_version: '2023-06-01',
@@ -368,7 +368,7 @@ class AWSBedrockService {
               client_name: 'Unknown Client',
               duration_minutes: 60,
               activity_type: 'General Legal Work',
-              description: request.messages[0]?.content || 'Voice transcription processed',
+              description: request.messages[0]?.content || 'Text input processed',
               date: new Date().toISOString().split('T')[0],
               is_billable: true,
               confidence_score: 0.7
@@ -473,7 +473,7 @@ class AWSBedrockService {
         ).join('\n')}\n\n`
       : '';
 
-    return `You are an AI assistant specialized in extracting structured time entry data from voice transcriptions for South African legal practices.
+    return `You are an AI assistant specialized in extracting structured time entry data from text input for South African legal practices.
 
 ${mattersContext}Context:
 - South African legal terminology and practices
@@ -484,10 +484,10 @@ ${mattersContext}Context:
 - Matter references may include client names, case numbers, or matter descriptions
 
 Instructions:
-1. Extract all relevant information from the transcription
+1. Extract all relevant information from the text input
 2. Match matter references against available matters using fuzzy matching
 3. Provide confidence scores (0.0 to 1.0) for each extracted field
-4. Handle South African accents and pronunciation variations
+4. Handle various text input formats and styles
 5. Return results in valid JSON format only
 
 Response format (JSON only):
@@ -511,15 +511,15 @@ Response format (JSON only):
   }
 
   /**
-   * Build extraction prompt for the transcription
+   * Build extraction prompt for the text input
    */
-  private buildExtractionPrompt(transcription: string): string {
-    return `Please extract time entry data from this voice transcription:
+  private buildExtractionPrompt(textInput: string): string {
+    return `Please extract time entry data from this text input:
 
-"${transcription}"
+"${textInput}"
 
-Analyze the transcription and extract structured time entry information. Pay special attention to:
-- Matter or client references (may be partial or mispronounced)
+Analyze the text and extract structured time entry information. Pay special attention to:
+- Matter or client references
 - Duration mentions (in any format)
 - Activity descriptions
 - Date references

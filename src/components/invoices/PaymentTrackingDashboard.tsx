@@ -243,7 +243,7 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
                       <p className="font-medium text-neutral-900">{invoice.invoiceNumber}</p>
                       <p className="text-sm text-neutral-600">{invoice.clientName}</p>
                       <p className="text-xs text-neutral-500">
-                        Due: {format(new Date(invoice.dateDue), 'dd MMM yyyy')}
+                        Due: {invoice.dateDue ? format(new Date(invoice.dateDue), 'dd MMM yyyy') : 'N/A'}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -306,7 +306,7 @@ export const PaymentTrackingDashboard: React.FC<PaymentTrackingDashboardProps> =
                       <p className="font-medium text-neutral-900">{invoice.invoiceNumber}</p>
                       <p className="text-sm text-neutral-600">{invoice.clientName}</p>
                       <p className="text-xs text-neutral-500">
-                        Due: {format(new Date(invoice.dateDue), 'dd MMM yyyy')}
+                        Due: {invoice.dateDue ? format(new Date(invoice.dateDue), 'dd MMM yyyy') : 'N/A'}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">

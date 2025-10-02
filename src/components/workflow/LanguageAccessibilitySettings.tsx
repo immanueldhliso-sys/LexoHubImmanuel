@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../../design-system/components';
 import { getEnhancedSpeechService, type SpeechRequest } from '../../services/enhanced-speech.service';
-import VoicePlaybackComponent from '../voice/VoicePlaybackComponent';
 
 export const LanguageAccessibilitySettings: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
@@ -60,13 +59,6 @@ export const LanguageAccessibilitySettings: React.FC = () => {
       description: 'Audio narration of interface elements and content',
       enabled: speechEnabled,
       category: 'hearing'
-    },
-    {
-      id: 'voice-navigation',
-      name: 'Voice Navigation',
-      description: 'Navigate the interface using voice commands',
-      enabled: false,
-      category: 'mobility'
     },
     {
       id: 'keyboard-navigation',
@@ -180,13 +172,6 @@ export const LanguageAccessibilitySettings: React.FC = () => {
 
                 {selectedLanguage === language.code && (
                   <div className="flex gap-2 mt-3">
-                    <VoicePlaybackComponent
-                      text={`Hello, this is a voice test in ${language.name}. LexoHub supports natural voice synthesis for all South African languages.`}
-                      language={language.code}
-                      useCase="accessibility"
-                      showControls={true}
-                      className="flex-1"
-                    />
                     <Button size="sm" variant="outline">
                       <Eye className="w-3 h-3 mr-1" />
                       Preview
@@ -323,71 +308,7 @@ export const LanguageAccessibilitySettings: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Voice & Audio Settings */}
-      <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold text-neutral-900">Voice & Audio Settings</h3>
-          <p className="text-neutral-600">Configure text-to-speech and voice interaction features</p>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-neutral-900">Text-to-Speech</h4>
-                <p className="text-sm text-neutral-600">Read interface elements and content aloud</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button size="sm" variant="outline">
-                  <Play className="w-3 h-3 mr-1" />
-                  Test Voice
-                </Button>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={speechEnabled}
-                    onChange={(e) => setSpeechEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-mpondo-gold-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-mpondo-gold-600"></div>
-                </label>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Voice Speed
-                </label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.1"
-                  defaultValue="1"
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-neutral-500 mt-1">
-                  <span>Slow</span>
-                  <span>Normal</span>
-                  <span>Fast</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Voice Language
-                </label>
-                <select className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-mpondo-gold-500">
-                  <option value="en-ZA">English (South Africa)</option>
-                  <option value="af-ZA">Afrikaans (South Africa)</option>
-                  <option value="zu-ZA">Zulu (South Africa)</option>
-                  <option value="xh-ZA">Xhosa (South Africa)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Language Features */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -404,18 +325,7 @@ export const LanguageAccessibilitySettings: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6 text-center">
-            <Volume2 className="w-12 h-12 text-judicial-blue-500 mx-auto mb-4" />
-            <h3 className="font-semibold text-neutral-900 mb-2">Multi-language Voice</h3>
-            <p className="text-sm text-neutral-600 mb-4">
-              Text-to-speech support in all 11 official South African languages
-            </p>
-            <Button size="sm" variant="outline" className="w-full">
-              Voice Settings
-            </Button>
-          </CardContent>
-        </Card>
+
 
         <Card>
           <CardContent className="p-6 text-center">

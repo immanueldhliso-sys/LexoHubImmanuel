@@ -9,43 +9,41 @@ import {
   TrendingUp,
   Eye,
   Calculator,
-  Mic,
   Play,
   Square,
   Timer,
   HelpCircle,
   Zap,
-  Search
+  Search,
+  Link
 } from 'lucide-react';
-import { Card, CardContent, Button, CardHeader } from '../design-system/components';
-import { VoiceRecordingModal, VoiceNotesList, VoiceTimeEntryForm } from '../components/voice';
+import { Card, CardContent, Button, CardHeader, Icon } from '../design-system/components';
 import { InvoiceGenerationModal } from '../components/invoices/InvoiceGenerationModal';
 import { NewMatterModal } from '../components/matters/NewMatterModal';
-import { voiceManagementService } from '../services/voice-management.service';
+import { ProFormaLinkModal } from '../components/matters/ProFormaLinkModal';
 import { InvoiceService } from '../services/api/invoices.service';
 import { matterApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
-import type { Matter, VoiceRecording, TimeEntry, Invoice } from '../types';
+import type { Matter, TimeEntry, Invoice, Page } from '../types';
 import { MatterStatus } from '../types';
 
-const MattersPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'active' | 'all' | 'analytics' | 'voice'>('active');
+interface MattersPageProps {
+  onNavigate?: (page: Page) => void;
+}
+
+const MattersPage: React.FC<MattersPageProps> = ({ onNavigate }) => {
+  const [activeTab, setActiveTab] = useState<'active' | 'all' | 'analytics'>('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus] = useState<MatterStatus | 'all'>('all');
   const [showNewMatterModal, setShowNewMatterModal] = useState(false);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
-  const [showVoiceTimeEntryForm, setShowVoiceTimeEntryForm] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showProFormaLinkModal, setShowProFormaLinkModal] = useState(false);
   const [selectedMatter, setSelectedMatter] = useState<Matter | null>(null);
-  const [selectedVoiceRecording, setSelectedVoiceRecording] = useState<VoiceRecording | null>(null);
-  const [voiceRecordings, setVoiceRecordings] = useState<VoiceRecording[]>([]);
-  const [playingRecordingId, setPlayingRecordingId] = useState<string | undefined>(undefined);
   const [matterInvoices, setMatterInvoices] = useState<Record<string, Invoice[]>>({});
   const [matters, setMatters] = useState<Matter[]>([]);
-  const [loadingMatters, setLoadingMatters] = useState<boolean>(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [loadingMatters, setLoadingMatters] = useState(true);
   const { user, loading, isAuthenticated } = useAuth();
 
   // Load matters from API based on current user
@@ -105,9 +103,8 @@ const MattersPage: React.FC = () => {
     fetchMatters();
   }, [loading, isAuthenticated, user?.id]);
 
-  // Load existing voice recordings and matter invoices when matters are available
+  // Load matter invoices when matters are available
   React.useEffect(() => {
-    setVoiceRecordings(voiceManagementService.getVoiceRecordings());
     if (matters.length > 0) {
       loadMatterInvoices();
     }
@@ -132,67 +129,7 @@ const MattersPage: React.FC = () => {
     }
   };
 
-  // Voice Recording Event Handlers
-  const voiceHandlers = React.useMemo(() => {
-    const handleVoiceRecordingComplete = async (recording: VoiceRecording) => {
-      try {
-        setIsRecording(false);
-        await voiceManagementService.processVoiceRecording(recording, matters);
-        setVoiceRecordings(voiceManagementService.getVoiceRecordings());
-        toast.success('Voice recording processed successfully');
-      } catch (error) {
-        toast.error('Failed to process voice recording');
-      }
-    };
 
-    const handleVoicePlayback = (recordingId: string) => {
-      if (playingRecordingId === recordingId) {
-        setPlayingRecordingId(undefined);
-      } else {
-        setPlayingRecordingId(recordingId);
-      }
-    };
-
-    const handleVoiceEdit = (recording: VoiceRecording) => {
-      setSelectedVoiceRecording(recording);
-      setShowVoiceTimeEntryForm(true);
-    };
-
-    const handleVoiceDelete = async (recordingId: string) => {
-      try {
-        await voiceManagementService.deleteVoiceRecording(recordingId);
-        setVoiceRecordings(voiceManagementService.getVoiceRecordings());
-        toast.success('Voice recording deleted');
-      } catch (error) {
-        toast.error('Failed to delete voice recording');
-      }
-    };
-
-    const handleConvertToTimeEntry = (recording: VoiceRecording) => {
-      setSelectedVoiceRecording(recording);
-      setShowVoiceTimeEntryForm(true);
-    };
-
-    const handleTimeEntrySave = async (timeEntry: TimeEntry) => {
-      try {
-        // Save time entry logic here
-        setShowVoiceTimeEntryForm(false);
-        setSelectedVoiceRecording(null);
-        toast.success('Time entry saved successfully');
-      } catch (error) {
-        toast.error('Failed to save time entry');
-      }
-    };
-
-    return {
-      handleVoiceRecordingComplete,
-      handleVoicePlayback,
-      handleVoiceEdit,
-      handleVoiceDelete,
-      handleConvertToTimeEntry,
-      handleTimeEntrySave
-    };
-  }, [playingRecordingId, matters]);
 
   // Invoice Generation Handlers
   const handleGenerateInvoice = (matter: Matter, isProForma: boolean = false) => {
@@ -224,6 +161,29 @@ const MattersPage: React.FC = () => {
     };
   };
 
+  // Function to determine if a matter is high WIP inactive
+  const isHighWipInactive = (matter: Matter) => {
+    const wipValue = matter.wip_value || 0;
+    const createdDate = new Date(matter.created_at);
+    const daysSinceCreation = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Consider high WIP if WIP > R50,000 and matter is older than 30 days
+    // This matches the logic from the SQL function we saw earlier
+    return wipValue > 50000 && daysSinceCreation > 30;
+  };
+
+  // Function to check if matter is approaching prescription
+  const isApproachingPrescription = (matter: Matter) => {
+    if (!matter.created_at) return false;
+    
+    const createdDate = new Date(matter.created_at);
+    const daysSinceCreation = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Warn if matter is approaching 3 years (prescription period)
+    // Alert when within 6 months (180 days) of prescription
+    return daysSinceCreation > (3 * 365 - 180);
+  };
+
   const filteredMatters = useMemo(() => {
     return matters.filter(matter => {
       const matchesSearch = matter.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -237,15 +197,17 @@ const MattersPage: React.FC = () => {
   }, [matters, searchTerm, filterStatus, activeTab]);
 
   const handleNewMatterClick = () => {
-    setShowVoiceModal(false);
-    setShowVoiceTimeEntryForm(false);
     setShowInvoiceModal(false);
-    setShowNewMatterModal(true);
+    if (onNavigate) {
+      onNavigate('matter-workbench');
+    } else {
+      // Fallback to modal if navigation is not available
+      setShowNewMatterModal(true);
+    }
   };
 
-  const handleQuickVoiceRecord = () => {
-    setIsRecording(true);
-    setShowVoiceModal(true);
+  const handleGetProFormaLink = () => {
+    setShowProFormaLinkModal(true);
   };
 
   return (
@@ -260,17 +222,6 @@ const MattersPage: React.FC = () => {
         {/* Quick Action Buttons */}
         <div className="flex flex-wrap gap-3">
           <Button 
-            variant="primary" 
-            onClick={handleQuickVoiceRecord}
-            className="flex items-center space-x-2 bg-red-600 hover:bg-red-700"
-            title="Start voice recording for time entry"
-          >
-            <Mic className="w-4 h-4" />
-            <span>Quick Record</span>
-            {isRecording && <div className="w-2 h-2 bg-white rounded-full animate-pulse ml-1" />}
-          </Button>
-          
-          <Button 
             variant="secondary" 
             onClick={handleNewMatterClick}
             className="flex items-center space-x-2"
@@ -279,44 +230,42 @@ const MattersPage: React.FC = () => {
             <Plus className="w-4 h-4" />
             <span>New Matter</span>
           </Button>
-          
-          <Button 
-            variant="ghost" 
-            onClick={() => setActiveTab('voice')}
+
+          <Button
+            variant="outline"
+            onClick={handleGetProFormaLink}
             className="flex items-center space-x-2"
-            title="View all voice recordings"
+            title="Get pro forma link"
           >
-            <Timer className="w-4 h-4" />
-            <span>Voice Notes ({voiceRecordings.length})</span>
+            <Link className="w-4 h-4" />
+            <span>Get Pro Forma Link</span>
           </Button>
         </div>
       </div>
 
       {/* Search and Filters */}
-      {activeTab !== 'voice' && (
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search matters, clients, or attorneys..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
-            />
-          </div>
-          
-          {/* Help Tooltip */}
-          <div className="flex items-center gap-2 text-sm text-neutral-500">
-            <HelpCircle className="w-4 h-4" />
-            <span>Tip: Use Quick Record for fast time entries</span>
-          </div>
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search matters, clients, or attorneys..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-mpondo-gold-500 focus:border-transparent"
+          />
         </div>
-      )}
+        
+        {/* Help Tooltip */}
+        <div className="flex items-center gap-2 text-sm text-neutral-500">
+          <HelpCircle className="w-4 h-4" />
+          <span>Tip: Create invoices directly from matter cards</span>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex space-x-1 bg-neutral-100 rounded-lg p-1">
-        {(['active', 'all', 'analytics', 'voice'] as const).map((tab) => (
+        {(['active', 'all', 'analytics'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -327,38 +276,12 @@ const MattersPage: React.FC = () => {
             }`}
           >
             {tab === 'active' ? 'Active Matters' : 
-             tab === 'all' ? 'All Matters' : 
-             tab === 'analytics' ? 'Analytics' : 'Voice Notes'}
+             tab === 'all' ? 'All Matters' : 'Analytics'}
           </button>
         ))}
       </div>
 
       {/* Content */}
-      {activeTab === 'voice' ? (
-        <div className="space-y-4">
-          {/* Voice Notes Header */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-neutral-900">Voice Recordings</h2>
-            <Button 
-              onClick={handleQuickVoiceRecord}
-              variant="primary"
-              className="flex items-center gap-2"
-            >
-              <Mic className="w-4 h-4" />
-              Record New
-            </Button>
-          </div>
-          
-          <VoiceNotesList
-            recordings={voiceRecordings}
-            onPlayback={voiceHandlers.handleVoicePlayback}
-            onEdit={voiceHandlers.handleVoiceEdit}
-            onDelete={voiceHandlers.handleVoiceDelete}
-            onConvertToTimeEntry={voiceHandlers.handleConvertToTimeEntry}
-            playingRecordingId={playingRecordingId}
-          />
-        </div>
-      ) : (
         <div className="space-y-4">
           {loadingMatters ? (
             <Card>
@@ -400,6 +323,41 @@ const MattersPage: React.FC = () => {
                           }`}>
                             {matter.status}
                           </span>
+                          
+                          {/* Health Check Warning Icons */}
+                          <div className="flex items-center gap-2">
+                            {isHighWipInactive(matter) && (
+                              <div className="group relative">
+                                <AlertTriangle 
+                                  className="w-5 h-5 text-amber-500 cursor-help" 
+                                  title="High WIP Inactive Matter"
+                                />
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-amber-800">High WIP Inactive</div>
+                                  <div className="text-xs text-amber-700">
+                                    WIP: R{(matter.wip_value || 0).toLocaleString()} • No recent activity
+                                  </div>
+                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-amber-200"></div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {isApproachingPrescription(matter) && (
+                              <div className="group relative">
+                                <Clock 
+                                  className="w-5 h-5 text-amber-600 cursor-help" 
+                                  title="Approaching Prescription"
+                                />
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-amber-800">Prescription Warning</div>
+                                  <div className="text-xs text-amber-700">
+                                    Matter approaching 3-year prescription period
+                                  </div>
+                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-amber-200"></div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                           <div>
@@ -463,20 +421,6 @@ const MattersPage: React.FC = () => {
                     {/* Quick Actions */}
                     <div className="flex flex-wrap gap-2">
                       <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedMatter(matter);
-                          setShowVoiceModal(true);
-                        }}
-                        className="flex items-center gap-2"
-                        title="Record time for this matter"
-                      >
-                        <Mic className="w-4 h-4" />
-                        Record Time
-                      </Button>
-                      
-                      <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => handleGenerateInvoice(matter)}
@@ -507,38 +451,8 @@ const MattersPage: React.FC = () => {
             })
           )}
         </div>
-      )}
 
-      {/* Voice Recording Modal */}
-      <VoiceRecordingModal
-        isOpen={showVoiceModal}
-        onClose={() => {
-          setShowVoiceModal(false);
-          setIsRecording(false);
-          setSelectedMatter(null);
-        }}
-        onRecordingComplete={(recording) => {
-          voiceHandlers.handleVoiceRecordingComplete(recording);
-          setShowVoiceModal(false);
-          setSelectedMatter(null);
-        }}
-        selectedMatter={selectedMatter}
-      />
 
-      {/* Voice Time Entry Form */}
-      {selectedVoiceRecording && selectedVoiceRecording.extractedData && (
-        <VoiceTimeEntryForm
-          isOpen={showVoiceTimeEntryForm}
-          recording={selectedVoiceRecording}
-          extractedData={selectedVoiceRecording.extractedData}
-          availableMatters={matters}
-          onSave={voiceHandlers.handleTimeEntrySave}
-          onCancel={() => {
-            setShowVoiceTimeEntryForm(false);
-            setSelectedVoiceRecording(null);
-          }}
-        />
-      )}
 
       {/* Invoice Generation Modal */}
       {showInvoiceModal && selectedMatter && (
@@ -563,6 +477,12 @@ const MattersPage: React.FC = () => {
           setShowNewMatterModal(false);
           toast.success(`Matter "${newMatter.title}" created successfully`);
         }}
+      />
+
+      {/* Pro Forma Link Modal */}
+      <ProFormaLinkModal
+        isOpen={showProFormaLinkModal}
+        onClose={() => setShowProFormaLinkModal(false)}
       />
     </div>
   );

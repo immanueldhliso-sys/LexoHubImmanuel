@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { Modal, ModalHeader, ModalBody, ModalFooter, Button, Input, Card, CardHeader, CardContent } from '../../design-system/components';
-import { Download, FileText, Database, Calendar, Clock, DollarSign, FileCheck, X } from 'lucide-react';
+import { Modal, ModalHeader, ModalBody, ModalFooter, Button, Input } from '../../design-system/components';
+import { Download, FileText, Database, Clock, DollarSign, FileCheck, X } from 'lucide-react';
 import { dataExportService, type ExportOptions, type ExportResult } from '../../services/data-export.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -96,7 +96,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
       <ModalHeader>
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-mpondo-gold/10 rounded-lg">
-            <Icon icon={Database} className="w-6 h-6 text-mpondo-gold" noGradient />
+            <Database className="w-6 h-6 text-mpondo-gold-600" />
           </div>
           <div>
             <h2 className="text-xl font-semibold text-neutral-900">
@@ -111,7 +111,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
           onClick={handleClose}
           className="text-neutral-400 hover:text-neutral-600 transition-colors"
         >
-          <Icon icon={X} className="h-6 w-6" noGradient />
+          <X className="h-6 w-6" />
         </button>
       </ModalHeader>
 
@@ -120,7 +120,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
           // Export Success View
           <div className="text-center py-8">
             <div className="p-4 bg-green-50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Icon icon={FileCheck} className="w-8 h-8 text-green-600" noGradient />
+              <FileCheck className="w-8 h-8 text-green-600" />
             </div>
             <h3 className="text-lg font-semibold text-neutral-900 mb-2">
               Export Completed Successfully!
@@ -155,7 +155,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
               onClick={handleDownloadAgain}
               className="flex items-center space-x-2"
             >
-              <Icon icon={Download} className="w-4 h-4" noGradient />
+              <Download className="w-4 h-4" />
               <span>Download Again</span>
             </Button>
           </div>
@@ -183,7 +183,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
                     }`}
                   >
                     <div className="flex items-center space-x-2 mb-1">
-                      <Icon icon={format.icon} className="w-4 h-4" noGradient />
+                      <format.icon className="w-4 h-4" />
                       <span className="font-medium text-sm">{format.label}</span>
                     </div>
                     <p className="text-xs text-neutral-600">{format.description}</p>
@@ -246,7 +246,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
                       className="w-4 h-4 text-mpondo-gold border-neutral-300 rounded focus:ring-mpondo-gold"
                     />
                     <div className="flex items-center space-x-2">
-                      <Icon icon={option.icon} className="w-4 h-4 text-neutral-500" noGradient />
+                      <option.icon className="w-4 h-4 text-neutral-500" />
                       <div>
                         <span className="text-sm font-medium text-neutral-700">{option.label}</span>
                         <p className="text-xs text-neutral-500">{option.description}</p>
@@ -260,7 +260,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
             {/* Export Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start space-x-3">
-                <Icon icon={Database} className="w-5 h-5 text-blue-600 mt-0.5" noGradient />
+                <Database className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
                   <h4 className="text-sm font-medium text-blue-900 mb-1">
                     About Data Liberation
@@ -314,7 +314,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
                   </>
                 ) : (
                   <>
-                    <Icon icon={Download} className="w-4 h-4" noGradient />
+                    <Download className="w-4 h-4" />
                     <span>Export Data</span>
                   </>
                 )}

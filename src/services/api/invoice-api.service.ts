@@ -47,7 +47,7 @@ export class InvoiceApiService extends BaseApiService<Invoice> {
     super('invoices', `
       *,
       matter:matters(title, client_name, reference_number),
-      advocate:advocates(full_name, practice_number, bar),
+      advocate:advocates!advocate_id(full_name, practice_number, bar),
       time_entries(id, duration_minutes, rate, description),
       payments(id, amount, payment_date, payment_method)
     `);
@@ -200,7 +200,7 @@ export class InvoiceApiService extends BaseApiService<Invoice> {
     const updateData: Partial<Invoice> = {
       amount_paid: newAmountPaid,
       status: isFullyPaid ? 'paid' : invoice.status,
-      date_paid: isFullyPaid ? paymentDate : invoice.date_paid,
+      date_paid: isFullyPaid ? paymentDate : invoice.datePaid,
       payment_method: paymentMethod,
       payment_reference: reference
     };

@@ -135,7 +135,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                 <div>
                   <p className="text-sm text-neutral-600">Date Issued</p>
                   <p className="font-medium text-neutral-900">
-                    {format(new Date(invoice.invoice_date), 'dd MMMM yyyy')}
+                    {invoice.dateIssued ? format(new Date(invoice.dateIssued), 'dd MMMM yyyy') : 'N/A'}
                   </p>
                 </div>
               </div>
@@ -145,7 +145,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                 <div>
                   <p className="text-sm text-neutral-600">Due Date</p>
                   <p className="font-medium text-neutral-900">
-                    {format(new Date(invoice.due_date), 'dd MMMM yyyy')}
+                    {invoice.dateDue ? format(new Date(invoice.dateDue), 'dd MMMM yyyy') : 'N/A'}
                   </p>
                 </div>
               </div>
@@ -301,7 +301,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               </p>
               {invoice.last_reminder_date && (
                 <p className="text-xs text-neutral-500 mt-1">
-                  Last reminder: {format(new Date(invoice.last_reminder_date), 'dd MMMM yyyy')}
+                  Last reminder: {invoice.last_reminder_date ? format(new Date(invoice.last_reminder_date), 'dd MMMM yyyy') : 'N/A'}
                 </p>
               )}
             </div>

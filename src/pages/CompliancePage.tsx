@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Calendar, Shield, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, BarChart3 } from 'lucide-react';
-import { Card, CardHeader, CardContent, CardFooter } from '../design-system/components';
+import { Card, CardHeader, CardContent, CardFooter, Icon } from '../design-system/components';
 import { LoadingSpinner } from '../components/design-system/components/LoadingSpinner';
 import { ComplianceService } from '../services/compliance.service';
 import type { 

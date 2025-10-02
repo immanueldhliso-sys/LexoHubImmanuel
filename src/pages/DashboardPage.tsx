@@ -6,22 +6,23 @@ import {
   Plus, 
   ArrowRight, 
   TrendingUp, 
-  Calendar,
   AlertTriangle,
   Clock,
   DollarSign,
-  Send,
   Calculator,
-  RefreshCw
+  Activity
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button, Icon } from '../design-system/components';
 import { NewMatterModal } from '../components/matters/NewMatterModal';
+import { PendingProFormaRequests } from '../components/proforma';
+import { PracticeHealthDashboard } from '../components/dashboard/PracticeHealthDashboard';
 import { InvoiceService } from '../services/api/invoices.service';
 import { matterApiService } from '../services/api';
+import { AnalyticsService } from '../services/api/analytics.service';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import type { Matter, Page, Invoice } from '../types';
-import { MatterStatus, BarAssociation, FeeType, RiskLevel, InvoiceStatus } from '../types';
+import { MatterStatus, InvoiceStatus } from '../types';
 
 interface DashboardPageProps {
   onNavigate?: (page: Page) => void;
@@ -63,6 +64,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     newInvoiceModal: false,
     quickTimeEntry: false
   });
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'overview' | 'health'>('overview');
 
   // Modal and detailed view states
   const [showDetailedView, setShowDetailedView] = useState({
@@ -106,7 +110,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       
       const paidThisMonth = invoices
         .filter(inv => {
-          const paidDate = inv.date_paid ? new Date(inv.date_paid) : null;
+          const paidDate = inv.datePaid ? new Date(inv.datePaid) : null;
           return paidDate && 
                  paidDate.getMonth() === currentMonth && 
                  paidDate.getFullYear() === currentYear;
@@ -118,13 +122,15 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         .filter(inv => inv.status !== InvoiceStatus.PAID)
         .reduce((sum, inv) => sum + (inv.total_amount - (inv.amount_paid || 0)), 0);
 
+      const collectionMetrics = await AnalyticsService.getCollectionMetrics();
+
       setInvoiceMetrics({
         totalInvoices: invoices.length,
         totalProFormas: proFormasResponse.data.length,
         outstandingAmount,
         paidThisMonth,
         overdueCount: overdueInvoices.length,
-        averagePaymentDays: 45, // This would be calculated from actual payment data
+        averagePaymentDays: Math.round(collectionMetrics.averageCollectionDays),
         conversionRate: proFormasResponse.data.length > 0 
           ? (proFormasResponse.data.filter(pf => pf.status === InvoiceStatus.CONVERTED).length / proFormasResponse.data.length) * 100 
           : 0,
@@ -140,6 +146,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const loadDashboardData = async () => {
     setDashboardData(prev => ({ ...prev, isLoading: true }));
     try {
+      const performanceMetrics = await AnalyticsService.getPerformanceMetrics();
       // Load recent matters from database
       if (!user?.id) {
         throw new Error('User not authenticated');
@@ -189,7 +196,14 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         }).length
       };
 
-      setDashboardData(prev => ({ ...prev, ...computed, isLoading: false }));
+      setDashboardData(prev => ({ 
+        ...prev, 
+        ...computed, 
+        settlementRate: Math.round(performanceMetrics.settlementRate),
+        collectionRate: Math.round(performanceMetrics.clientSatisfaction),
+        avgBillTime: Math.round(performanceMetrics.timeManagement),
+        isLoading: false 
+      }));
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -303,14 +317,49 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {/* Tab Navigation */}
+      <div className="border-b border-neutral-200">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'overview'
+                ? 'border-mpondo-gold-500 text-mpondo-gold-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Icon icon={BarChart3} className="w-4 h-4" noGradient />
+              Overview
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('health')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'health'
+                ? 'border-mpondo-gold-500 text-mpondo-gold-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Icon icon={Activity} className="w-4 h-4" noGradient />
+              Practice Health
+            </div>
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <>
+          {/* Quick Actions */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Button 
           variant="outline" 
           onClick={() => handleQuickAction('new-invoice')}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Icon icon={FileText} className="w-6 h-6 mb-1" />
+          <Icon icon={FileText} className="w-6 h-6 mb-1" noGradient />
           <span className="text-sm font-medium">Generate Invoice</span>
         </Button>
         <Button 
@@ -318,7 +367,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={() => onNavigate?.('proforma')}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Icon icon={Calculator} className="w-6 h-6 mb-1" />
+          <Icon icon={Calculator} className="w-6 h-6 mb-1" noGradient />
           <span className="text-sm font-medium">Create Pro Forma</span>
         </Button>
         <Button 
@@ -326,7 +375,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={() => handleQuickAction('time-entry')}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Icon icon={Clock} className="w-6 h-6 mb-1" />
+          <Icon icon={Clock} className="w-6 h-6 mb-1" noGradient />
           <span className="text-sm font-medium">Quick Time Entry</span>
         </Button>
         <Button 
@@ -334,7 +383,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           onClick={handleViewAllMatters}
           className="h-16 flex flex-col items-center justify-center"
         >
-          <Icon icon={Briefcase} className="w-6 h-6 mb-1" />
+          <Icon icon={Briefcase} className="w-6 h-6 mb-1" noGradient />
           <span className="text-sm font-medium">View All Matters</span>
         </Button>
     </div>
@@ -344,7 +393,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       <Card hoverable onClick={() => onNavigate?.('invoices')} className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
           <div className="mb-2">
-            <Icon icon={FileText} className="w-8 h-8 mx-auto" />
+            <Icon icon={FileText} className="w-8 h-8 mx-auto" noGradient />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : invoiceMetrics.totalInvoices}
@@ -359,7 +408,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       <Card hoverable onClick={() => onNavigate?.('proforma')} className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
           <div className="mb-2">
-            <Icon icon={Calculator} className="w-8 h-8 mx-auto" />
+            <Icon icon={Calculator} className="w-8 h-8 mx-auto" noGradient />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : invoiceMetrics.totalProFormas}
@@ -374,7 +423,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       <Card hoverable onClick={handleOverdueInvoicesClick} className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
           <div className="mb-2">
-            <Icon icon={AlertTriangle} className="w-8 h-8 mx-auto" />
+            <Icon icon={AlertTriangle} className="w-8 h-8 mx-auto" noGradient />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : invoiceMetrics.overdueCount}
@@ -389,7 +438,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       <Card hoverable className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardContent className="p-6 text-center">
           <div className="mb-2">
-            <Icon icon={DollarSign} className="w-8 h-8 mx-auto" />
+            <Icon icon={DollarSign} className="w-8 h-8 mx-auto" noGradient />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900">
             {invoiceMetrics.isLoading ? '...' : formatCurrency(invoiceMetrics.paidThisMonth)}
@@ -408,12 +457,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <Card hoverable onClick={handleViewAllMatters} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
           <div className="mb-2">
-            <Icon icon={Briefcase} className="w-8 h-8 mx-auto" />
+            <Icon icon={Briefcase} className="w-8 h-8 mx-auto" noGradient />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{dashboardData.activeMatters}</h3>
           <p className="text-sm text-neutral-600">Active Matters</p>
             <div className="mt-2 text-xs text-mpondo-gold-600 flex items-center justify-center">
-              View Details <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
+            View Details <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
             </div>
         </CardContent>
       </Card>
@@ -421,12 +470,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <Card hoverable onClick={handleWipReportClick} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
           <div className="mb-2">
-            <Icon icon={FileText} className="w-8 h-8 mx-auto" />
+            <Icon icon={FileText} className="w-8 h-8 mx-auto" noGradient />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{formatCurrency(dashboardData.outstandingWip)}</h3>
           <p className="text-sm text-neutral-600">Outstanding WIP</p>
             <div className="mt-2 text-xs text-judicial-blue-600 flex items-center justify-center">
-              View WIP Report <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
+            View WIP Report <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
             </div>
         </CardContent>
       </Card>
@@ -434,12 +483,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <Card hoverable onClick={handleBillingReportClick} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
           <div className="mb-2">
-            <Icon icon={BarChart3} className="w-8 h-8 mx-auto" />
+            <Icon icon={BarChart3} className="w-8 h-8 mx-auto" noGradient />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{formatCurrency(dashboardData.monthlyBilling)}</h3>
           <p className="text-sm text-neutral-600">This Month Billing</p>
             <div className="mt-2 text-xs text-status-success-600 flex items-center justify-center">
-              View Reports <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
+            View Reports <Icon icon={ArrowRight} className="w-3 h-3 ml-1" noGradient />
             </div>
         </CardContent>
       </Card>
@@ -447,7 +496,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <Card hoverable onClick={handleOverdueInvoicesClick} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardContent className="p-6 text-center">
           <div className="mb-2">
-              <Icon icon={AlertTriangle} className="w-8 h-8 mx-auto" />
+              <Icon icon={AlertTriangle} className="w-8 h-8 mx-auto" noGradient />
           </div>
             <h3 className="text-2xl font-bold text-neutral-900">{dashboardData.overdueInvoices}</h3>
           <p className="text-sm text-neutral-600">Overdue Invoices</p>
@@ -457,6 +506,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </CardContent>
       </Card>
     </div>
+
+    {/* Pending Pro Forma Requests */}
+    <PendingProFormaRequests />
 
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Card>
@@ -601,6 +653,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </CardContent>
       </Card>
     </div>
+        </>
+      )}
+
+      {/* Practice Health Dashboard Tab */}
+      {activeTab === 'health' && (
+        <PracticeHealthDashboard />
+      )}
 
       {/* Modal Components */}
       

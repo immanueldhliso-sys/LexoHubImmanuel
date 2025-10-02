@@ -42,17 +42,12 @@ export const Icon = ({
   noGradient = false, 
   ...props 
 }: IconProps) => {
-  // Base classes for all icons - using existing brand colors
-  const baseClasses = 'from-mpondo-gold-500 to-judicial-blue-600';
-
-  // Conditionally apply the gradient class
   const iconClasses = twMerge(
     clsx(
-      baseClasses,
       {
-        'text-gradient-icon': !noGradient, // Apply gradient ONLY if noGradient is false
+        'text-gradient-icon': !noGradient,
       },
-      className, // Any additional classes passed in will be merged
+      className,
     ),
   );
 

@@ -306,7 +306,7 @@ export class InvoiceService {
       // Add status-specific fields
       if (newStatus === 'sent' && !currentInvoice.sent_at) {
         updateData.sent_at = new Date().toISOString();
-      } else if (newStatus === 'paid' && !currentInvoice.date_paid) {
+      } else if (newStatus === 'paid' && !currentInvoice.datePaid) {
         updateData.date_paid = new Date().toISOString().split('T')[0];
         updateData.amount_paid = currentInvoice.total_amount;
       }
@@ -476,7 +476,7 @@ export class InvoiceService {
         .update({
           amount_paid: newAmountPaid,
           status: newStatus,
-          date_paid: newStatus === 'paid' ? payment.paymentDate : invoice.date_paid,
+          date_paid: newStatus === 'paid' ? payment.paymentDate : invoice.datePaid,
           payment_method: payment.paymentMethod,
           payment_reference: payment.reference
         })

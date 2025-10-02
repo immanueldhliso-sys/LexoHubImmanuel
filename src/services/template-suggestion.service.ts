@@ -1,11 +1,10 @@
 /**
  * Template Suggestion Service
- * Analyzes voice input and suggests relevant matter templates
+ * Analyzes text input and suggests relevant matter templates
  */
 
 import { matterTemplatesService } from './api/matter-templates.service';
 import type { MatterTemplate, TemplateCategory } from '../types/matter-templates';
-import type { ExtractedTimeEntryData } from '../types';
 
 export interface TemplateSuggestion {
   template: MatterTemplate;
@@ -13,7 +12,7 @@ export interface TemplateSuggestion {
   matchReasons: string[];
 }
 
-export interface VoiceTemplateAnalysis {
+export interface TemplateAnalysis {
   suggestions: TemplateSuggestion[];
   extractedMatterData: Partial<{
     title: string;
@@ -56,18 +55,18 @@ class TemplateAnalysisService {
   };
 
   /**
-   * Analyze voice transcription and suggest relevant templates
+   * Analyze text input and suggest relevant templates
    */
-  async analyzeVoiceForTemplates(transcription: string, extractedData?: ExtractedTimeEntryData): Promise<VoiceTemplateAnalysis> {
+  async analyzeTextForTemplates(text: string): Promise<TemplateAnalysis> {
     try {
       // Get all available templates
       const templates = await matterTemplatesService.getTemplates();
       
-      // Extract matter-related information from transcription
-      const extractedMatterData = this.extractMatterDataFromVoice(transcription, extractedData);
+      // Extract matter-related information from text
+      const extractedMatterData = this.extractMatterDataFromText(text);
       
       // Generate template suggestions
-      const suggestions = this.generateTemplateSuggestions(transcription, templates, extractedMatterData);
+      const suggestions = this.generateTemplateSuggestions(text, templates, extractedMatterData);
       
       // Calculate overall confidence
       const confidence = this.calculateOverallConfidence(suggestions, extractedMatterData);
@@ -78,7 +77,7 @@ class TemplateAnalysisService {
         confidence
       };
     } catch (error) {
-      console.error('Error analyzing voice for templates:', error);
+      console.error('Error analyzing text for templates:', error);
       return {
         suggestions: [],
         extractedMatterData: {},
@@ -88,11 +87,11 @@ class TemplateAnalysisService {
   }
 
   /**
-   * Extract matter-related data from voice transcription
+   * Extract matter-related data from text input
    */
-  private extractMatterDataFromVoice(transcription: string, extractedData?: ExtractedTimeEntryData): VoiceTemplateAnalysis['extractedMatterData'] {
-    const lowerText = transcription.toLowerCase();
-    const extractedMatterData: VoiceTemplateAnalysis['extractedMatterData'] = {};
+  private extractMatterDataFromText(text: string): TemplateAnalysis['extractedMatterData'] {
+    const lowerText = text.toLowerCase();
+    const extractedMatterData: TemplateAnalysis['extractedMatterData'] = {};
 
     // Extract matter type based on keywords
     for (const [matterType, keywords] of Object.entries(this.MATTER_TYPE_KEYWORDS)) {
@@ -151,12 +150,12 @@ class TemplateAnalysisService {
    * Generate template suggestions based on analysis
    */
   private generateTemplateSuggestions(
-    transcription: string, 
+    text: string, 
     templates: MatterTemplate[], 
-    extractedData: VoiceTemplateAnalysis['extractedMatterData']
+    extractedData: TemplateAnalysis['extractedMatterData']
   ): TemplateSuggestion[] {
     const suggestions: TemplateSuggestion[] = [];
-    const lowerText = transcription.toLowerCase();
+    const lowerText = text.toLowerCase();
 
     for (const template of templates) {
       const matchReasons: string[] = [];
@@ -193,9 +192,9 @@ class TemplateAnalysisService {
       // Match by description similarity
       if (template.data.description) {
         const descriptionWords = template.data.description.toLowerCase().split(/\s+/);
-        const transcriptionWords = lowerText.split(/\s+/);
+        const textWords = lowerText.split(/\s+/);
         const commonWords = descriptionWords.filter(word => 
-          word.length > 3 && transcriptionWords.includes(word)
+          word.length > 3 && textWords.includes(word)
         );
         if (commonWords.length > 0) {
           confidence += 0.1 * (commonWords.length / descriptionWords.length);
@@ -239,7 +238,7 @@ class TemplateAnalysisService {
   /**
    * Calculate overall confidence score
    */
-  private calculateOverallConfidence(suggestions: TemplateSuggestion[], extractedData: VoiceTemplateAnalysis['extractedMatterData']): number {
+  private calculateOverallConfidence(suggestions: TemplateSuggestion[], extractedData: TemplateAnalysis['extractedMatterData']): number {
     if (suggestions.length === 0) return 0;
 
     const topSuggestionConfidence = suggestions[0]?.confidence || 0;
@@ -249,14 +248,14 @@ class TemplateAnalysisService {
   }
 
   /**
-   * Get smart template suggestions based on recent voice activity
+   * Get smart template suggestions based on recent text activity
    */
-  async getSmartSuggestions(recentTranscriptions: string[]): Promise<TemplateSuggestion[]> {
-    if (recentTranscriptions.length === 0) return [];
+  async getSmartSuggestions(recentTexts: string[]): Promise<TemplateSuggestion[]> {
+    if (recentTexts.length === 0) return [];
 
-    // Combine recent transcriptions for analysis
-    const combinedText = recentTranscriptions.join(' ');
-    const analysis = await this.analyzeVoiceForTemplates(combinedText);
+    // Combine recent texts for analysis
+    const combinedText = recentTexts.join(' ');
+    const analysis = await this.analyzeTextForTemplates(combinedText);
     
     return analysis.suggestions;
   }

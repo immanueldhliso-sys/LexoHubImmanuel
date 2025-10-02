@@ -508,7 +508,7 @@ const LoginPage = () => {
                 </div>
             )}
         
-        <AuthPanel userType="junior" title="JUNIOR ADVOCATES" subtitle="BUILD YOUR PRACTICE. INNOVATE & GROW" Icon={TrendingUp} features={['Voice-First Time Capture', 'AI-Powered Brief Analysis', 'Practice Growth Tools']}
+        <AuthPanel userType="junior" title="JUNIOR ADVOCATES" subtitle="BUILD YOUR PRACTICE. INNOVATE & GROW" Icon={TrendingUp} features={['AI-Powered Brief Analysis', 'Practice Growth Tools']}
           badge={ <div className="flex items-center gap-2 p-2 bg-white/15 rounded-lg border border-white/30 w-fit mt-auto shadow-sm"><span className="text-white text-sm font-medium">South Africa</span></div> }
           color="blue" selectedType={selectedType} setSelectedType={setSelectedType}
         >

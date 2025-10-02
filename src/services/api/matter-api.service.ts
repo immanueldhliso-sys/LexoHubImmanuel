@@ -6,6 +6,7 @@
 
 import { BaseApiService, type ApiResponse, type FilterOptions, type PaginationOptions } from './base-api.service';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 import type { Matter, MatterStatus, NewMatterForm } from '../../types';
 
 export interface MatterFilters extends FilterOptions {
@@ -44,7 +45,7 @@ export class MatterApiService extends BaseApiService<Matter> {
   constructor() {
     super('matters', `
       *,
-      advocate:advocates(full_name, practice_number),
+      advocate:advocates!advocate_id(full_name, practice_number),
       time_entries(count),
       invoices(count),
       documents(count),

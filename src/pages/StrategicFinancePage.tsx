@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Shield
 } from 'lucide-react';
+import { Icon } from '../design-system/components';
 import { format } from 'date-fns';
 import { 
   StrategicFinanceService, 

@@ -40,10 +40,8 @@ export interface MatterTemplateData {
   // Additional fields that can be customized
   customFields?: Record<string, unknown>;
   tags?: string;
-  
-  // Voice integration specific fields
-  workType?: string; // Maps to matterType for voice integration
-  billable?: boolean; // Maps to feeType determination
+  workType?: string;
+  billable?: boolean;
 }
 
 // Template category interface
@@ -160,12 +158,7 @@ export interface SaveTemplateModalState {
   error?: string;
 }
 
-// Voice integration types
-export interface VoiceTemplateMapping {
-  workType: string;
-  suggestedTemplates: TemplateSuggestion[];
-  confidence: number;
-}
+
 
 // Template usage analytics
 export interface TemplateUsageStats {

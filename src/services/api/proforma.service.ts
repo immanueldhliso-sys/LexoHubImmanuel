@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
-import type { ProForma, ProFormaGenerationRequest, ProFormaStatus } from '../../types';
+import type { ProForma, ProFormaGenerationRequest } from '../../types';
+import { ProFormaStatus } from '../../types';
 import { toast } from 'react-hot-toast';
 
 export class ProFormaService {
@@ -292,8 +293,8 @@ export class ProFormaService {
       matter_id: invoice.matter_id,
       advocate_id: invoice.advocate_id,
       quote_number: invoice.invoice_number,
-      quote_date: invoice.invoice_date,
-      valid_until: invoice.due_date,
+      quote_date: invoice.dateIssued,
+        valid_until: invoice.dateDue,
       fee_narrative: invoice.fee_narrative || '',
       total_amount: invoice.total_amount || 0,
       status: this.mapInvoiceStatusToProFormaStatus(invoice.status),

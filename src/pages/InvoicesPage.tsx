@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { Button } from '../design-system/components';
+import { Button, Icon } from '../design-system/components';
 import { InvoiceList } from '../components/invoices/InvoiceList';
 import { PaymentTrackingDashboard } from '../components/invoices/PaymentTrackingDashboard';
 

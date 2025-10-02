@@ -13,7 +13,7 @@ import {
   Settings,
   AlertTriangle
 } from 'lucide-react';
-import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { Card, CardHeader, CardContent, Button, Icon } from '../design-system/components';
 import { InvoiceService } from '../services/api/invoices.service';
 import { StrategicFinanceService, type SuccessFeeScenario } from '../services/api/strategic-finance.service';
 import { toast } from 'react-hot-toast';

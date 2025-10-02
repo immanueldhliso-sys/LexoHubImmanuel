@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Scale, BarChart3, TrendingUp, User as UserIcon } from 'lucide-react';
-import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { Card, CardHeader, CardContent, Button, Icon } from '../design-system/components';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 

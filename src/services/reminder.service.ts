@@ -1,6 +1,7 @@
 import { format, addDays, isAfter, isBefore, differenceInDays } from 'date-fns';
 import type { Invoice, Payment, Bar } from '@/types';
 import { InvoiceService } from './api/invoices.service';
+import { invoiceApiService } from './api/invoice-api.service';
 
 export interface ReminderSchedule {
   daysAfterDue: number;
@@ -19,11 +20,7 @@ export interface PaymentTrackingMetrics {
 }
 
 export class ReminderService {
-  private invoiceService: InvoiceService;
-
-  constructor() {
-    this.invoiceService = new InvoiceService();
-  }
+  constructor() {}
 
   /**
    * Get reminder schedules based on Bar rules
@@ -75,7 +72,19 @@ export class ReminderService {
    */
   async processReminders(): Promise<void> {
     try {
-      const overdueInvoices = await this.invoiceService.getOverdueInvoices();
+      // Fetch invoices and compute overdue locally
+      const { data: allInvoices } = await InvoiceService.getInvoices({
+        page: 1,
+        pageSize: 200,
+        status: ['sent', 'viewed', 'overdue'],
+        sortBy: 'due_date',
+        sortOrder: 'asc'
+      } as any);
+      const overdueInvoices: Invoice[] = (allInvoices || []).filter((invoice: any) => {
+        const status = String(invoice.status || '').toLowerCase();
+        const due = invoice.dateDue || invoice.due_date;
+        return status === 'overdue' || (status !== 'paid' && !!due && isAfter(new Date(), new Date(due)));
+      });
       const today = new Date();
 
       for (const invoice of overdueInvoices) {
@@ -86,7 +95,7 @@ export class ReminderService {
           if (daysPastDue >= reminder.daysAfterDue) {
             const shouldSend = await this.shouldSendReminder(invoice, reminder);
             if (shouldSend) {
-              await this.sendReminder(invoice, reminder);
+              await this.sendReminderForSchedule(invoice, reminder);
               await this.logReminderSent(invoice.id, reminder.type);
             }
           }
@@ -121,7 +130,7 @@ export class ReminderService {
   /**
    * Send a reminder for an invoice
    */
-  private async sendReminder(invoice: Invoice, reminder: ReminderSchedule): Promise<void> {
+  private async sendReminderForSchedule(invoice: Invoice, reminder: ReminderSchedule): Promise<void> {
     const subject = reminder.subject.replace('{invoiceNumber}', invoice.invoiceNumber);
     const template = this.getReminderTemplate(invoice, reminder);
 
@@ -132,8 +141,8 @@ export class ReminderService {
 
     // Update the invoice's next reminder date
     const nextReminderDate = this.calculateNextReminderDate(invoice, reminder);
-    await this.invoiceService.updateInvoice(invoice.id, {
-      nextReminderDate: nextReminderDate?.toISOString() || null
+    await invoiceApiService.update(invoice.id, {
+      next_reminder_date: nextReminderDate ? nextReminderDate.toISOString().split('T')[0] : null
     });
   }
 
@@ -221,25 +230,26 @@ Kind regards,
    */
   async getPaymentTrackingMetrics(): Promise<PaymentTrackingMetrics> {
     try {
-      const allInvoices = await this.invoiceService.getInvoices();
+      const { data: allInvoices } = await InvoiceService.getInvoices({ page: 1, pageSize: 500 } as any);
+      const invoices: Invoice[] = (allInvoices || []) as any;
       const payments = await this.getAllPayments();
       
-      const overdueInvoices = allInvoices.filter(invoice => 
+      const overdueInvoices = invoices.filter(invoice => 
         invoice.status === 'Overdue' || 
-        (invoice.status === 'Unpaid' && isAfter(new Date(), new Date(invoice.dateDue)))
+        (String(invoice.status || '').toLowerCase() !== 'paid' && isAfter(new Date(), new Date(invoice.dateDue)))
       );
 
-      const upcomingDueDates = allInvoices.filter(invoice => {
+      const upcomingDueDates = invoices.filter(invoice => {
         const dueDate = new Date(invoice.dateDue);
         const today = new Date();
         const sevenDaysFromNow = addDays(today, 7);
         
-        return invoice.status === 'Unpaid' && 
+        return String(invoice.status || '').toLowerCase() === 'unpaid' && 
                isAfter(dueDate, today) && 
                isBefore(dueDate, sevenDaysFromNow);
       });
 
-      const totalOutstanding = allInvoices
+      const totalOutstanding = invoices
         .filter(invoice => invoice.status !== 'Paid')
         .reduce((sum, invoice) => sum + invoice.amount, 0);
 
@@ -247,7 +257,7 @@ Kind regards,
         .reduce((sum, invoice) => sum + invoice.amount, 0);
 
       // Calculate average payment days
-      const paidInvoices = allInvoices.filter(invoice => invoice.status === 'Paid');
+      const paidInvoices = invoices.filter(invoice => String(invoice.status || '').toLowerCase() === 'paid');
       const paymentDays = paidInvoices.map(invoice => {
         const payment = payments.find(p => p.invoiceId === invoice.id);
         if (payment) {
@@ -343,7 +353,16 @@ Kind regards,
    */
   async getUpcomingReminders(): Promise<Array<{ invoice: Invoice; reminderType: string; dueDate: Date }>> {
     try {
-      const overdueInvoices = await this.invoiceService.getOverdueInvoices();
+      const { data: allInvoices } = await InvoiceService.getInvoices({
+        page: 1,
+        pageSize: 500,
+        status: ['sent', 'viewed', 'overdue']
+      } as any);
+      const overdueInvoices: Invoice[] = (allInvoices || []).filter((invoice: any) => {
+        const status = String(invoice.status || '').toLowerCase();
+        const due = invoice.dateDue || invoice.due_date;
+        return status === 'overdue' || (status !== 'paid' && !!due && isAfter(new Date(), new Date(due)));
+      }) as any;
       const upcomingReminders: Array<{ invoice: Invoice; reminderType: string; dueDate: Date }> = [];
       
       for (const invoice of overdueInvoices) {
@@ -366,6 +385,16 @@ Kind regards,
     } catch (error) {
       console.error('Error getting upcoming reminders:', error);
       return [];
+    }
+  }
+
+  /**
+   * Public API: Send a reminder by invoice id (used by dashboard)
+   */
+  async sendReminder(invoiceId: string): Promise<void> {
+    const result = await invoiceApiService.sendReminder(invoiceId);
+    if (result.error) {
+      throw new Error(result.error.message || 'Failed to send reminder');
     }
   }
 }

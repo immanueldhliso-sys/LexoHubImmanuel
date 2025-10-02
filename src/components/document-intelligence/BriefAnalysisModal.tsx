@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
-import { X, Upload, Brain, FileText, AlertCircle } from 'lucide-react';
+import { X, Upload, FileText, AlertCircle, Sparkles } from 'lucide-react';
 import { DocumentIntelligenceService } from '../../services/api/document-intelligence.service';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
-
-interface BriefAnalysisModalProps {
-  onClose: () => void;
-}
 
 export const BriefAnalysisModal: React.FC<BriefAnalysisModalProps> = ({ onClose }) => {
   const [file, setFile] = useState<File | null>(null);
@@ -39,13 +36,27 @@ export const BriefAnalysisModal: React.FC<BriefAnalysisModalProps> = ({ onClose 
 
     setUploading(true);
     try {
-      // In a real implementation, you would upload the file first
-      // For now, we'll simulate with a mock document ID
-      const mockDocumentId = 'mock-doc-' + Date.now();
+      let documentId: string;
+      
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `briefs/${fileName}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(filePath, file);
+        
+        if (uploadError) throw uploadError;
+        
+        documentId = uploadData.path;
+      } else {
+        throw new Error('No file selected');
+      }
       
       setAnalyzing(true);
       await DocumentIntelligenceService.analyzeDocument({
-        documentId: mockDocumentId,
+        documentId,
         analysisType,
         priority
       });

@@ -242,7 +242,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 INSERT INTO opportunities (advocate_id, name, description, client_name, estimated_value, probability_percentage, source, status) 
 SELECT 
   a.id,
-  'Potential Commercial Dispute - ' || a.name,
+  'Potential Commercial Dispute - ' || a.full_name,
   'Initial consultation regarding contract dispute with supplier',
   'ABC Corporation',
   75000.00,

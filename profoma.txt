@@ -1,0 +1,287 @@
+. Database and Backend Setup
+We'll create a new table named pro_forma_requests to manage these requests.
+
+New Migration File: supabase/migrations/20251001080000_add_pro_forma_requests.sql
+This SQL script creates the table with the updated naming and defines the necessary security policies.
+
+SQL
+
+-- Define enum types for status and the requested action
+CREATE TYPE pro_forma_request_status AS ENUM ('pending', 'submitted', 'processed', 'declined');
+CREATE TYPE pro_forma_action_type AS ENUM ('matter', 'pro_forma');
+
+-- Create the table to store pro forma requests
+CREATE TABLE IF NOT EXISTS pro_forma_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    advocate_id UUID NOT NULL REFERENCES advocates(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL DEFAULT extensions.uuid_generate_v4()::text,
+    status pro_forma_request_status NOT NULL DEFAULT 'pending',
+    requested_action pro_forma_action_type, -- To be filled by the form submitter
+
+    -- Form Data (nullable until submitted)
+    instructing_attorney_name TEXT,
+    instructing_attorney_firm TEXT,
+    instructing_attorney_email TEXT,
+    instructing_attorney_phone TEXT,
+    client_name TEXT,
+    matter_title TEXT,
+    matter_description TEXT,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    submitted_at TIMESTAMPTZ,
+    processed_at TIMESTAMPTZ
+);
+
+-- Add indexes for performance
+CREATE INDEX idx_pro_forma_requests_advocate_id_status ON pro_forma_requests(advocate_id, status);
+CREATE INDEX idx_pro_forma_requests_token ON pro_forma_requests(token);
+
+-- Enable Row Level Security
+ALTER TABLE pro_forma_requests ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+-- Advocates can create, view, and manage their own requests.
+CREATE POLICY "Advocates can manage their own pro_forma_requests"
+ON pro_forma_requests FOR ALL
+USING (auth.uid() = advocate_id);
+
+-- Anyone with the link can view the form to submit it.
+CREATE POLICY "Public can view a pending pro_forma_request form"
+ON pro_forma_requests FOR SELECT
+USING (status = 'pending');
+
+-- Anyone with the link can update a pending request to submit their details.
+CREATE POLICY "Public can submit a pending pro_forma_request"
+ON pro_forma_requests FOR UPDATE
+USING (status = 'pending')
+WITH CHECK (status = 'pending');
+After running this migration, remember to update your types/database.ts file to reflect the new pro_forma_requests table.
+
+2. The Public-Facing Pro Forma Request Form
+This is the new, publicly accessible page for instructing attorneys.
+
+Step 1: Create the Public Route
+In your src/App.tsx file, add the new route.
+
+TypeScript
+
+// src/App.tsx
+// ... imports
+import ProFormaRequestPage from './pages/ProFormaRequestPage'; // Create this new page
+
+function App() {
+  // ...
+  return (
+    <Router>
+      <Routes>
+        {/* ... other routes */}
+        <Route path="/pro-forma-request/:token" element={<ProFormaRequestPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        {/* ... other protected routes */}
+      </Routes>
+    </Router>
+  );
+}
+Step 2: Build the ProFormaRequestPage.tsx Component
+This page will handle fetching the request, displaying the form, and submitting the data.
+
+TypeScript
+
+// src/pages/ProFormaRequestPage.tsx (New File)
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Button, Card, CardContent, Input } from '../design-system/components';
+import { toast } from 'react-hot-toast';
+
+const ProFormaRequestPage: React.FC = () => {
+  const { token } = useParams<{ token: string }>();
+  const [formData, setFormData] = useState({ /* ... form fields ... */ });
+  const [requestStatus, setRequestStatus] = useState<'loading' | 'pending' | 'submitted' | 'not_found'>('loading');
+  const [requestedAction, setRequestedAction] = useState<'matter' | 'pro_forma'>('pro_forma');
+
+  useEffect(() => {
+    const checkRequest = async () => {
+      const { data, error } = await supabase
+        .from('pro_forma_requests')
+        .select('status')
+        .eq('token', token)
+        .single();
+        
+      if (error || !data) {
+        setRequestStatus('not_found');
+      } else if (data.status !== 'pending') {
+        setRequestStatus('submitted');
+      } else {
+        setRequestStatus('pending');
+      }
+    };
+    if (token) checkRequest();
+  }, [token]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase
+      .from('pro_forma_requests')
+      .update({ 
+        ...formData,
+        requested_action: requestedAction,
+        status: 'submitted',
+        submitted_at: new Date().toISOString()
+      })
+      .eq('token', token);
+
+    if (error) {
+      toast.error('Failed to submit request.');
+    } else {
+      setRequestStatus('submitted');
+      toast.success('Your request has been sent!');
+    }
+  };
+
+  if (requestStatus === 'loading') return <div>Loading...</div>;
+  if (requestStatus === 'not_found') return <div>Request not found or has expired.</div>;
+  if (requestStatus === 'submitted') return <div>This pro forma request has already been submitted.</div>;
+
+  return (
+    <div className="container mx-auto p-4 max-w-2xl">
+      <Card>
+        <CardContent>
+          <h1 className="text-2xl font-bold mb-4">Request for Pro Forma / Instruction</h1>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Add Input fields for:
+              - instructing_attorney_name
+              - instructing_attorney_firm
+              - client_name
+              - matter_title
+              - matter_description (textarea)
+            */}
+            
+            <div>
+              <label>I would like to:</label>
+              <div className="flex gap-4 mt-2">
+                <label>
+                  <input type="radio" value="pro_forma" checked={requestedAction === 'pro_forma'} onChange={() => setRequestedAction('pro_forma')} />
+                  Request a Pro Forma Invoice
+                </label>
+                <label>
+                  <input type="radio" value="matter" checked={requestedAction === 'matter'} onChange={() => setRequestedAction('matter')} />
+                  Open a New Matter
+                </label>
+              </div>
+            </div>
+
+            <Button type="submit" variant="primary">Submit Request</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ProFormaRequestPage;
+3. Advocate Interface: Generate & Process
+Finally, here are the changes for the advocate's side of the application.
+
+Step 1: Add a "Get Pro Forma Link" Button
+In src/pages/MattersPage.tsx, add the button to generate and copy the link.
+
+TypeScript
+
+// src/pages/MattersPage.tsx
+
+// ... in the quick action buttons section
+import { Link2 } from 'lucide-react'; // Add new icon
+
+// ... inside the component
+const handleGetProFormaLink = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+        .from('pro_forma_requests')
+        .insert({ advocate_id: user.id })
+        .select('token')
+        .single();
+
+    if (error || !data) {
+        toast.error('Could not generate link.');
+    } else {
+        const url = `${window.location.origin}/pro-forma-request/${data.token}`;
+        navigator.clipboard.writeText(url);
+        toast.success('Pro forma request link copied to clipboard!');
+    }
+};
+
+// ... in the JSX for quick actions
+<Button 
+  variant="outline" 
+  onClick={handleGetProFormaLink}
+  className="flex items-center space-x-2"
+  title="Generate a link to request a pro forma"
+>
+  <Link2 className="w-4 h-4" />
+  <span>Get Pro Forma Link</span>
+</Button>
+Step 2: Display and Process Incoming Requests
+You can create a new component to display incoming requests on your dashboard or another suitable page. This component would handle the logic for pre-populating the correct modal based on the attorney's choice.
+
+TypeScript
+
+// A new component, e.g., src/components/proforma/PendingProFormaRequests.tsx
+
+// ... (imports)
+// This component would receive the fetched requests as props
+
+const handleProcessRequest = async (request: ProFormaRequest) => {
+    const initialData = {
+      title: request.matter_title,
+      description: request.matter_description,
+      client_name: request.client_name,
+      instructing_attorney: request.instructing_attorney_name,
+      instructing_firm: request.instructing_attorney_firm,
+      instructing_attorney_email: request.instructing_attorney_email,
+      instructing_attorney_phone: request.instructing_attorney_phone,
+    };
+    
+    // Set state to hold this data
+    setPrepopulationData(initialData);
+
+    if (request.requested_action === 'matter') {
+        // Open the NewMatterModal with initialData
+        setShowNewMatterModal(true);
+    } else { // 'pro_forma'
+        // The InvoiceGenerationModal needs a `Matter` object
+        const tempMatterForInvoice = { id: 'temp-pro-forma-' + request.id, ...initialData };
+        setPrepopulationData(tempMatterForInvoice);
+        // Open the InvoiceGenerationModal, ensuring it defaults to pro forma
+        setShowInvoiceModal(true);
+    }
+    
+    // Mark the request as processed in the database
+    await supabase.from('pro_forma_requests').update({ status: 'processed', processed_at: new Date() }).eq('id', request.id);
+};
+
+// ... In your return statement, you would have the modals ready to be opened
+return (
+  <>
+    {/* ... list of pending requests with buttons that call handleProcessRequest ... */}
+
+    {prepopulationData && (
+      <NewMatterModal
+        isOpen={showNewMatterModal}
+        onClose={() => setShowNewMatterModal(false)}
+        initialData={prepopulationData}
+      />
+    )}
+    
+    {prepopulationData && (
+       <InvoiceGenerationModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          matter={prepopulationData}
+          onInvoiceGenerated={() => { /* ... */ }}
+          defaultToProForma={true}
+      />
+    )}
+  </>
+);

@@ -14,7 +14,6 @@ import {
   Search,
   Settings,
   Shield,
-  Mic,
   Calculator,
   Target,
   BookOpen,
@@ -25,18 +24,14 @@ import {
   LineChart,
   CreditCard,
   Receipt,
-  Wallet,
-  Building,
   UserPlus,
   MessageSquare,
-  Phone,
-  Mail,
   Globe,
   Lightbulb,
-  Rocket,
-  Star
+  Rocket
 } from 'lucide-react';
-import type { NavigationConfig } from '../types';
+import { UserTier } from '../types';
+import type { NavigationConfig, NavigationItem } from '../types';
 
 export const navigationConfig: NavigationConfig = {
   categories: [
@@ -64,7 +59,7 @@ export const navigationConfig: NavigationConfig = {
               page: 'ai-analytics',
               icon: Brain,
               description: 'AI-powered insights and analytics',
-              minTier: 'advocate_pro',
+              minTier: UserTier.ADVOCATE_PRO,
               isNew: true
             }
           ]
@@ -73,14 +68,6 @@ export const navigationConfig: NavigationConfig = {
           id: 'quick-actions',
           title: 'Quick Actions',
           items: [
-            {
-              id: 'voice-time-entry',
-              label: 'Voice Time Entry',
-              icon: Mic,
-              description: 'Capture time entries using voice commands',
-              minTier: 'advocate_pro',
-              badge: 'Voice'
-            },
             {
               id: 'create-matter',
               label: 'New Matter',
@@ -111,19 +98,9 @@ export const navigationConfig: NavigationConfig = {
               label: 'Financial Analytics',
               icon: PieChart,
               description: 'Revenue and profitability insights',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             }
           ]
-        }
-      ],
-      featured: [
-        {
-          id: 'voice-dashboard',
-          label: 'Voice-Powered Dashboard',
-          icon: Mic,
-          description: 'Control your dashboard with voice commands',
-          minTier: 'senior_advocate',
-          isNew: true
         }
       ]
     },
@@ -156,6 +133,39 @@ export const navigationConfig: NavigationConfig = {
               label: 'New Matter',
               icon: PlusCircle,
               description: 'Create a new matter'
+            },
+            {
+              id: 'matter-templates',
+              label: 'Matter Templates',
+              icon: FileText,
+              description: 'Quick setup with templates',
+              minTier: UserTier.ADVOCATE_PRO
+            }
+          ]
+        },
+        {
+          id: 'time-billing',
+          title: 'Time & Billing',
+          items: [
+            {
+              id: 'time-tracking',
+              label: 'Time Tracking',
+              icon: Clock,
+              description: 'Track time spent on matters'
+            },
+            {
+              id: 'proforma',
+              label: 'Pro Forma',
+              page: 'proforma',
+              icon: Receipt,
+              description: 'Create and send pro forma invoices'
+            },
+            {
+              id: 'matter-invoices',
+              label: 'Invoices',
+              page: 'invoices',
+              icon: FileText,
+              description: 'Generate invoices from matters'
             }
           ]
         },
@@ -176,59 +186,19 @@ export const navigationConfig: NavigationConfig = {
               description: 'View matter-related deadlines and events'
             },
             {
-              id: 'time-tracking',
-              label: 'Time Tracking',
-              icon: Clock,
-              description: 'Track time spent on matters'
-            }
-          ]
-        },
-        {
-          id: 'templates',
-          title: 'Templates',
-          items: [
-            {
-              id: 'matter-templates',
-              label: 'Matter Templates',
-              icon: FileText,
-              description: 'Manage and use matter templates for quick setup',
-              minTier: 'advocate_pro'
-            },
-            {
-              id: 'template-library',
-              label: 'Template Library',
-              icon: BookOpen,
-              description: 'Browse and organize your matter templates',
-              minTier: 'advocate_pro'
-            }
-          ]
-        },
-        {
-          id: 'ai-assistance',
-          title: 'AI Assistance',
-          items: [
-            {
               id: 'brief-analysis',
               label: 'Brief Analysis',
               icon: Brain,
               description: 'AI-powered brief and document analysis',
-              minTier: 'advocate_pro',
+              minTier: UserTier.ADVOCATE_PRO,
               badge: 'AI'
             },
             {
               id: 'case-research',
               label: 'Case Research',
               icon: Search,
-              description: 'AI-assisted legal research and precedent finding',
-              minTier: 'senior_advocate',
-              badge: 'AI'
-            },
-            {
-              id: 'document-drafting',
-              label: 'Document Drafting',
-              icon: FileText,
-              description: 'AI-assisted document creation and review',
-              minTier: 'senior_advocate',
+              description: 'AI-assisted legal research',
+              minTier: UserTier.SENIOR_ADVOCATE,
               badge: 'AI'
             }
           ]
@@ -237,10 +207,11 @@ export const navigationConfig: NavigationConfig = {
       featured: [
         {
           id: 'ai-matter-insights',
-          label: 'AI Matter Insights',
-          icon: Brain,
-          description: 'Get AI-powered insights on your matters',
-          minTier: 'advocate_pro'
+          label: 'Complete Matter Workflow',
+          icon: Zap,
+          description: 'Matter → Time → Pro Forma → Invoice',
+          minTier: UserTier.ADVOCATE_PRO,
+          isNew: true
         }
       ]
     },
@@ -252,70 +223,78 @@ export const navigationConfig: NavigationConfig = {
       description: 'Financial management and billing',
       sections: [
         {
-          id: 'billing',
-          title: 'Billing & Invoicing',
+          id: 'billing-workflow',
+          title: 'Billing Workflow',
           items: [
             {
+              id: 'proforma',
+              label: 'Pro Forma Invoices',
+              page: 'proforma',
+              icon: Receipt,
+              description: 'Create and send estimates to clients'
+            },
+            {
               id: 'invoices',
-              label: 'Invoices',
+              label: 'Final Invoices',
               page: 'invoices',
               icon: FileText,
               description: 'Manage invoices and billing'
-            },
-            {
-              id: 'proforma',
-              label: 'Pro Forma',
-              page: 'proforma',
-              icon: Receipt,
-              description: 'Create and manage pro forma invoices'
-            },
-            {
-              id: 'pricing',
-              label: 'Pricing Management',
-              page: 'pricing-management',
-              icon: Scale,
-              description: 'Manage your pricing and fee structures'
-            }
-          ]
-        },
-        {
-          id: 'financial-tools',
-          title: 'Financial Tools',
-          items: [
-            {
-              id: 'fee-calculator',
-              label: 'Fee Calculator',
-              icon: Calculator,
-              description: 'Calculate fees and estimates',
-              minTier: 'advocate_pro'
             },
             {
               id: 'payment-tracking',
               label: 'Payment Tracking',
               icon: CreditCard,
               description: 'Track payments and outstanding amounts',
-              minTier: 'advocate_pro'
-            },
-            {
-              id: 'financial-reports',
-              label: 'Financial Reports',
-              icon: BarChart,
-              description: 'Comprehensive financial reporting',
-              minTier: 'senior_advocate'
+              minTier: UserTier.ADVOCATE_PRO
             }
           ]
         },
         {
-          id: 'strategic-finance',
-          title: 'Strategic Finance',
+          id: 'pricing-fees',
+          title: 'Pricing & Fees',
           items: [
+            {
+              id: 'pricing',
+              label: 'Pricing Management',
+              page: 'pricing-management',
+              icon: Scale,
+              description: 'Manage pricing and fee structures'
+            },
+            {
+              id: 'fee-calculator',
+              label: 'Fee Calculator',
+              icon: Calculator,
+              description: 'Calculate fees and estimates',
+              minTier: UserTier.ADVOCATE_PRO
+            },
+            {
+              id: 'ai-billing',
+              label: 'AI Billing Assistant',
+              icon: Brain,
+              description: 'Smart billing suggestions',
+              minTier: UserTier.ADVOCATE_PRO,
+              badge: 'AI'
+            }
+          ]
+        },
+        {
+          id: 'financial-analytics',
+          title: 'Financial Analytics',
+          items: [
+            {
+              id: 'financial-reports',
+              label: 'Financial Reports',
+              icon: BarChart,
+              description: 'Revenue and cash flow analysis',
+              minTier: UserTier.ADVOCATE_PRO
+            },
             {
               id: 'strategic-finance',
               label: 'Strategic Finance',
               page: 'strategic-finance',
               icon: TrendingUp,
-              description: 'Advanced financial planning and analysis',
-              minTier: 'senior_advocate',
+              description: 'Advanced financial planning',
+              minTier: UserTier.SENIOR_ADVOCATE,
               isNew: true
             }
           ]
@@ -323,11 +302,12 @@ export const navigationConfig: NavigationConfig = {
       ],
       featured: [
         {
-          id: 'ai-billing',
-          label: 'AI-Powered Billing',
-          icon: Brain,
-          description: 'Intelligent billing suggestions and automation',
-          minTier: 'advocate_pro'
+          id: 'end-to-end-billing',
+          label: 'End-to-End Billing',
+          icon: Zap,
+          description: 'Pro Forma → Invoice → Payment → Analytics',
+          minTier: UserTier.ADVOCATE_PRO,
+          isNew: true
         }
       ]
     },
@@ -353,14 +333,14 @@ export const navigationConfig: NavigationConfig = {
               label: 'Client Acquisition',
               icon: UserPlus,
               description: 'Tools for acquiring new clients',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             },
             {
               id: 'referral-tracking',
               label: 'Referral Tracking',
               icon: Target,
               description: 'Track and manage referrals',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             }
           ]
         },
@@ -374,21 +354,21 @@ export const navigationConfig: NavigationConfig = {
               page: 'practice-growth',
               icon: TrendingUp,
               description: 'Strategic practice development tools',
-              minTier: 'senior_advocate'
+              minTier: UserTier.SENIOR_ADVOCATE
             },
             {
               id: 'marketing-tools',
               label: 'Marketing Tools',
               icon: Rocket,
               description: 'Digital marketing and practice promotion',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             },
             {
               id: 'networking',
               label: 'Professional Network',
               icon: Users,
               description: 'Connect with other legal professionals',
-              minTier: 'senior_advocate'
+              minTier: UserTier.SENIOR_ADVOCATE
             }
           ]
         },
@@ -401,7 +381,7 @@ export const navigationConfig: NavigationConfig = {
               label: 'Client Communication',
               icon: MessageSquare,
               description: 'Streamlined client communication tools',
-              minTier: 'advocate_pro',
+              minTier: UserTier.ADVOCATE_PRO,
               isNew: true
             }
           ]
@@ -413,7 +393,7 @@ export const navigationConfig: NavigationConfig = {
           label: 'Growth Analytics',
           icon: BarChart,
           description: 'Track your practice growth metrics',
-          minTier: 'advocate_pro'
+          minTier: UserTier.ADVOCATE_PRO
         }
       ]
     },
@@ -434,14 +414,14 @@ export const navigationConfig: NavigationConfig = {
               page: 'ai-analytics',
               icon: Brain,
               description: 'AI-powered practice insights and analytics',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             },
             {
               id: 'predictive-analytics',
               label: 'Predictive Analytics',
               icon: LineChart,
               description: 'Predict case outcomes and practice trends',
-              minTier: 'advocate_pro',
+              minTier: UserTier.ADVOCATE_PRO,
               badge: 'AI'
             }
           ]
@@ -456,7 +436,7 @@ export const navigationConfig: NavigationConfig = {
               page: 'workflow-integrations',
               icon: Zap,
               description: 'Automate repetitive tasks and workflows',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             }
           ]
         }
@@ -467,7 +447,7 @@ export const navigationConfig: NavigationConfig = {
           label: 'AI Legal Assistant',
           icon: Brain,
           description: 'Your personal AI legal assistant',
-          minTier: 'senior_advocate',
+          minTier: UserTier.SENIOR_ADVOCATE,
           isNew: true
         }
       ]
@@ -528,7 +508,7 @@ export const navigationConfig: NavigationConfig = {
           label: 'AI-Powered Learning',
           icon: Brain,
           description: 'Personalized learning recommendations',
-          minTier: 'advocate_pro'
+          minTier: UserTier.ADVOCATE_PRO
         }
       ]
     },
@@ -580,7 +560,7 @@ export const navigationConfig: NavigationConfig = {
               label: 'API Settings',
               icon: Globe,
               description: 'Manage API keys and external connections',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             }
           ]
         },
@@ -600,7 +580,7 @@ export const navigationConfig: NavigationConfig = {
               label: 'Security Settings',
               icon: Shield,
               description: 'Account security and access controls',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             }
           ]
         },
@@ -613,34 +593,14 @@ export const navigationConfig: NavigationConfig = {
               label: 'Template Settings',
               icon: FileText,
               description: 'Configure template preferences and defaults',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             },
             {
               id: 'template-categories',
               label: 'Template Categories',
               icon: BookOpen,
               description: 'Manage template categories and organization',
-              minTier: 'advocate_pro'
-            }
-          ]
-        },
-        {
-          id: 'advanced-features',
-          title: 'Advanced Features',
-          items: [
-            {
-              id: 'feature-toggles',
-              label: 'Feature Toggles',
-              icon: Zap,
-              description: 'Enable or disable advanced features',
-              minTier: 'advocate_pro'
-            },
-            {
-              id: 'ai-settings',
-              label: 'AI Settings',
-              icon: Brain,
-              description: 'Configure AI features and preferences',
-              minTier: 'advocate_pro'
+              minTier: UserTier.ADVOCATE_PRO
             }
           ]
         }
@@ -651,19 +611,12 @@ export const navigationConfig: NavigationConfig = {
           label: 'Advanced Configuration',
           icon: Settings,
           description: 'Access advanced practice configuration options',
-          minTier: 'senior_advocate'
+          minTier: UserTier.SENIOR_ADVOCATE
         }
       ]
     }
   ],
   quickActions: [
-    {
-      id: 'voice-capture',
-      label: 'Voice Capture',
-      icon: Mic,
-      description: 'Quick voice time entry',
-      minTier: 'advocate_pro'
-    },
     {
       id: 'new-matter',
       label: 'New Matter',
@@ -723,8 +676,13 @@ export const getFilteredNavigationConfig = (userTier: string): NavigationConfig 
   return filteredConfig;
 };
 
-// Helper function to get accessible navigation items for current user
-export const getAccessibleNavigationItems = (userTier: string) => {
+// Helper function to filter navigation items by user tier
+export const getAccessibleNavigationItems = (items: NavigationItem[], userTier: UserTier): NavigationItem[] => {
+  return items.filter(item => hasAccess(userTier, item.minTier));
+};
+
+// Helper function to get all accessible navigation items for current user
+export const getAllAccessibleNavigationItems = (userTier: string) => {
   const config = getFilteredNavigationConfig(userTier);
   const items: Array<{ id: string; label: string; page?: string }> = [];
   

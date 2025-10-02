@@ -14,6 +14,7 @@ import {
   ArrowDownRight,
   UserCheck
 } from 'lucide-react';
+import { Icon } from '../design-system/components';
 import { format } from 'date-fns';
 import { PracticeGrowthService, type OverflowBrief, type SpecialisationCategory } from '../services/api/practice-growth.service';
 import { OverflowBriefCard } from '../components/practice-growth/OverflowBriefCard';

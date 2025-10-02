@@ -6,9 +6,9 @@ import type {
   NavigationCategory, 
   NavigationItem, 
   NavigationSection, 
-  Page, 
-  UserTier 
+  Page
 } from '../../types';
+import { UserTier } from '../../types';
 
 interface MegaMenuProps {
   category: NavigationCategory;
@@ -54,7 +54,7 @@ const MegaMenuItem: React.FC<MegaMenuItemProps> = ({
 
   return (
     <div
-      className={`group relative p-3 sm:p-3 rounded-lg transition-all duration-200 min-h-[44px] flex items-center ${
+      className={`group relative p-2.5 rounded-lg transition-all duration-200 min-h-[44px] flex items-center ${
         isAccessible
           ? 'hover:bg-neutral-50 active:bg-neutral-100 cursor-pointer touch-manipulation'
           : 'opacity-60 cursor-not-allowed'
@@ -156,11 +156,11 @@ const MegaMenuSection: React.FC<MegaMenuSectionProps> = ({
   }
 
   return (
-    <div className="space-y-1">
-      <h3 className="text-xs font-semibold text-judicial-blue-600 uppercase tracking-wider mb-2 sm:mb-3">
+    <div className="space-y-1 bg-white rounded-lg border border-neutral-100 p-4">
+      <h3 className="text-xs font-semibold text-judicial-blue-600 uppercase tracking-wider mb-3">
         {section.title}
       </h3>
-      <div className="space-y-0.5 sm:space-y-1">
+      <div className="space-y-1">
         {section.items.map((item) => (
           <MegaMenuItem
             key={item.id}
@@ -187,10 +187,10 @@ const FeaturedItems: React.FC<{
   }
 
   return (
-    <div className="bg-gradient-to-br from-mpondo-gold-50 to-judicial-blue-50 rounded-lg p-3 sm:p-4">
-      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+    <div className="bg-gradient-to-br from-mpondo-gold-50 to-judicial-blue-50 rounded-lg p-4 border border-mpondo-gold-200">
+      <div className="flex items-center gap-2 mb-3">
         <Star className="w-4 h-4 text-mpondo-gold-600" />
-        <h3 className="text-sm font-semibold text-neutral-900">Featured</h3>
+        <h3 className="text-sm font-semibold text-neutral-900">Featured Workflow</h3>
       </div>
       <div className="space-y-1 sm:space-y-2">
         {accessibleItems.map((item) => {
@@ -264,40 +264,42 @@ export const MegaMenu: React.FC<MegaMenuProps> = ({
     const sectionCount = accessibleSections.length;
     const hasFeatured = category.featured && category.featured.length > 0;
     
-    // Mobile-first responsive grid
-    let baseClasses = 'grid-cols-1 sm:grid-cols-2';
-    
     if (hasFeatured) {
-      baseClasses += sectionCount <= 2 ? ' lg:grid-cols-3' : ' lg:grid-cols-4';
-    } else {
-      baseClasses += sectionCount <= 2 ? ' lg:grid-cols-2' : 
-                     sectionCount === 3 ? ' lg:grid-cols-3' : ' lg:grid-cols-4';
+      return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
     }
     
-    return baseClasses;
+    if (sectionCount === 3) {
+      return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+    }
+    
+    if (sectionCount === 2) {
+      return 'grid-cols-1 md:grid-cols-2';
+    }
+    
+    return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
   };
 
   return (
     <div 
-      className={`max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 ${className}`}
+      className={`max-w-7xl mx-auto px-4 lg:px-8 py-6 ${className}`}
       role="menu"
       aria-label={`${category.label} menu`}
     >
       {/* Category Header */}
-      <div className="mb-4 sm:mb-6">
-        <div className="flex items-center gap-2 sm:gap-3 mb-2">
-          <category.icon className="w-5 h-5 sm:w-6 sm:h-6 text-mpondo-gold-600" />
-          <h2 className="text-base sm:text-lg font-semibold text-neutral-900">
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <category.icon className="w-6 h-6 text-mpondo-gold-600" />
+          <h2 className="text-lg font-semibold text-neutral-900">
             {category.label}
           </h2>
         </div>
         {category.description && (
-          <p className="text-xs sm:text-sm text-neutral-600">{category.description}</p>
+          <p className="text-sm text-neutral-600">{category.description}</p>
         )}
       </div>
 
       {/* Menu Content Grid */}
-      <div className={`grid gap-4 sm:gap-6 lg:gap-8 ${getGridColumns()}`}>
+      <div className={`grid gap-4 ${getGridColumns()}`}>
         {/* Navigation Sections */}
         {accessibleSections.map((section) => (
           <MegaMenuSection
@@ -319,8 +321,8 @@ export const MegaMenu: React.FC<MegaMenuProps> = ({
       </div>
 
       {/* Footer Actions */}
-      <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-neutral-200">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+      <div className="mt-8 pt-6 border-t border-neutral-200">
+        <div className="flex items-center justify-between">
           <div className="text-xs text-neutral-500">
             Explore all {category.label.toLowerCase()} features
           </div>
@@ -329,7 +331,7 @@ export const MegaMenu: React.FC<MegaMenuProps> = ({
               variant="outline"
               size="sm"
               onClick={() => onItemClick(category.page!)}
-              className="text-xs w-full sm:w-auto"
+              className="text-xs"
             >
               View All
               <ArrowRight className="w-3 h-3 ml-1" />

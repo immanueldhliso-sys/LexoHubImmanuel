@@ -2,19 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Gavel, 
-  Mic, 
   Settings, 
   RefreshCw, 
   Plus,
   Search,
-  Filter,
   Globe,
   Sync,
   CheckCircle,
   AlertCircle,
   Clock
 } from 'lucide-react';
-import { Button, Card, CardHeader, CardContent } from '../design-system/components';
+import { Button, Card, CardHeader, CardContent, Icon } from '../design-system/components';
 import { WorkflowIntegrationsService } from '../services/api/workflow-integrations.service';
 import type { 
   WorkflowPage, 
@@ -22,7 +20,6 @@ import type {
   CourtRegistry, 
   Judge, 
   JudgeAnalytics,
-  VoiceQuery,
   CourtIntegrationLog 
 } from '../types';
 import { toast } from 'react-hot-toast';
@@ -31,7 +28,6 @@ import { format, isToday, isTomorrow, addDays } from 'date-fns';
 // Component imports will be created below
 import { CourtDiaryCard } from '../components/workflow/CourtDiaryCard';
 import { JudgeAnalyticsCard } from '../components/workflow/JudgeAnalyticsCard';
-import { VoiceAssistantPanel } from '../components/workflow/VoiceAssistantPanel';
 import { IntegrationsPanel } from '../components/workflow/IntegrationsPanel';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -49,9 +45,7 @@ const WorkflowIntegrationsPage: React.FC = () => {
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
   const [judgeAnalytics, setJudgeAnalytics] = useState<JudgeAnalytics | null>(null);
   
-  // Voice Assistant State
-  const [voiceQueries, setVoiceQueries] = useState<VoiceQuery[]>([]);
-  const [isListening, setIsListening] = useState(false);
+
   
   // Integrations State
   const [integrationLogs, setIntegrationLogs] = useState<CourtIntegrationLog[]>([]);
@@ -70,9 +64,6 @@ const WorkflowIntegrationsPage: React.FC = () => {
           break;
         case 'judge-analytics':
           await loadJudgeAnalytics();
-          break;
-        case 'voice-assistant':
-          await loadVoiceQueries();
           break;
         case 'integrations':
           await loadIntegrations();
@@ -106,14 +97,7 @@ const WorkflowIntegrationsPage: React.FC = () => {
     }
   };
 
-  const loadVoiceQueries = async () => {
-    if (!user?.id) {
-      toast.error('You must be signed in to load voice history');
-      return;
-    }
-    const queries = await WorkflowIntegrationsService.getVoiceQueryHistory(user.id);
-    setVoiceQueries(queries);
-  };
+
 
   const loadIntegrations = async () => {
     const logs = await WorkflowIntegrationsService.getIntegrationLogs();
@@ -137,51 +121,11 @@ const WorkflowIntegrationsPage: React.FC = () => {
     }
   };
 
-  const processVoiceQuery = async (queryText: string, languageCode: string = 'en') => {
-    try {
-      if (!user?.id) {
-        toast.error('You must be signed in to use voice assistant');
-        return;
-      }
-      const result = await WorkflowIntegrationsService.processVoiceQuery(
-        user?.id || '',
-        queryText,
-        languageCode
-      );
-      
-      toast.success(result.response);
-      await loadVoiceQueries();
-      
-      // Execute actions based on response
-      if (result.actions?.action) {
-        handleVoiceAction(result.actions);
-      }
-    } catch (error) {
-      toast.error('Failed to process voice query');
-    }
-  };
 
-  const handleVoiceAction = (actions: any) => {
-    switch (actions.action) {
-      case 'show_court_diary':
-        setActiveTab('court-diary');
-        break;
-      case 'show_matters':
-        // Navigate to matters page (would need to be implemented in parent)
-        break;
-      case 'show_invoices':
-        // Navigate to invoices page
-        break;
-      case 'show_help':
-        // Show help modal
-        break;
-    }
-  };
 
   const tabs = [
     { id: 'court-diary' as WorkflowPage, label: 'Court Diary', icon: Calendar },
     { id: 'judge-analytics' as WorkflowPage, label: 'Judge Analytics', icon: Gavel },
-    { id: 'voice-assistant' as WorkflowPage, label: 'Voice Assistant', icon: Mic },
     { id: 'integrations' as WorkflowPage, label: 'Integrations', icon: Settings }
   ];
 
@@ -347,22 +291,7 @@ const WorkflowIntegrationsPage: React.FC = () => {
     </div>
   );
 
-  const renderVoiceAssistant = () => (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-neutral-900">Voice Assistant</h2>
-        <p className="text-neutral-600">Query your practice data using natural language</p>
-      </div>
 
-      <VoiceAssistantPanel
-        isListening={isListening}
-        onStartListening={() => setIsListening(true)}
-        onStopListening={() => setIsListening(false)}
-        onProcessQuery={processVoiceQuery}
-        queryHistory={voiceQueries}
-      />
-    </div>
-  );
 
   const renderIntegrations = () => (
     <div className="space-y-6">
@@ -392,8 +321,6 @@ const WorkflowIntegrationsPage: React.FC = () => {
         return renderCourtDiary();
       case 'judge-analytics':
         return renderJudgeAnalytics();
-      case 'voice-assistant':
-        return renderVoiceAssistant();
       case 'integrations':
         return renderIntegrations();
       default:

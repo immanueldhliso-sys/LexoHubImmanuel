@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Upload, FileText, AlertCircle, Plus } from 'lucide-react';
+import { X, Upload, AlertCircle, Plus } from 'lucide-react';
 import { DocumentIntelligenceService } from '../../services/api/document-intelligence.service';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 
 interface UploadPrecedentModalProps {
@@ -70,8 +71,21 @@ export const UploadPrecedentModal: React.FC<UploadPrecedentModalProps> = ({ onCl
 
     setUploading(true);
     try {
-      // In a real implementation, you would upload the file first
-      const mockDocumentId = file ? 'mock-doc-' + Date.now() : undefined;
+      let documentId: string | undefined;
+      
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `precedents/${fileName}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(filePath, file);
+        
+        if (uploadError) throw uploadError;
+        
+        documentId = uploadData.path;
+      }
       
       await DocumentIntelligenceService.uploadPrecedent({
         title: formData.title,
@@ -79,7 +93,7 @@ export const UploadPrecedentModal: React.FC<UploadPrecedentModalProps> = ({ onCl
         precedentType: formData.precedentType,
         category: formData.category,
         subcategory: formData.subcategory || undefined,
-        documentId: mockDocumentId,
+        documentId,
         templateContent: useTemplate ? templateContent : undefined,
         bar: formData.bar || undefined,
         courtLevel: formData.courtLevel || undefined,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { X, AlertTriangle, Save, FileText, RotateCcw, Library, Bookmark, Mic, Brain, Sparkles } from 'lucide-react';
+import { X, AlertTriangle, Save, FileText, RotateCcw, Library, Bookmark } from 'lucide-react';
 import { Button, Card, CardContent, Input, Modal, ModalBody, ModalFooter, Icon } from '../../design-system/components';
 import { matterApiService } from '../../services/api';
 import { authService } from '../../services/auth.service';
@@ -10,8 +10,7 @@ import { BarAssociation, FeeType, RiskLevel, ClientType, MatterStatus } from '..
 import type { Matter, NewMatterForm } from '../../types';
 import { TemplateLibraryModal, SaveTemplateModal } from './templates';
 import type { MatterTemplateData } from '../../types/matter-templates';
-import { templateSuggestionService, type TemplateSuggestion, type VoiceTemplateAnalysis } from '../../services/template-suggestion.service';
-import { speechToTextService } from '../../services/speech-to-text.service';
+import { templateSuggestionService, type TemplateSuggestion } from '../../services/template-suggestion.service';
 
 interface NewMatterFormData {
   title: string;
@@ -67,10 +66,9 @@ export interface MatterPrepopulationData {
   expected_completion_date?: string;
   vat_exempt?: boolean;
   tags?: string | string[];
-  // Voice integration specific fields
-  work_type?: string; // Maps to matter_type
-  duration?: string; // Could be used for estimated_fee calculation
-  billable?: boolean; // Maps to fee_type
+  work_type?: string;
+  duration?: string;
+  billable?: boolean;
 }
 
 interface NewMatterModalProps {
@@ -128,7 +126,6 @@ const normalizeInitialData = (initialData?: MatterPrepopulationData): Partial<Ne
   if (initialData.instructing_firm) normalized.instructing_firm = initialData.instructing_firm;
   else if (initialData.firm) normalized.instructing_firm = initialData.firm;
 
-  // Voice integration specific mappings
   if (initialData.work_type && !normalized.matter_type) {
     // Map common work types to matter types
     const workTypeMapping: Record<string, string> = {
@@ -231,12 +228,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
 
-  // Voice-powered template suggestions state
-  const [isListening, setIsListening] = useState(false);
-  const [voiceTranscription, setVoiceTranscription] = useState('');
-  const [voiceAnalysis, setVoiceAnalysis] = useState<VoiceTemplateAnalysis | null>(null);
-  const [showVoiceSuggestions, setShowVoiceSuggestions] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
 
   // Service selection state
   const [serviceCategories, setServiceCategories] = useState<unknown[]>([]);
@@ -463,67 +455,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
     };
   };
 
-  // Voice functionality handlers
-  const handleVoiceInput = async () => {
-    if (isListening) {
-      // Stop listening
-      speechToTextService.stopListening();
-      setIsListening(false);
-      return;
-    }
 
-    try {
-      setIsListening(true);
-      setVoiceTranscription('');
-      setVoiceAnalysis(null);
-
-      // Start voice recognition
-      const transcription = await speechToTextService.startListening({
-        onTranscript: (transcript) => {
-          setVoiceTranscription(transcript);
-        },
-        onError: (error) => {
-          console.error('Voice recognition error:', error);
-          toast.error('Voice recognition failed. Please try again.');
-          setIsListening(false);
-        }
-      });
-
-      if (transcription) {
-        setIsListening(false);
-        setIsAnalyzing(true);
-        
-        // Analyze transcription for template suggestions
-        const analysis = await templateSuggestionService.analyzeVoiceForTemplates(transcription);
-        setVoiceAnalysis(analysis);
-        
-        if (analysis.suggestions.length > 0) {
-          setShowVoiceSuggestions(true);
-          toast.success(`Found ${analysis.suggestions.length} template suggestions!`);
-        } else if (Object.keys(analysis.extractedMatterData).length > 0) {
-          // Apply extracted data directly if no templates found
-          handleApplyVoiceData(analysis.extractedMatterData);
-          toast.success('Applied voice data to form');
-        } else {
-          toast('No template suggestions found, but transcription captured');
-        }
-        
-        setIsAnalyzing(false);
-      }
-    } catch (error) {
-      console.error('Voice input error:', error);
-      toast.error('Voice input failed. Please try again.');
-      setIsListening(false);
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleApplyVoiceData = (extractedData: unknown) => {
-    setFormData(prev => ({
-      ...prev,
-      ...extractedData
-    }));
-  };
 
   const handleApplyTemplateSuggestion = (suggestion: TemplateSuggestion) => {
     const templateData = suggestion.template.data;
@@ -555,12 +487,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
       tags: templateData.tags || prev.tags
     }));
 
-    // Apply any voice-extracted data on top of template
-    if (voiceAnalysis?.extractedMatterData) {
-      handleApplyVoiceData(voiceAnalysis.extractedMatterData);
-    }
 
-    setShowVoiceSuggestions(false);
     toast.success(`Applied template: ${suggestion.template.name}`);
   };
 
@@ -1276,27 +1203,6 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             <button
-              onClick={handleVoiceInput}
-              disabled={isAnalyzing}
-              className={`inline-flex items-center px-3 py-1 text-sm font-medium border rounded-md transition-colors ${
-                isListening 
-                  ? 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' 
-                  : isAnalyzing
-                  ? 'text-blue-600 bg-blue-50 border-blue-200'
-                  : 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100'
-              }`}
-              title={isListening ? 'Stop voice input' : isAnalyzing ? 'Analyzing...' : 'Voice-powered templates'}
-            >
-              {isListening ? (
-                <Icon icon={Mic} className="w-4 h-4 mr-1 animate-pulse" />
-              ) : isAnalyzing ? (
-                <Icon icon={Brain} className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <Icon icon={Sparkles} className="w-4 h-4 mr-1" />
-              )}
-              {isListening ? 'Listening...' : isAnalyzing ? 'Analyzing...' : 'Voice'}
-            </button>
-            <button
               onClick={() => setShowTemplateLibrary(true)}
               className="inline-flex items-center px-3 py-1 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
               title="Load from template"
@@ -1449,119 +1355,7 @@ export const NewMatterModal: React.FC<NewMatterModalProps> = ({
         }}
       />
 
-      {/* Voice Transcription Display */}
-      {voiceTranscription && (
-        <div className="fixed bottom-4 right-4 max-w-md bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
-          <div className="flex items-start justify-between mb-2">
-            <h4 className="text-sm font-medium text-gray-900">Voice Transcription</h4>
-            <button
-              onClick={() => setVoiceTranscription('')}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-sm text-gray-700 mb-3">{voiceTranscription}</p>
-          {voiceAnalysis && (
-            <div className="text-xs text-gray-500">
-              Confidence: {Math.round(voiceAnalysis.confidence * 100)}%
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* Voice Template Suggestions Modal */}
-      {showVoiceSuggestions && voiceAnalysis && (
-        <Modal isOpen={true} onClose={() => setShowVoiceSuggestions(false)} size="lg">
-          <ModalBody>
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <Sparkles className="w-5 h-5 text-purple-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-900">Voice-Powered Template Suggestions</h3>
-              </div>
-
-              {voiceAnalysis.extractedData && Object.keys(voiceAnalysis.extractedData).length > 0 && (
-                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="text-sm font-medium text-blue-900 mb-2">Extracted Information</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {Object.entries(voiceAnalysis.extractedData).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-blue-700 capitalize">{key.replace('_', ' ')}:</span>
-                        <span className="text-blue-900 font-medium">{String(value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {voiceAnalysis.suggestions.length > 0 ? (
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-gray-900">Recommended Templates</h4>
-                  {voiceAnalysis.suggestions.map((suggestion, index) => (
-                    <div
-                      key={index}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors cursor-pointer"
-                      onClick={() => handleApplyTemplateSuggestion(suggestion)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h5 className="font-medium text-gray-900">{suggestion.templateName}</h5>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs text-gray-500">
-                            {Math.round(suggestion.confidence * 100)}% match
-                          </span>
-                          <div className={`w-2 h-2 rounded-full ${
-                            suggestion.confidence > 0.8 ? 'bg-green-500' :
-                            suggestion.confidence > 0.6 ? 'bg-yellow-500' : 'bg-gray-400'
-                          }`} />
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">{suggestion.description}</p>
-                      <div className="flex flex-wrap gap-1">
-                        {suggestion.matchedKeywords.map((keyword, i) => (
-                          <span
-                            key={i}
-                            className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Brain className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600">No template suggestions found for this voice input.</p>
-                  <p className="text-sm text-gray-500 mt-1">Try describing your matter type or legal area.</p>
-                </div>
-              )}
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <div className="flex justify-between w-full">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  if (voiceAnalysis?.extractedData) {
-                    handleApplyVoiceData(voiceAnalysis.extractedData);
-                  }
-                  setShowVoiceSuggestions(false);
-                }}
-                disabled={!voiceAnalysis?.extractedData || Object.keys(voiceAnalysis.extractedData).length === 0}
-              >
-                Apply Extracted Data Only
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setShowVoiceSuggestions(false)}
-              >
-                Close
-              </Button>
-            </div>
-          </ModalFooter>
-        </Modal>
-      )}
     </Modal>
   );
 };

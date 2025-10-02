@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, FileText, Calendar, Building, Search, Filter, RefreshCw, Send, CheckCircle, Clock, AlertCircle, Download, Printer } from 'lucide-react';
-import { Button, Card, CardHeader, CardContent, Input, Modal, ModalBody, ModalFooter } from '../design-system/components';
+import { Button, Card, CardHeader, CardContent, Input, Modal, ModalBody, ModalFooter, Icon } from '../design-system/components';
 import { LoadingSpinner } from '../components/design-system/components/LoadingSpinner';
 import { ProFormaCreationModal } from '../components/proforma/ProFormaCreationModal';
 import { proformaService } from '../services/api/proforma.service';
@@ -259,7 +259,8 @@ const ProFormaPage: React.FC = () => {
       // Load pro formas, matters, and advocate data from API
       const [proformasData, mattersResponse, advocateData] = await Promise.all([
         proformaService.getProFormas(),
-        matterApiService.getAll({ page: 1, pageSize: 100 }),
+        // Use correct pagination options and consume ApiResponse shape
+        matterApiService.getAll({ pagination: { page: 1, limit: 100 } }),
         AdvocateService.getCurrentAdvocate()
       ]);
 
@@ -300,7 +301,8 @@ const ProFormaPage: React.FC = () => {
       setState(prev => ({
         ...prev,
         proformas: proformasWithServices,
-        matters: mattersResponse || [],
+        // Extract array from ApiResponse
+        matters: mattersResponse?.data || [],
         advocate: advocateData,
         isLoading: false
       }));

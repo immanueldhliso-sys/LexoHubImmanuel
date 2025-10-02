@@ -21,8 +21,7 @@ import {
   Sparkles,
   RefreshCw
 } from 'lucide-react';
-import { Card, CardHeader, CardContent, Button } from '../design-system/components';
-import { AdvancedVoiceAssistant } from '../components/ai/AdvancedVoiceAssistant';
+import { Card, CardHeader, CardContent, Button, Icon } from '../design-system/components';
 import { PredictiveAnalyticsService, type SettlementPrediction, type CaseOutcomePrediction, type FeeOptimizationRecommendation } from '../services/ai/predictive-analytics.service';
 import { AdvancedNLPService } from '../services/ai/nlp-processor.service';
 import { ExternalAPIService } from '../services/integrations/external-api.service';
@@ -57,6 +56,8 @@ export const AIAnalyticsDashboard: React.FC = () => {
   // Core state
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState<string>('Analyzing your practice data with advanced AI...');
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'predictions' | 'optimizations' | 'insights' | 'integrations'>('overview');
 
@@ -87,23 +88,37 @@ export const AIAnalyticsDashboard: React.FC = () => {
 
   const loadAIAnalytics = async () => {
     setLoading(true);
+    setLoadingMessage('Initializing AI analytics...');
+    setLoadingProgress(5);
     try {
       // Load practice metrics
+      setLoadingMessage('Gathering practice metrics...');
+      setLoadingProgress(20);
       await loadPracticeMetrics();
       
       // Load AI insights
+      setLoadingMessage('Generating AI insights...');
+      setLoadingProgress(45);
       await loadAIInsights();
       
       // Load predictive analytics
+      setLoadingMessage('Running predictive models...');
+      setLoadingProgress(70);
       await loadPredictiveAnalytics();
       
       // Load integration status
+      setLoadingMessage('Checking integrations...');
+      setLoadingProgress(85);
       await loadIntegrationStatus();
       
+      setLoadingMessage('Finalizing dashboard...');
+      setLoadingProgress(95);
     } catch (error) {
       console.error('Error loading AI analytics:', error);
       toast.error('Failed to load AI analytics');
     } finally {
+      setLoadingMessage('Complete');
+      setLoadingProgress(100);
       setLoading(false);
     }
   };
@@ -233,9 +248,13 @@ export const AIAnalyticsDashboard: React.FC = () => {
   const handleRefreshAnalytics = async () => {
     setRefreshing(true);
     try {
+      setLoading(true);
+      setLoadingMessage('Refreshing AI analytics...');
+      setLoadingProgress(5);
       await loadAIAnalytics();
       toast.success('AI analytics refreshed');
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -283,7 +302,16 @@ export const AIAnalyticsDashboard: React.FC = () => {
         <div className="text-center">
           <Brain className="w-12 h-12 text-mpondo-gold-500 mx-auto mb-4 animate-pulse" />
           <h2 className="text-xl font-semibold text-neutral-900 mb-2">Loading AI Analytics</h2>
-          <p className="text-neutral-600">Analyzing your practice data with advanced AI...</p>
+          <p className="text-neutral-600 mb-4">{loadingMessage}</p>
+          <div className="w-64 mx-auto">
+            <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-mpondo-gold-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${loadingProgress}%` }}
+              ></div>
+            </div>
+            <p className="mt-2 text-xs text-neutral-500">{Math.min(loadingProgress, 100)}%</p>
+          </div>
         </div>
       </div>
     );
@@ -437,9 +465,6 @@ export const AIAnalyticsDashboard: React.FC = () => {
                 ))}
               </CardContent>
             </Card>
-
-            {/* Voice Assistant Integration */}
-            <AdvancedVoiceAssistant className="h-fit" />
           </div>
         </div>
       )}

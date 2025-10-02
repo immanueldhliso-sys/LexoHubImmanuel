@@ -22,16 +22,34 @@ export const validateEmail = (email: string): EmailValidation => {
 // Validate password strength with simple heuristic
 export const validatePassword = (password: string): PasswordValidation => {
   if (!password) return { isValid: false, message: 'Password is required', strength: 0 };
-  if (password.length < 8) return { isValid: false, message: 'Password must be at least 8 characters', strength: 1 };
+  if (password.length < 12) return { isValid: false, message: 'Password must be at least 12 characters', strength: 1 };
+
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasDigit = /[0-9]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+
+  const errors: string[] = [];
+  if (!hasUpper) errors.push('uppercase letter');
+  if (!hasLower) errors.push('lowercase letter');
+  if (!hasDigit) errors.push('number');
+  if (!hasSpecial) errors.push('special character');
 
   let strength = 0;
-  if (password.length >= 8) strength++;
-  if (/[A-Z]/.test(password)) strength++;
-  if (/[a-z]/.test(password)) strength++;
-  if (/[0-9]/.test(password)) strength++;
-  if (/[^A-Za-z0-9]/.test(password)) strength++;
+  if (password.length >= 12) strength++;
+  if (hasUpper) strength++;
+  if (hasLower) strength++;
+  if (hasDigit) strength++;
+  if (hasSpecial) strength++;
 
-  if (strength < 3) return { isValid: false, message: 'Password is too weak', strength };
+  if (errors.length > 0) {
+    return {
+      isValid: false,
+      message: `Password must contain: ${errors.join(', ')}`,
+      strength
+    };
+  }
+
   return { isValid: true, strength };
 };
 

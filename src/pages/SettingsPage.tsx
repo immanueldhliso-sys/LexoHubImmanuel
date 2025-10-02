@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { X, Plus, Save, RotateCcw, Zap, Download } from 'lucide-react';
-import { Card, CardHeader, CardContent, Button } from '../design-system/components';
+import { X, Plus, Save, RotateCcw, Download, FileText } from 'lucide-react';
+import { Card, CardHeader, CardContent, Button, Icon } from '../design-system/components';
 import { toast } from 'react-hot-toast';
-import { AdvancedFeaturesSettings } from '../components/settings/AdvancedFeaturesSettings';
 import { DataExportModal } from '../components/data-export';
 
 const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'templates' | 'advanced-features'>('practice');
+  const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'templates'>('practice');
   const [practiceSettings, setPracticeSettings] = useState({
     firmName: 'Mpondo & Associates',
     practiceAreas: ['Commercial Litigation', 'Employment Law', 'Mining Law'],
@@ -44,13 +43,6 @@ const SettingsPage: React.FC = () => {
 
   const handleResetToDefaults = () => {
     if (window.confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
-      setNotifications({
-        emailReminders: true,
-        smsAlerts: false,
-        invoiceUpdates: true,
-        matterDeadlines: true,
-        paymentReceived: true
-      });
       setPracticeSettings({
         firmName: 'Mpondo & Associates',
         practiceAreas: ['Commercial Litigation', 'Employment Law', 'Mining Law'],
@@ -95,23 +87,21 @@ const SettingsPage: React.FC = () => {
 
         {/* Tabs */}
         <div className="flex space-x-1 bg-neutral-100 rounded-lg p-1">
-          {(['practice', 'integrations', 'compliance', 'billing', 'templates', 'advanced-features'] as const).map((tab) => (
+          {(['practice', 'integrations', 'compliance', 'billing', 'templates'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 activeTab === tab
                   ? 'bg-white text-neutral-900 shadow-sm'
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              {tab === 'advanced-features' && <Zap className="w-4 h-4" />}
               {tab === 'practice' ? 'Practice' :
                tab === 'integrations' ? 'Integrations' :
                tab === 'compliance' ? 'Compliance' :
                tab === 'billing' ? 'Billing' :
-               tab === 'templates' ? 'Templates' :
-               'Advanced Features'}
+               'Templates'}
             </button>
           ))}
         </div>
@@ -759,16 +749,6 @@ const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'advanced-features' && (
-        <div className="space-y-6">
-          <AdvancedFeaturesSettings 
-            onFeatureToggle={(feature, enabled) => {
-              // Handle feature toggle if needed
-              console.log(`Feature ${feature.name} ${enabled ? 'enabled' : 'disabled'}`);
-            }}
-          />
-        </div>
-      )}
 
       {/* Data Export Modal */}
       <DataExportModal

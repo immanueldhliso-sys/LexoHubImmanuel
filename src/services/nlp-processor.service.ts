@@ -76,10 +76,10 @@ class NLPProcessor {
   };
 
   /**
-   * Extract time entry data with Claude as primary method and traditional NLP as fallback
+   * Main extraction method with fallback logic
    */
   async extractTimeEntryData(
-    transcription: string, 
+    textInput: string, 
     availableMatters: Matter[] = [],
     options: ProcessingOptions = {}
   ): Promise<ExtractedTimeEntryData> {
@@ -96,15 +96,15 @@ class NLPProcessor {
     // Force traditional NLP if requested
     if (forceTraditionalNLP) {
       console.log('Using traditional NLP processing (forced)');
-      return this.extractWithTraditionalNLP(transcription, availableMatters);
+      return this.extractWithTraditionalNLP(textInput, availableMatters);
     }
 
     // Try Claude extraction first
     try {
-      const claudeResult = await this.extractWithClaude(transcription, availableMatters, maxRetries);
+      const claudeResult = await this.extractWithClaude(textInput, availableMatters, maxRetries);
       
       if (claudeResult.success && claudeResult.data) {
-        const convertedData = this.convertClaudeToExtractedData(claudeResult.data, transcription);
+        const convertedData = this.convertClaudeToExtractedData(claudeResult.data, textInput);
         
         // Check if Claude result meets confidence threshold
         if (convertedData.overall_confidence >= confidenceThreshold) {
@@ -129,7 +129,7 @@ class NLPProcessor {
     if (enableFallback) {
       console.log('Falling back to traditional NLP processing');
       try {
-        const traditionalResult = this.extractWithTraditionalNLP(transcription, availableMatters);
+        const traditionalResult = this.extractWithTraditionalNLP(textInput, availableMatters);
         
         return {
           ...traditionalResult,
@@ -147,7 +147,7 @@ class NLPProcessor {
     // If all methods fail, return minimal data
     return {
       description: {
-        cleaned_text: transcription,
+        cleaned_text: textInput,
         confidence: 0.1
       },
       overall_confidence: 0.1,
@@ -161,7 +161,7 @@ class NLPProcessor {
    * Extract using AWS Claude with retry logic
    */
   private async extractWithClaude(
-    transcription: string, 
+    textInput: string, 
     availableMatters: Matter[],
     maxRetries: number = 2
   ): Promise<{ success: boolean; data?: ExtractedTimeEntry; error?: string }> {
@@ -175,7 +175,7 @@ class NLPProcessor {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
 
-        const result = await awsBedrockService.extractTimeEntryData(transcription, availableMatters);
+        const result = await awsBedrockService.extractTimeEntryData(textInput, availableMatters);
         
         if (result.success) {
           return result;
@@ -185,7 +185,7 @@ class NLPProcessor {
         
         // Don't retry on certain types of errors
         if (lastError.includes('temporarily unavailable') || 
-            lastError.includes('Transcription text is required') ||
+            lastError.includes('Text input is required') ||
             lastError.includes('too long')) {
           break;
         }
@@ -248,8 +248,8 @@ class NLPProcessor {
   /**
    * Traditional NLP extraction as fallback
    */
-  private extractWithTraditionalNLP(transcription: string, availableMatters: Matter[] = []): ExtractedTimeEntryData {
-    const preprocessedText = this.preprocessText(transcription);
+  private extractWithTraditionalNLP(textInput: string, availableMatters: Matter[] = []): ExtractedTimeEntryData {
+    const preprocessedText = this.preprocessText(textInput);
     
     const duration = this.extractDuration(preprocessedText);
     const date = this.extractDate(preprocessedText);
@@ -642,8 +642,8 @@ class NLPProcessor {
   /**
    * Force traditional NLP processing only
    */
-  async extractWithTraditionalNLPOnly(transcription: string, availableMatters: Matter[] = []): Promise<ExtractedTimeEntryData> {
-    return this.extractWithTraditionalNLP(transcription, availableMatters);
+  async extractWithTraditionalNLPOnly(textInput: string, availableMatters: Matter[] = []): Promise<ExtractedTimeEntryData> {
+    return this.extractWithTraditionalNLP(textInput, availableMatters);
   }
 }
 

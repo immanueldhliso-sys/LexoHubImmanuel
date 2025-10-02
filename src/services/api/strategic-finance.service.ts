@@ -824,7 +824,7 @@ export class StrategicFinanceService {
       if (!invoice) throw new Error('Invoice not found');
 
       const invoiceAgeDays = Math.floor(
-        (new Date().getTime() - new Date(invoice.invoice_date).getTime()) / (1000 * 60 * 60 * 24)
+        (new Date().getTime() - new Date(invoice.dateIssued).getTime()) / (1000 * 60 * 60 * 24)
       );
 
       // Create application

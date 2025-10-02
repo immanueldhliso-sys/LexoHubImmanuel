@@ -1,6 +1,6 @@
 /**
  * Advanced NLP Processor Service
- * Handles natural language processing for voice commands, document analysis, and text understanding
+ * Handles natural language processing for document analysis and text understanding
  */
 
 // import { toast } from 'react-hot-toast';
@@ -45,15 +45,7 @@ export interface LegalDocumentAnalysis {
   }>;
 }
 
-export interface VoiceCommandResult {
-  intent: NLPIntent;
-  response: string;
-  actions?: Array<{
-    type: 'navigate' | 'create' | 'update' | 'search' | 'reminder';
-    target: string;
-    parameters: Record<string, any>;
-  }>;
-}
+
 
 export class AdvancedNLPService {
   private static legalTermsDatabase = new Map([
@@ -72,55 +64,9 @@ export class AdvancedNLPService {
     ['judgment', { type: 'legal_concept', category: 'outcome' }],
   ]);
 
-  private static voiceIntents = new Map([
-    // Voice command patterns and their intents
-    ['show.*matters?.*today', { intent: 'view_matters', context: 'today' }],
-    ['what.*matters?.*active', { intent: 'view_matters', context: 'active' }],
-    ['create.*new.*matter', { intent: 'create_matter' }],
-    ['generate.*invoice', { intent: 'create_invoice' }],
-    ['show.*invoices?.*overdue', { intent: 'view_invoices', context: 'overdue' }],
-    ['my.*court.*diary', { intent: 'view_court_diary' }],
-    ['add.*time.*entry', { intent: 'create_time_entry' }],
-    ['what.*is.*my.*wip', { intent: 'view_wip_summary' }],
-    ['settlement.*probability.*for', { intent: 'analyze_settlement_probability' }],
-    ['conflict.*check.*for', { intent: 'run_conflict_check' }],
-  ]);
 
-  /**
-   * Process voice command with advanced NLP
-   */
-  static async processVoiceCommand(transcript: string, languageCode: string = 'en'): Promise<VoiceCommandResult> {
-    try {
-      // Clean and normalize the transcript
-      const normalizedText = this.normalizeText(transcript);
-      
-      // Extract intent and entities
-      const intent = this.extractIntent(normalizedText);
-      const entities = this.extractEntities(normalizedText);
-      
-      // Enhanced intent with entities
-      const enhancedIntent: NLPIntent = {
-        ...intent,
-        entities,
-        parameters: this.extractParameters(normalizedText, intent.intent)
-      };
 
-      // Generate contextual response
-      const response = this.generateResponse(enhancedIntent);
-      
-      // Generate actions based on intent
-      const actions = this.generateActions(enhancedIntent);
 
-      return {
-        intent: enhancedIntent,
-        response,
-        actions
-      };
-    } catch (error) {
-      console.error('Error processing voice command:', error);
-      throw new Error('Failed to process voice command');
-    }
-  }
 
   /**
    * Analyze legal document with advanced NLP
@@ -311,16 +257,6 @@ export class AdvancedNLPService {
    * Extract intent from normalized text
    */
   private static extractIntent(text: string): Omit<NLPIntent, 'entities' | 'parameters'> {
-    for (const [pattern, intentData] of this.voiceIntents) {
-      const regex = new RegExp(pattern, 'i');
-      if (regex.test(text)) {
-        return {
-          intent: intentData.intent,
-          confidence: 0.85
-        };
-      }
-    }
-
     // Default intent for unrecognized commands
     return {
       intent: 'general_query',
@@ -376,7 +312,7 @@ export class AdvancedNLPService {
         break;
       
       case 'create_matter':
-        // Extract matter details from voice command
+        // Extract matter details from text
         const clientMatch = text.match(/for\s+([a-zA-Z\s]+)/);
         if (clientMatch) parameters.clientName = clientMatch[1].trim();
         break;

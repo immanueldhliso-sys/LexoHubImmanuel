@@ -29,6 +29,18 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+
+  code, pre, kbd, samp {
+    @apply font-mono;
+  }
+
+  p, span, div, a, button, label {
+    @apply font-sans;
+  }
+
   /* Accessible Focus Styles - WCAG 2.1 AA Compliant */
   :focus-visible {
     @apply outline-none ring-2 ring-mpondo-gold-400 ring-offset-2 ring-offset-white;
@@ -313,11 +325,17 @@
     @apply font-data text-sm font-normal;
   }
 
-  /* Icon Gradient Utility */
   .text-gradient-icon {
     background: linear-gradient(135deg, #D4AF37 0%, #1E3A8A 50%, #059669 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    color: transparent;
+  }
+  
+  @supports not (background-clip: text) {
+    .text-gradient-icon {
+      color: #D4AF37;
+    }
   }
 }

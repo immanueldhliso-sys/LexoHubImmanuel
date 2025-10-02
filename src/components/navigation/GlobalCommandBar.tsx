@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Mic, Clock, ArrowRight, FileText, Users, Receipt, Zap } from 'lucide-react';
+import { Search, Clock, ArrowRight, FileText, Users, Receipt, Zap } from 'lucide-react';
 import { SearchResult, SearchCategory, SearchState, KeyboardShortcut } from '../../types';
 import { Button } from '../../design-system/components';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -210,16 +210,6 @@ const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({
           aria-haspopup="listbox"
           role="combobox"
         />
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-1 h-6 w-6 text-neutral-400 hover:text-neutral-600"
-            aria-label="Voice search"
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       {/* Search Dropdown */}
@@ -261,13 +251,6 @@ const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({
                   >
                     <span>Add New Matter</span>
                     <span className="text-xs text-neutral-400">Ctrl+Shift+M</span>
-                  </button>
-                  <button
-                    onClick={() => onAction('voice-time-entry')}
-                    className="w-full text-left px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-md transition-colors flex items-center justify-between"
-                  >
-                    <span>Start Voice Time Entry</span>
-                    <span className="text-xs text-neutral-400">Ctrl+Shift+V</span>
                   </button>
                   <button
                     onClick={() => onAction('create-invoice')}

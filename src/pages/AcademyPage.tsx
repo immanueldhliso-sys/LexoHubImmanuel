@@ -20,86 +20,71 @@ import { VirtualShadowingDashboard } from '../components/academy/VirtualShadowin
 import { PeerReviewNetwork } from '../components/academy/PeerReviewNetwork';
 import { CPDTrackingCard } from '../components/academy/CPDTrackingCard';
 import { PracticeSuccessionPlanning } from '../components/academy/PracticeSuccessionPlanning';
+import { AcademyService } from '../services/api/academy.service';
+import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'react-hot-toast';
 
 export const AcademyPage: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'shadowing' | 'peer-review' | 'cpd' | 'succession'>('overview');
+  const [isLoading, setIsLoading] = useState(true);
   const [learningProgress, setLearningProgress] = useState({
-    totalCourses: 24,
-    completedCourses: 18,
-    cpdHours: 15.5,
+    totalCourses: 0,
+    completedCourses: 0,
+    cpdHours: 0,
     requiredCpdHours: 20,
-    shadowingSessions: 8,
-    peerReviews: 12
+    shadowingSessions: 0,
+    peerReviews: 0
   });
 
-  const featuredCourses = [
-    {
-      id: '1',
-      title: 'Advanced Commercial Litigation Techniques',
-      instructor: 'SC Sarah Matthews',
-      duration: '3.5 hours',
-      level: 'Advanced',
-      rating: 4.8,
-      students: 156,
-      cpdCredits: 3.5,
-      category: 'Commercial Law',
-      thumbnail: '/api/placeholder/300/200'
-    },
-    {
-      id: '2',
-      title: 'Constitutional Law Masterclass',
-      instructor: 'Prof. Michael Thompson',
-      duration: '5 hours',
-      level: 'Expert',
-      rating: 4.9,
-      students: 203,
-      cpdCredits: 5,
-      category: 'Constitutional Law',
-      thumbnail: '/api/placeholder/300/200'
-    },
-    {
-      id: '3',
-      title: 'Modern Employment Law Trends',
-      instructor: 'Adv. Nomsa Mthembu',
-      duration: '2.5 hours',
-      level: 'Intermediate',
-      rating: 4.7,
-      students: 89,
-      cpdCredits: 2.5,
-      category: 'Employment Law',
-      thumbnail: '/api/placeholder/300/200'
-    }
-  ];
+  const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
-  const upcomingEvents = [
-    {
-      id: '1',
-      type: 'Virtual Shadowing',
-      title: 'High Court Motion Proceedings',
-      date: '2024-02-15',
-      time: '09:00',
-      mentor: 'SC David Wilson',
-      participants: 12
-    },
-    {
-      id: '2',
-      type: 'Peer Review',
-      title: 'Contract Drafting Workshop',
-      date: '2024-02-16',
-      time: '14:00',
-      mentor: 'Adv. Jane Smith',
-      participants: 8
-    },
-    {
-      id: '3',
-      type: 'CPD Seminar',
-      title: 'Ethics in Digital Age Practice',
-      date: '2024-02-18',
-      time: '10:30',
-      mentor: 'Prof. Robert Chen',
-      participants: 45
+  useEffect(() => {
+    loadAcademyData();
+  }, [user?.id]);
+
+  const loadAcademyData = async () => {
+    if (!user?.id) return;
+    
+    setIsLoading(true);
+    try {
+      const [courses, events, progress] = await Promise.all([
+        AcademyService.getFeaturedCourses(6),
+        AcademyService.getUpcomingEvents(10),
+        AcademyService.getLearningProgress(user.id)
+      ]);
+
+      setFeaturedCourses(courses.map(course => ({
+        id: course.id,
+        title: course.title,
+        instructor: course.instructor,
+        duration: course.duration_hours ? `${course.duration_hours} hours` : 'N/A',
+        level: course.level || 'Intermediate',
+        rating: course.rating || 0,
+        students: course.student_count || 0,
+        cpdCredits: course.cpd_credits || 0,
+        category: course.category || 'General',
+        thumbnail: course.thumbnail_url || '/api/placeholder/300/200'
+      })));
+
+      setUpcomingEvents(events.map(event => ({
+        type: event.event_type.replace('_', ' '),
+        title: event.title,
+        date: new Date(event.event_date).toISOString().split('T')[0],
+        time: new Date(event.event_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        mentor: event.mentor || 'TBA',
+        participants: event.current_participants || 0
+      })));
+
+      setLearningProgress(progress);
+    } catch (error) {
+      console.error('Error loading academy data:', error);
+      toast.error('Failed to load academy data');
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const getLevelColor = (level: string) => {
     switch (level) {

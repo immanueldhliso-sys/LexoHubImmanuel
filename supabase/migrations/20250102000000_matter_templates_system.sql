@@ -180,7 +180,7 @@ BEGIN
     (mt.advocate_id = user_id) as is_owner,
     CASE 
       WHEN mt.advocate_id = user_id THEN NULL
-      ELSE a.name
+      ELSE a.full_name
     END as shared_by_name
   FROM matter_templates mt
   LEFT JOIN advocates a ON mt.advocate_id = a.id

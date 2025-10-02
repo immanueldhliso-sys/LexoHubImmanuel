@@ -29,31 +29,9 @@ class FeatureGuardService {
    * Check if user can access a specific page
    */
   canAccessPage(page: string): FeatureAccessResult {
-    // Check if this is an advanced feature page
-    const feature = getFeatureByPage(page);
-    
-    if (!feature) {
-      // Not an advanced feature page, always accessible
-      return {
-        allowed: true
-      };
-    }
-
-    // Check if the feature is enabled
-    const isEnabled = featureToggleService.isFeatureEnabled(feature.id);
-    
-    if (isEnabled) {
-      return {
-        allowed: true
-      };
-    }
-
-    // Feature is disabled
+    // Disabled feature guard - all pages are accessible
     return {
-      allowed: false,
-      error: FeatureAccessError.FEATURE_DISABLED,
-      message: `${feature.name} is not enabled. You can enable it in Settings > Advanced Features.`,
-      redirectTo: 'dashboard'
+      allowed: true
     };
   }
 

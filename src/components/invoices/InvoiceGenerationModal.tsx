@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { InvoiceService } from '@/services/api/invoices.service';
 import { TimeEntryService } from '@/services/api/time-entries.service';
+import { ExpensesService } from '@/services/api/expenses.service';
 import { DocumentIntelligenceService } from '@/services/api/document-intelligence.service';
 import { FeeNarrativeGenerator } from '@/services/fee-narrative-generator.service';
 import { InvoicePDFService } from '@/services/pdf/invoice-pdf.service';
@@ -109,30 +110,20 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
     try {
       if (!selectedMatter?.id) return;
       
-      // Mock expenses for now - replace with actual API call
-      const mockExpenses: Expense[] = [
-        {
-          id: '1',
-          description: 'Court filing fees',
-          amount: 250.00,
-          category: 'court_fees',
-          date: new Date().toISOString(),
-          matterId: selectedMatter.id,
-          invoiced: false
-        },
-        {
-          id: '2',
-          description: 'Document printing and binding',
-          amount: 85.50,
-          category: 'printing',
-          date: new Date().toISOString(),
-          matterId: selectedMatter.id,
-          invoiced: false
-        }
-      ];
+      const expensesData = await ExpensesService.getMatterExpenses(selectedMatter.id);
       
-      setExpenses(mockExpenses);
-      setSelectedExpenses(mockExpenses.map(e => e.id));
+      const unbilledExpenses = expensesData.map(exp => ({
+        id: exp.id,
+        description: exp.description,
+        amount: exp.amount,
+        category: (exp.category || 'other') as ExpenseCategory,
+        date: exp.date,
+        matterId: selectedMatter.id,
+        invoiced: false
+      }));
+      
+      setExpenses(unbilledExpenses);
+      setSelectedExpenses(unbilledExpenses.map(e => e.id));
     } catch (error) {
       console.error('Error loading unbilled expenses:', error);
       toast.error('Failed to load unbilled expenses');

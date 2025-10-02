@@ -11,8 +11,7 @@ const TimeEntryValidation = z.object({
   description: z.string().min(5, 'Description must be at least 5 characters'),
   rate: z.number().positive('Rate must be positive'),
   billable: z.boolean().optional(),
-  recordingMethod: z.enum(['manual', 'voice', 'timer', 'ai_suggested']).optional(),
-  voiceTranscription: z.string().optional(),
+  recordingMethod: z.enum(['manual', 'timer', 'ai_suggested']).optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional()
 });
@@ -26,8 +25,7 @@ export class TimeEntryService {
     description: string;
     rate: number;
     billable?: boolean;
-    recordingMethod?: 'manual' | 'voice' | 'timer' | 'ai_suggested';
-    voiceTranscription?: string;
+    recordingMethod?: 'manual' | 'timer' | 'ai_suggested';
     startTime?: string;
     endTime?: string;
   }): Promise<TimeEntry> {
@@ -68,7 +66,6 @@ export class TimeEntryService {
           rate: validated.rate,
           billable: validated.billable ?? true,
           recording_method: validated.recordingMethod || 'manual',
-          voice_transcription: validated.voiceTranscription || null,
           start_time: validated.startTime || null,
           end_time: validated.endTime || null,
           billed: false,
