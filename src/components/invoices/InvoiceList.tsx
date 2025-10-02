@@ -213,14 +213,8 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ className = '' }) => {
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Invoices</h1>
-          <p className="text-neutral-600 mt-1">
-            Manage your invoices and track payments
-          </p>
-        </div>
+      {/* Quick Action */}
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setShowGenerationModal(true)}
           className="inline-flex items-center gap-2 px-4 py-2 bg-mpondo-gold-600 text-white rounded-lg hover:bg-mpondo-gold-700 transition-colors"

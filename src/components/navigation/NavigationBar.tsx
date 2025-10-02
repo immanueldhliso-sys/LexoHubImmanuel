@@ -328,7 +328,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                       onKeyDown={(e) => handleKeyDown(e, category.id)}
                       className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                         isActive
-                          ? 'bg-mpondo-gold-100 text-mpondo-gold-900'
+                          ? 'text-mpondo-gold-600 font-semibold'
                           : isHovered
                           ? 'bg-neutral-100 text-neutral-900'
                           : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'

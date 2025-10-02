@@ -203,16 +203,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Header */}
         <div>
-          <h1 className="heading-2 text-neutral-900">Settings</h1>
-          <p className="text-neutral-600 mt-1">Manage your practice configuration and preferences</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900">Settings</h1>
+          <p className="text-sm sm:text-base text-neutral-600 mt-1">Manage your practice configuration and preferences</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-1 bg-neutral-100 rounded-lg p-1">
+        <div className="flex flex-wrap gap-1 bg-neutral-100 rounded-lg p-1">
           {(['practice', 'integrations', 'compliance', 'billing', 'templates'] as const).map((tab) => (
             <button
               key={tab}

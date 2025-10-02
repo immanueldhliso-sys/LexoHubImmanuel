@@ -398,10 +398,10 @@ const PricingManagementPage: React.FC = () => {
   // Future: aggregate pricing plan analytics when backend is available
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900">Pricing Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900">Pricing Management</h1>
           <p className="text-neutral-600 mt-1">Manage your performance-based pricing models and track success fees</p>
         </div>
         <div className="flex items-center gap-3">

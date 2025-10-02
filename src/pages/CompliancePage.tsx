@@ -354,15 +354,15 @@ const CompliancePage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="w-full space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Compliance Management</h1>
-        <p className="text-gray-600">Monitor and manage your practice's compliance requirements</p>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Compliance Management</h1>
+        <p className="text-sm sm:text-base text-gray-600">Monitor and manage your practice's compliance requirements</p>
       </div>
 
       {/* Tab Navigation */}
-      <div className="mb-8">
+      <div>
         <nav className="flex space-x-8 border-b border-gray-200">
           {tabs.map((tab) => {
             const Icon = tab.icon;

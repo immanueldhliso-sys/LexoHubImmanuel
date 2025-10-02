@@ -13,16 +13,17 @@ const InvoicesPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900">Invoices</h1>
-          <p className="text-neutral-600 mt-1">Manage your invoices and payment tracking</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900">Invoices</h1>
+          <p className="text-sm sm:text-base text-neutral-600 mt-1">Manage your invoices and payment tracking</p>
         </div>
         <Button 
           variant="outline" 
           onClick={handleRefresh}
           data-testid="refresh-invoices-button"
+          className="self-start sm:self-auto"
         >
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh

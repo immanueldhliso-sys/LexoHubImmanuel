@@ -21,6 +21,22 @@
   }
 
   /* Base Typography & Colors */
+  html {
+    font-size: 14px;
+  }
+  
+  @media (min-width: 640px) {
+    html {
+      font-size: 15px;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    html {
+      font-size: 16px;
+    }
+  }
+  
   body {
     @apply font-ui text-neutral-900 bg-neutral-50 antialiased;
     font-feature-settings: 'kern' 1, 'liga' 1;
@@ -160,7 +176,7 @@
   }
 
   .card {
-    @apply bg-white rounded-xl border border-neutral-200 shadow-soft p-6
+    @apply bg-white rounded-lg border border-neutral-200 shadow-soft p-4 sm:p-5
            hover:shadow-md transition-shadow duration-200;
   }
 
@@ -263,40 +279,40 @@
 
   /* Heading Styles with New Font */
   .heading-1 {
-    @apply font-heading text-4xl font-bold leading-tight;
+    @apply font-heading text-xl sm:text-2xl font-bold leading-tight;
   }
 
   .heading-2 {
-    @apply font-heading text-3xl font-bold leading-tight;
+    @apply font-heading text-lg sm:text-xl font-bold leading-tight;
   }
 
   .heading-3 {
-    @apply font-heading text-2xl font-semibold leading-tight;
+    @apply font-heading text-base sm:text-lg font-semibold leading-tight;
   }
 
   .heading-4 {
-    @apply font-heading text-xl font-semibold leading-tight;
+    @apply font-heading text-sm sm:text-base font-semibold leading-tight;
   }
 
   .heading-5 {
-    @apply font-heading text-lg font-semibold leading-tight;
+    @apply font-heading text-sm font-semibold leading-tight;
   }
 
   .heading-6 {
-    @apply font-heading text-base font-semibold leading-tight;
+    @apply font-heading text-2xs sm:text-xs font-semibold leading-tight;
   }
 
   /* Body Text Styles */
   .body-large {
-    @apply font-ui text-lg font-normal leading-relaxed;
+    @apply font-ui text-sm sm:text-base font-normal leading-relaxed;
   }
 
   .body-medium {
-    @apply font-ui text-base font-normal leading-relaxed;
+    @apply font-ui text-xs sm:text-sm font-normal leading-relaxed;
   }
 
   .body-small {
-    @apply font-ui text-sm font-normal leading-relaxed;
+    @apply font-ui text-2xs sm:text-xs font-normal leading-relaxed;
   }
 
   /* UI Element Styles */

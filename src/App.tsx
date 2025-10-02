@@ -137,7 +137,7 @@ const MainLayout: React.FC<{
   const userTier: UserTier = 'professional'; // This should come from user data/subscription
   
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 flex flex-col">
       <NavigationBar
         activePage={activePage}
         onPageChange={onPageChange}
@@ -146,8 +146,8 @@ const MainLayout: React.FC<{
       />
 
       {/* Main content area */}
-      <main>
-        <div className="px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1">
+        <div className="px-3 sm:px-4 md:px-6 py-4 md:py-6">
           {children}
         </div>
       </main>

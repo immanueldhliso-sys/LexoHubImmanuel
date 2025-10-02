@@ -429,12 +429,12 @@ const ProFormaPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Pro Forma Management</h1>
-          <p className="text-neutral-600 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900">Pro Forma Management</h1>
+          <p className="text-sm sm:text-base text-neutral-600 mt-1">
             Create and manage client pro formas with seamless invoice conversion
           </p>
         </div>
