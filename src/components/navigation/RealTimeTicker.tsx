@@ -1,17 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Clock, 
-  AlertTriangle, 
-  FileText, 
-  Calendar, 
-  DollarSign,
-  Users,
-  Gavel,
+  AlertTriangle,
   ChevronRight,
   Minus,
   Plus
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { tickerDataService } from '../../services/ticker-data.service';
 
 export interface TickerItem {
   id: string;
@@ -49,89 +45,14 @@ export const RealTimeTicker: React.FC<RealTimeTickerProps> = ({
   const tickerRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Mock data generator - in production this would come from your API
-  const generateTickerData = (): TickerItem[] => {
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    return [
-      {
-        id: '1',
-        type: 'deadline',
-        title: 'Constitutional Court Filing Due',
-        description: 'Smith v Jones - Application deadline in 2 hours',
-        urgency: 'urgent',
-        dueDate: new Date(now.getTime() + 2 * 60 * 60 * 1000),
-        navigateTo: '/matters',
-        icon: <Gavel className="w-4 h-4" />
-      },
-      {
-        id: '2',
-        type: 'invoice',
-        title: 'Overdue Invoice',
-        description: 'Van der Merwe Trust - R45,000 overdue 15 days',
-        urgency: 'urgent',
-        amount: 45000,
-        navigateTo: '/finance',
-        icon: <DollarSign className="w-4 h-4" />
-      },
-      {
-        id: '3',
-        type: 'court_date',
-        title: 'High Court Appearance',
-        description: 'Johannesburg High Court - Tomorrow 9:00 AM',
-        urgency: 'attention',
-        dueDate: tomorrow,
-        navigateTo: '/matters',
-        icon: <Calendar className="w-4 h-4" />
-      },
-      {
-        id: '4',
-        type: 'matter',
-        title: 'New Matter Assigned',
-        description: 'Corporate Merger - Urgent review required',
-        urgency: 'attention',
-        navigateTo: '/matters',
-        icon: <FileText className="w-4 h-4" />
-      },
-      {
-        id: '5',
-        type: 'client',
-        title: 'Client Meeting Reminder',
-        description: 'ABC Corporation - Strategy session in 1 hour',
-        urgency: 'normal',
-        dueDate: new Date(now.getTime() + 60 * 60 * 1000),
-        navigateTo: '/matters',
-        icon: <Users className="w-4 h-4" />
-      },
-      {
-        id: '6',
-        type: 'payment',
-        title: 'Payment Received',
-        description: 'XYZ Ltd - R25,000 payment processed',
-        urgency: 'normal',
-        amount: 25000,
-        navigateTo: '/finance',
-        icon: <DollarSign className="w-4 h-4" />
-      },
-      {
-        id: '7',
-        type: 'deadline',
-        title: 'Discovery Deadline',
-        description: 'Commercial Litigation - Document production due next week',
-        urgency: 'normal',
-        dueDate: nextWeek,
-        navigateTo: '/matters',
-        icon: <Clock className="w-4 h-4" />
-      }
-    ];
-  };
-
-  // Load ticker data
   useEffect(() => {
-    const loadData = () => {
-      setTickerItems(generateTickerData());
+    const loadData = async () => {
+      try {
+        const items = await tickerDataService.getTickerItems();
+        setTickerItems(items);
+      } catch (error) {
+        console.error('Failed to load ticker data:', error);
+      }
     };
 
     loadData();

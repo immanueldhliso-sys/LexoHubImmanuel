@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      // Ensure a single React instance is used across the app and all dependencies
+      dedupe: ['react', 'react-dom']
     },
     optimizeDeps: {
       exclude: ['lucide-react'],

@@ -11,6 +11,11 @@ import {
   Bell,
   CheckCircle
 } from 'lucide-react';
+import { invoiceApiService } from './api/invoice-api.service';
+import { matterApiService } from './api';
+import { supabase } from '../lib/supabase';
+import type { Invoice, Matter } from '../types';
+import { InvoiceStatus } from '../types';
 
 export interface TickerDataFilters {
   urgency?: ('urgent' | 'attention' | 'normal')[];
@@ -73,25 +78,21 @@ class TickerDataService {
    */
   async getTickerItems(filters?: TickerDataFilters): Promise<TickerItem[]> {
     try {
-      // In production, this would be an API call
-      const items = await this.generateMockTickerData();
+      const items = await this.fetchRealTickerData();
       
       if (!filters) {
         return items;
       }
 
       return items.filter(item => {
-        // Filter by urgency
         if (filters.urgency && !filters.urgency.includes(item.urgency)) {
           return false;
         }
 
-        // Filter by type
         if (filters.types && !filters.types.includes(item.type)) {
           return false;
         }
 
-        // Filter by date range
         if (filters.dateRange && item.dueDate) {
           const itemDate = item.dueDate;
           if (itemDate < filters.dateRange.start || itemDate > filters.dateRange.end) {
@@ -218,6 +219,174 @@ class TickerDataService {
       });
     } catch (error) {
       console.error('Failed to notify ticker subscribers:', error);
+    }
+  }
+
+  /**
+   * Fetch real ticker data from database
+   */
+  private async fetchRealTickerData(): Promise<TickerItem[]> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return [];
+      }
+
+      const items: TickerItem[] = [];
+      const now = new Date();
+
+      const overdueInvoicesResponse = await invoiceApiService.getOverdueInvoices(user.id);
+      if (overdueInvoicesResponse.data) {
+        for (const invoice of overdueInvoicesResponse.data) {
+          const daysOverdue = invoice.days_outstanding || 0;
+          const dueDateStr = (invoice as any).due_date || invoice.dateDue;
+          const dueDate = dueDateStr ? new Date(dueDateStr) : null;
+          
+          let matterName = 'Matter';
+          let clientName = '';
+          
+          if (invoice.matter_id) {
+            const matterResponse = await matterApiService.getById(invoice.matter_id);
+            if (matterResponse.data) {
+              clientName = matterResponse.data.client_name || '';
+              matterName = clientName;
+            }
+          }
+          
+          items.push({
+            id: `invoice-${invoice.id}`,
+            type: 'invoice',
+            title: 'Overdue Invoice',
+            description: `${matterName} - R${(invoice.balance_due || invoice.total_amount)?.toLocaleString()} overdue ${daysOverdue} days`,
+            urgency: daysOverdue > 30 ? 'urgent' : 'attention',
+            amount: invoice.balance_due || invoice.total_amount,
+            dueDate: dueDate || undefined,
+            navigateTo: '/invoices',
+            icon: React.createElement(AlertTriangle, { className: 'w-4 h-4' })
+          });
+        }
+      }
+
+      const unpaidInvoicesResponse = await invoiceApiService.getUnpaidInvoices(user.id);
+      if (unpaidInvoicesResponse.data) {
+        const upcomingInvoices = unpaidInvoicesResponse.data
+          .filter((inv: Invoice) => inv.status !== InvoiceStatus.OVERDUE)
+          .slice(0, 3);
+          
+        for (const invoice of upcomingInvoices) {
+          const dueDateStr = (invoice as any).due_date || invoice.dateDue;
+          const dueDate = dueDateStr ? new Date(dueDateStr) : null;
+          const daysUntilDue = dueDate ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+          
+          if (daysUntilDue <= 7 && daysUntilDue > 0) {
+            let matterName = 'Matter';
+            
+            if (invoice.matter_id) {
+              const matterResponse = await matterApiService.getById(invoice.matter_id);
+              if (matterResponse.data) {
+                matterName = matterResponse.data.client_name || matterResponse.data.title || 'Matter';
+              }
+            }
+            
+            items.push({
+              id: `invoice-due-${invoice.id}`,
+              type: 'invoice',
+              title: 'Invoice Due Soon',
+              description: `${matterName} - R${(invoice.balance_due || invoice.total_amount)?.toLocaleString()} due in ${daysUntilDue} days`,
+              urgency: daysUntilDue <= 3 ? 'attention' : 'normal',
+              amount: invoice.balance_due || invoice.total_amount,
+              dueDate: dueDate || undefined,
+              navigateTo: '/invoices',
+              icon: React.createElement(DollarSign, { className: 'w-4 h-4' })
+            });
+          }
+        }
+      }
+
+      const mattersResponse = await matterApiService.getByAdvocate(user.id, {
+        pagination: { page: 1, limit: 50 }
+      });
+      
+      if (mattersResponse.data) {
+        mattersResponse.data.forEach((matter: Matter) => {
+          if (matter.next_court_date) {
+            const courtDate = new Date(matter.next_court_date);
+            const daysUntilCourt = Math.ceil((courtDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntilCourt >= 0 && daysUntilCourt <= 7) {
+              items.push({
+                id: `court-${matter.id}`,
+                type: 'court_date',
+                title: daysUntilCourt === 0 ? 'Court Appearance Today' : daysUntilCourt === 1 ? 'Court Appearance Tomorrow' : 'Upcoming Court Date',
+                description: `${matter.title} - ${courtDate.toLocaleDateString()}`,
+                urgency: daysUntilCourt <= 1 ? 'urgent' : 'attention',
+                dueDate: courtDate,
+                navigateTo: '/matters',
+                icon: React.createElement(Gavel, { className: 'w-4 h-4' })
+              });
+            }
+          }
+
+          if (matter.expected_completion_date) {
+            const deadline = new Date(matter.expected_completion_date);
+            const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntilDeadline >= 0 && daysUntilDeadline <= 7) {
+              items.push({
+                id: `deadline-${matter.id}`,
+                type: 'deadline',
+                title: daysUntilDeadline === 0 ? 'Deadline Today' : 'Upcoming Deadline',
+                description: `${matter.title} - Due ${deadline.toLocaleDateString()}`,
+                urgency: daysUntilDeadline <= 2 ? 'urgent' : 'attention',
+                dueDate: deadline,
+                navigateTo: '/matters',
+                icon: React.createElement(Clock, { className: 'w-4 h-4' })
+              });
+            }
+          }
+        });
+
+        const recentMatters = mattersResponse.data
+          .filter((m: Matter) => {
+            const created = m.created_at ? new Date(m.created_at) : null;
+            if (!created) return false;
+            const daysSinceCreated = Math.ceil((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+            return daysSinceCreated <= 3;
+          })
+          .slice(0, 2);
+
+        recentMatters.forEach((matter: Matter) => {
+          items.push({
+            id: `new-matter-${matter.id}`,
+            type: 'matter',
+            title: 'New Matter',
+            description: `${matter.title} - ${matter.client_name}`,
+            urgency: 'normal',
+            navigateTo: '/matters',
+            icon: React.createElement(FileText, { className: 'w-4 h-4' })
+          });
+        });
+      }
+
+      const sortedItems = items.sort((a, b) => {
+        const urgencyOrder = { urgent: 0, attention: 1, normal: 2 };
+        const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+        
+        if (urgencyDiff !== 0) {
+          return urgencyDiff;
+        }
+
+        if (a.dueDate && b.dueDate) {
+          return a.dueDate.getTime() - b.dueDate.getTime();
+        }
+
+        return 0;
+      });
+
+      return sortedItems.slice(0, 10);
+    } catch (error) {
+      console.error('Error fetching real ticker data:', error);
+      return this.generateMockTickerData();
     }
   }
 
