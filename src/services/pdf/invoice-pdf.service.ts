@@ -29,12 +29,12 @@ declare module 'jspdf' {
 
 export class InvoicePDFService {
   private static readonly COLORS = {
-    primary: '#1e40af',      // Blue
+    primary: '#1e3a8a',      // Navy Blue (matching design)
     secondary: '#64748b',    // Slate
     accent: '#059669',       // Emerald
     text: '#1f2937',         // Gray-800
     lightGray: '#f8fafc',    // Slate-50
-    border: '#e2e8f0'        // Slate-200
+    border: '#cbd5e1'        // Slate-300
   };
 
   private static readonly FONTS = {
@@ -76,7 +76,7 @@ export class InvoicePDFService {
       let yPosition = this.MARGINS.top;
 
       // Header with firm branding
-      yPosition = this.addHeader(doc, 'PRO FORMA INVOICE', yPosition, pageWidth);
+      yPosition = this.addHeader(doc, 'PRO FORMA INVOICE', yPosition, pageWidth, advocate);
 
       // Firm details
       yPosition = this.addFirmDetails(doc, advocate, yPosition, pageWidth);
@@ -142,7 +142,7 @@ export class InvoicePDFService {
       let yPosition = this.MARGINS.top;
 
       // Header with firm branding
-      yPosition = this.addHeader(doc, 'INVOICE', yPosition, pageWidth);
+      yPosition = this.addHeader(doc, 'INVOICE', yPosition, pageWidth, advocate);
 
       // Firm details
       yPosition = this.addFirmDetails(doc, advocate, yPosition, pageWidth);
@@ -204,22 +204,59 @@ export class InvoicePDFService {
   /**
    * Add header with firm branding
    */
-  private static addHeader(doc: jsPDF, title: string, yPosition: number, pageWidth: number): number {
+  private static addHeader(doc: jsPDF, title: string, yPosition: number, pageWidth: number, advocate?: Advocate): number {
+    const centerX = pageWidth / 2;
+    const startY = yPosition;
+    
+    // Logo (if available)
+    if (advocate?.firm_logo_url) {
+      try {
+        const logoSize = 25;
+        doc.addImage(advocate.firm_logo_url, 'PNG', centerX - logoSize / 2, yPosition, logoSize, logoSize);
+        yPosition += logoSize + 3;
+      } catch (error) {
+        console.warn('Failed to add logo to PDF:', error);
+      }
+    }
+    
+    // Firm Name (if available)
+    if (advocate?.firm_name) {
+      doc.setFontSize(this.FONTS.size.subtitle);
+      doc.setFont(this.FONTS.bold, 'bold');
+      doc.setTextColor(this.COLORS.text);
+      const firmNameWidth = doc.getTextWidth(advocate.firm_name);
+      doc.text(advocate.firm_name, centerX - firmNameWidth / 2, yPosition);
+      yPosition += 5;
+      
+      // Tagline
+      if (advocate?.firm_tagline) {
+        doc.setFontSize(this.FONTS.size.small);
+        doc.setFont(this.FONTS.regular, 'italic');
+        doc.setTextColor(this.COLORS.secondary);
+        const taglineWidth = doc.getTextWidth(advocate.firm_tagline);
+        doc.text(advocate.firm_tagline, centerX - taglineWidth / 2, yPosition);
+        yPosition += 6;
+      }
+    }
+    
+    // Add spacing before title
+    yPosition += 2;
+    
     // Title
     doc.setFontSize(this.FONTS.size.title);
     doc.setFont(this.FONTS.bold, 'bold');
     doc.setTextColor(this.COLORS.primary);
     
     const titleWidth = doc.getTextWidth(title);
-    const titleX = (pageWidth - titleWidth) / 2;
-    doc.text(title, titleX, yPosition);
+    doc.text(title, centerX - titleWidth / 2, yPosition);
 
     // Underline
     doc.setDrawColor(this.COLORS.primary);
-    doc.setLineWidth(0.5);
-    doc.line(titleX, yPosition + 2, titleX + titleWidth, yPosition + 2);
+    doc.setLineWidth(0.8);
+    const underlineStart = centerX - titleWidth / 2;
+    doc.line(underlineStart, yPosition + 2, underlineStart + titleWidth, yPosition + 2);
 
-    return yPosition + 15;
+    return yPosition + 10;
   }
 
   /**
@@ -231,49 +268,51 @@ export class InvoicePDFService {
     doc.setTextColor(this.COLORS.text);
 
     const leftColumn = this.MARGINS.left;
-    const rightColumn = pageWidth - this.MARGINS.right - 60;
+    const rightColumn = pageWidth - this.MARGINS.right - 70;
 
-    // Firm name and advocate details
+    const startY = yPosition;
+
+    // Left column - Advocate details
     doc.setFont(this.FONTS.bold, 'bold');
-    doc.text(`${advocate.firstName} ${advocate.lastName}`, leftColumn, yPosition);
+    doc.text(advocate.full_name || 'Advocate', leftColumn, yPosition);
     
     doc.setFont(this.FONTS.regular, 'normal');
-    yPosition += 5;
-    doc.text(`${advocate.barAssociation} Bar`, leftColumn, yPosition);
+    yPosition += 4;
+    doc.text(`${advocate.bar} Bar`, leftColumn, yPosition);
     
-    if (advocate.practiceNumber) {
+    if (advocate.practice_number) {
       yPosition += 4;
-      doc.text(`Practice Number: ${advocate.practiceNumber}`, leftColumn, yPosition);
+      doc.text(`Practice Number: ${advocate.practice_number}`, leftColumn, yPosition);
     }
 
-    // Contact details (right column)
-    let rightY = yPosition - 9;
+    // Right column - Contact details
+    let rightY = startY;
     if (advocate.email) {
       doc.text(`Email: ${advocate.email}`, rightColumn, rightY);
       rightY += 4;
     }
-    if (advocate.phone) {
-      doc.text(`Tel: ${advocate.phone}`, rightColumn, rightY);
+    if (advocate.phone_number) {
+      doc.text(`Tel: ${advocate.phone_number}`, rightColumn, rightY);
       rightY += 4;
     }
 
-    // Address
-    yPosition += 8;
-    if (advocate.address) {
-      const addressLines = advocate.address.split('\n');
-      addressLines.forEach(line => {
+    // Continue left column - Address
+    yPosition = Math.max(yPosition + 6, rightY + 2);
+    if (advocate.chambers_address) {
+      const addressLines = advocate.chambers_address.split('\n');
+      addressLines.forEach((line: string) => {
         doc.text(line, leftColumn, yPosition);
         yPosition += 4;
       });
     }
 
     // VAT Registration
-    if (advocate.vatNumber) {
+    if (advocate.vat_number) {
       yPosition += 2;
-      doc.text(`VAT Registration: ${advocate.vatNumber}`, leftColumn, yPosition);
+      doc.text(`VAT Registration: ${advocate.vat_number}`, leftColumn, yPosition);
     }
 
-    return yPosition + 10;
+    return yPosition + 8;
   }
 
   /**
@@ -290,36 +329,37 @@ export class InvoicePDFService {
     doc.setTextColor(this.COLORS.text);
 
     const leftColumn = this.MARGINS.left;
-    const rightColumn = pageWidth / 2 + 10;
+    const rightColumn = pageWidth / 2 + 5;
+    const startY = yPosition;
 
     // Client details (left column)
     doc.setFont(this.FONTS.bold, 'bold');
     doc.text('BILL TO:', leftColumn, yPosition);
     
     doc.setFont(this.FONTS.regular, 'normal');
-    yPosition += 6;
-    doc.text(matter.clientName || 'Client', leftColumn, yPosition);
+    yPosition += 5;
+    doc.text(matter.client_name || 'Client', leftColumn, yPosition);
     
-    if (matter.clientEmail) {
+    if (matter.client_email) {
       yPosition += 4;
-      doc.text(matter.clientEmail, leftColumn, yPosition);
+      doc.text(matter.client_email, leftColumn, yPosition);
     }
 
     // Matter details (right column)
-    let rightY = yPosition - 6;
+    let rightY = startY;
     doc.setFont(this.FONTS.bold, 'bold');
     doc.text('MATTER DETAILS:', rightColumn, rightY);
     
     doc.setFont(this.FONTS.regular, 'normal');
-    rightY += 6;
+    rightY += 5;
     doc.text(`Matter: ${matter.title || 'Legal Matter'}`, rightColumn, rightY);
     
-    if (matter.matterNumber) {
+    if (matter.reference_number) {
       rightY += 4;
-      doc.text(`Matter No: ${matter.matterNumber}`, rightColumn, rightY);
+      doc.text(`Matter No: ${matter.reference_number}`, rightColumn, rightY);
     }
 
-    return Math.max(yPosition, rightY) + 10;
+    return Math.max(yPosition, rightY) + 8;
   }
 
   /**
@@ -360,47 +400,50 @@ export class InvoicePDFService {
     doc.setTextColor(this.COLORS.text);
 
     const leftColumn = this.MARGINS.left;
-    const rightColumn = pageWidth / 2 + 10;
+    const rightColumn = pageWidth / 2 + 5;
+    const startY = yPosition;
 
     // Document details (left column)
     doc.setFont(this.FONTS.bold, 'bold');
     doc.text(`${isProForma ? 'PRO FORMA' : 'INVOICE'} DETAILS:`, leftColumn, yPosition);
     
     doc.setFont(this.FONTS.regular, 'normal');
-    yPosition += 6;
+    yPosition += 5;
     
-    if (invoice.invoiceNumber) {
-      doc.text(`${isProForma ? 'Pro Forma' : 'Invoice'} No: ${invoice.invoiceNumber}`, leftColumn, yPosition);
+    if (invoice.invoice_number) {
+      doc.text(`${isProForma ? 'Pro Forma' : 'Invoice'} No: ${invoice.invoice_number}`, leftColumn, yPosition);
       yPosition += 4;
     }
 
-    if (invoice.issueDate) {
-      doc.text(`Issue Date: ${new Date(invoice.issueDate).toLocaleDateString('en-ZA')}`, leftColumn, yPosition);
+    const invoiceDate = (invoice as any).invoice_date || (invoice as any).dateIssued;
+    if (invoiceDate) {
+      doc.text(`Issue Date: ${new Date(invoiceDate).toLocaleDateString('en-ZA')}`, leftColumn, yPosition);
       yPosition += 4;
     }
 
-    if (invoice.dueDate && !isProForma) {
-      doc.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString('en-ZA')}`, leftColumn, yPosition);
+    const dueDate = (invoice as any).due_date || (invoice as any).dateDue;
+    if (dueDate && !isProForma) {
+      doc.text(`Due Date: ${new Date(dueDate).toLocaleDateString('en-ZA')}`, leftColumn, yPosition);
       yPosition += 4;
     }
 
     // Status and payment info (right column)
-    let rightY = yPosition - 14;
+    let rightY = startY;
     doc.setFont(this.FONTS.bold, 'bold');
     doc.text('STATUS:', rightColumn, rightY);
     
     doc.setFont(this.FONTS.regular, 'normal');
-    rightY += 6;
+    rightY += 5;
     
     const status = isProForma ? 'Pro Forma' : (invoice.status || 'Draft');
     doc.text(`Status: ${status}`, rightColumn, rightY);
     
-    if (!isProForma && invoice.paidAmount && invoice.paidAmount > 0) {
+    if (!isProForma && invoice.amount_paid && invoice.amount_paid > 0) {
       rightY += 4;
-      doc.text(`Paid: ${this.formatCurrency(invoice.paidAmount)}`, rightColumn, rightY);
+      doc.text(`Paid: ${this.formatCurrency(invoice.amount_paid)}`, rightColumn, rightY);
     }
 
-    return Math.max(yPosition, rightY) + 10;
+    return Math.max(yPosition, rightY) + 8;
   }
 
   /**
@@ -413,40 +456,42 @@ export class InvoicePDFService {
     pageWidth: number
   ): number {
     if (!lineItems || lineItems.length === 0) {
-      // Add placeholder for empty line items
       doc.setFontSize(this.FONTS.size.body);
       doc.setTextColor(this.COLORS.secondary);
       doc.text('No line items available', this.MARGINS.left, yPosition);
       return yPosition + 10;
     }
 
-    const tableData = lineItems.map(item => [
+    const tableData = lineItems.map((item, index) => [
+      (index + 1).toString(),
       item.description || '',
       item.quantity?.toString() || '1',
-      this.formatCurrency(item.rate || 0),
       this.formatCurrency(item.amount || 0)
     ]);
 
     doc.autoTable({
       startY: yPosition,
-      head: [['Description', 'Qty', 'Rate', 'Amount']],
+      head: [['#', 'Description', 'Qty', 'Amount']],
       body: tableData,
       theme: 'grid',
       styles: {
         fontSize: this.FONTS.size.body,
-        cellPadding: 3,
-        textColor: this.COLORS.text
+        cellPadding: 4,
+        textColor: this.COLORS.text,
+        lineColor: this.COLORS.border,
+        lineWidth: 0.1
       },
       headStyles: {
         fillColor: this.COLORS.primary,
         textColor: 'white',
-        fontStyle: 'bold'
+        fontStyle: 'bold',
+        halign: 'center'
       },
       columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { cellWidth: 20, halign: 'center' },
-        2: { cellWidth: 30, halign: 'right' },
-        3: { cellWidth: 30, halign: 'right' }
+        0: { cellWidth: 15, halign: 'center' },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 35, halign: 'right' }
       },
       margin: { left: this.MARGINS.left, right: this.MARGINS.right }
     });
@@ -463,48 +508,58 @@ export class InvoicePDFService {
     yPosition: number, 
     pageWidth: number
   ): number {
-    const rightColumn = pageWidth - this.MARGINS.right - 60;
-    const labelColumn = rightColumn - 40;
+    const centerX = pageWidth / 2;
+    const boxWidth = 80;
+    const boxLeft = centerX - boxWidth / 2;
+    const labelX = boxLeft + 5;
+    const valueX = boxLeft + boxWidth - 5;
 
     doc.setFontSize(this.FONTS.size.body);
     doc.setTextColor(this.COLORS.text);
 
+    let currentY = yPosition;
+
     // Subtotal
     if (invoice.subtotal) {
       doc.setFont(this.FONTS.regular, 'normal');
-      doc.text('Subtotal:', labelColumn, yPosition);
-      doc.text(this.formatCurrency(invoice.subtotal), rightColumn, yPosition, { align: 'right' });
-      yPosition += 5;
+      doc.text('Subtotal:', labelX, currentY);
+      doc.text(this.formatCurrency(invoice.subtotal), valueX, currentY, { align: 'right' });
+      currentY += 6;
     }
 
     // VAT
-    if (invoice.vatAmount && invoice.vatAmount > 0) {
-      doc.text(`VAT (${invoice.vatRate || 15}%):`, labelColumn, yPosition);
-      doc.text(this.formatCurrency(invoice.vatAmount), rightColumn, yPosition, { align: 'right' });
-      yPosition += 5;
+    if (invoice.vat_amount && invoice.vat_amount > 0) {
+      doc.text(`VAT (${invoice.vat_rate || 15}%):`, labelX, currentY);
+      doc.text(this.formatCurrency(invoice.vat_amount), valueX, currentY, { align: 'right' });
+      currentY += 6;
     }
 
     // Discount
-    if (invoice.discountAmount && invoice.discountAmount > 0) {
+    const discountAmount = (invoice as any).discount_amount || 0;
+    if (discountAmount && discountAmount > 0) {
       doc.setTextColor(this.COLORS.accent);
-      doc.text('Discount:', labelColumn, yPosition);
-      doc.text(`-${this.formatCurrency(invoice.discountAmount)}`, rightColumn, yPosition, { align: 'right' });
+      doc.text('Discount:', labelX, currentY);
+      doc.text(`-${this.formatCurrency(discountAmount)}`, valueX, currentY, { align: 'right' });
       doc.setTextColor(this.COLORS.text);
-      yPosition += 5;
+      currentY += 6;
     }
 
-    // Total
+    // Add spacing before total
+    currentY += 2;
+
+    // Total - with prominent styling
     doc.setFont(this.FONTS.bold, 'bold');
     doc.setFontSize(this.FONTS.size.heading);
-    doc.text('TOTAL:', labelColumn, yPosition);
-    doc.text(this.formatCurrency(invoice.totalAmount || 0), rightColumn, yPosition, { align: 'right' });
+    doc.setTextColor(this.COLORS.primary);
+    doc.text('TOTAL:', labelX, currentY);
+    doc.text(this.formatCurrency(invoice.total_amount || 0), valueX, currentY, { align: 'right' });
 
-    // Add border around total
+    // Add border box around entire totals section
     doc.setDrawColor(this.COLORS.primary);
-    doc.setLineWidth(0.5);
-    doc.rect(labelColumn - 2, yPosition - 4, 62, 8);
+    doc.setLineWidth(0.8);
+    doc.rect(boxLeft, yPosition - 5, boxWidth, currentY - yPosition + 8);
 
-    return yPosition + 15;
+    return currentY + 15;
   }
 
   /**
@@ -519,32 +574,38 @@ export class InvoicePDFService {
     doc.text('PAYMENT TERMS:', this.MARGINS.left, yPosition);
     
     doc.setFont(this.FONTS.regular, 'normal');
-    yPosition += 6;
+    yPosition += 5;
     
     const paymentTerms = [
-      'Payment is due within 30 days of invoice date.',
-      'Late payments may incur interest charges as per the Legal Practice Act.',
-      'Please reference the invoice number when making payment.',
-      'All amounts are in South African Rand (ZAR).'
+      '• Payment is due within 30 days of invoice date.',
+      '• Late payments may incur interest charges as per the Legal Practice Act.',
+      '• Please reference the invoice number when making payment.',
+      '• All amounts are in South African Rand (ZAR).'
     ];
 
     paymentTerms.forEach(term => {
-      doc.text(`• ${term}`, this.MARGINS.left + 5, yPosition);
+      doc.text(term, this.MARGINS.left, yPosition);
       yPosition += 4;
     });
 
     // Bar Council compliance note
-    yPosition += 5;
+    yPosition += 4;
     doc.setFont(this.FONTS.bold, 'bold');
     doc.text('BAR COUNCIL COMPLIANCE:', this.MARGINS.left, yPosition);
     
     doc.setFont(this.FONTS.regular, 'normal');
-    yPosition += 6;
-    doc.text('This invoice complies with the Legal Practice Act and Bar Council guidelines.', this.MARGINS.left + 5, yPosition);
-    yPosition += 4;
-    doc.text('Fees are charged in accordance with professional standards and ethical requirements.', this.MARGINS.left + 5, yPosition);
+    yPosition += 5;
+    
+    const maxWidth = pageWidth - this.MARGINS.left - this.MARGINS.right;
+    const complianceText = 'This invoice complies with the Legal Practice Act and Bar Council guidelines. Fees are charged in accordance with professional standards and ethical requirements.';
+    const lines = doc.splitTextToSize(complianceText, maxWidth);
+    
+    lines.forEach((line: string) => {
+      doc.text(line, this.MARGINS.left, yPosition);
+      yPosition += 4;
+    });
 
-    return yPosition + 10;
+    return yPosition + 8;
   }
 
   /**
@@ -563,8 +624,15 @@ export class InvoicePDFService {
     doc.setFont(this.FONTS.regular, 'normal');
     let bankingY = footerY + 4;
     
-    // Default banking details (should be configurable)
-    const bankingDetails = [
+    // Use advocate's banking details or defaults
+    const bankingDetails = advocate?.banking_details ? [
+      `Bank: ${advocate.banking_details.bank_name}`,
+      `Account Name: ${advocate.banking_details.account_name}`,
+      `Account Number: ${advocate.banking_details.account_number}`,
+      `Branch Code: ${advocate.banking_details.branch_code}`,
+      advocate.banking_details.swift_code ? `Swift Code: ${advocate.banking_details.swift_code}` : null,
+      'Reference: Invoice Number'
+    ].filter(Boolean) : [
       'Bank: Standard Bank',
       'Account Name: Legal Practice Trust Account',
       'Account Number: 123456789',
@@ -573,8 +641,10 @@ export class InvoicePDFService {
     ];
 
     bankingDetails.forEach(detail => {
-      doc.text(detail, this.MARGINS.left, bankingY);
-      bankingY += 3;
+      if (detail) {
+        doc.text(detail, this.MARGINS.left, bankingY);
+        bankingY += 3;
+      }
     });
 
     // Footer line

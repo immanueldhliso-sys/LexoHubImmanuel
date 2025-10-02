@@ -257,6 +257,17 @@ export interface Advocate {
   phone_number?: string;
   chambers_address?: string;
   postal_address?: string;
+  firm_name?: string;
+  firm_tagline?: string;
+  firm_logo_url?: string;
+  vat_number?: string;
+  banking_details?: {
+    bank_name: string;
+    account_name: string;
+    account_number: string;
+    branch_code: string;
+    swift_code?: string;
+  };
   notification_preferences: {
     email: boolean;
     whatsapp: boolean;

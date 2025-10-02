@@ -195,8 +195,8 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   };
 
   const handlePreviewNarrative = async () => {
-    if (selectedEntries.length === 0) {
-      toast.error('Please select time entries to preview narrative');
+    if (selectedEntries.length === 0 && selectedExpenses.length === 0) {
+      toast.error('Please select at least one time entry or expense to preview narrative');
       return;
     }
 
@@ -275,8 +275,8 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   };
 
   const handleGenerateInvoice = async () => {
-    if (selectedEntries.length === 0) {
-      toast.error('Please select at least one time entry');
+    if (selectedEntries.length === 0 && selectedExpenses.length === 0) {
+      toast.error('Please select at least one time entry or expense');
       return;
     }
 
@@ -318,8 +318,8 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
   };
 
   const handleDownloadPDF = async () => {
-    if (selectedEntries.length === 0) {
-      toast.error('Please select time entries first');
+    if (selectedEntries.length === 0 && selectedExpenses.length === 0) {
+      toast.error('Please select at least one time entry or expense');
       return;
     }
 
@@ -466,7 +466,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
               <div>
                 <div className="mb-6">
                   <h3 className="text-lg font-medium text-neutral-900 mb-2">
-                    Unbilled Time Entries
+                    Unbilled Time Entries <span className="text-sm text-neutral-500 font-normal">(Optional)</span>
                   </h3>
                   <p className="text-sm text-neutral-600">
                     Select the time entries to include in this invoice
@@ -536,7 +536,7 @@ export const InvoiceGenerationModal: React.FC<InvoiceGenerationModalProps> = ({
                 <div className="mb-6 flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-medium text-neutral-900 mb-2">
-                      Expenses & Disbursements
+                      Expenses & Disbursements <span className="text-sm text-neutral-500 font-normal">(Optional)</span>
                     </h3>
                     <p className="text-sm text-neutral-600">
                       Select expenses to include in this invoice

@@ -2,6 +2,89 @@
 
 ## Quick Start: Priority AWS Services
 
+### Required Information (fill these so I can generate your final least‑privilege IAM policy)
+
+1. Route 53 Hosted Zone IDs (if using custom domains)
+   - Current placeholders: Z0123456789ABC, Z9876543210XYZ
+   - How to find:
+     - CLI: aws route53 list-hosted-zones --query 'HostedZones[*].[Name,Id]' --output table
+     - Console: Route 53 → Hosted Zones → copy the ID (starts with "Z")
+   - If you don’t have custom domains yet: remove Route 53 statements from the policy.
+
+2. Lambda Execution Role Naming Pattern
+   - Observed in repo: lexohub-lambda-execution-${Environment} (e.g., lexohub-lambda-execution-production)
+   - Also used: lexohub-textract-role (Textract permissions)
+   - Recommendation: use a consistent prefix like lexohub-lambda-execution- for all Lambda execution roles.
+   - Provide your pattern and examples (e.g., lexohub-lambda-form-assistant-role, lexohub-lambda-textract-processor-role).
+
+3. DynamoDB Table Names
+   - Observed in repo:
+     - lexohub-document-metadata-${Environment}
+     - lexohub-template-cache-${Environment}
+   - If adding business tables (matters, clients, time entries, invoices): confirm names or use the lexohub- prefix.
+
+4. SQS Queue Names
+   - Observed in repo:
+     - lexohub-tier0-queue-${Environment}
+     - lexohub-tier1-queue-${Environment}
+     - lexohub-tier2-queue-${Environment}
+     - lexohub-tier3-queue-${Environment}
+     - lexohub-validation-queue-${Environment}
+     - lexohub-dlq-${Environment}
+   - You can also add:
+     - lexohub-document-queue-${Environment} (main processing)
+     - lexohub-textract-results-${Environment} (job completion notifications)
+
+5. SNS Topic Names
+   - Observed in repo:
+     - lexohub-textract-completion-${Environment}
+   - You can add:
+     - lexohub-alerts-${Environment}
+     - lexohub-document-processed-${Environment}
+
+6. S3 Bucket Names
+   - Observed in repo:
+     - lexohub-documents-${Environment} (e.g., lexohub-documents-production)
+   - Also referenced in UI docs:
+     - lexohub-documents-processing (default UI bucket example)
+   - Recommended additional buckets (optional):
+     - lexohub-uploads-${Environment} (temporary uploads)
+     - textract-output-lexohub (Textract results)
+     - lexohub-backups-${Environment} (backups)
+
+7. Amplify App ID (optional – tighter security)
+   - Pattern now: apps/* (all apps)
+   - How to find: Amplify Console → select app → copy App ID (format: d123abc456xyz)
+   - If provided: we’ll lock the policy to only that specific app.
+
+8. CloudFront Distribution ID (optional – tighter security)
+   - Pattern now: distribution/* (all distributions)
+   - How to find: CloudFront Console → copy Distribution ID (format: E1234ABCDEFGHI)
+
+Quick Decision Guide
+- Option A: Use the policy as‑is with wildcards – fast, works immediately, broader permissions (good for dev/testing)
+- Option B: Provide specific values – most secure, production‑ready
+- Option C: Hybrid – use wildcards for resources that don’t exist yet; use specific ARNs for existing ones
+
+Reply Template (copy, fill in, and send back)
+```
+1. Route 53: Hosted zone IDs = Z____________, Z____________ for <your-domain>
+2. Lambda roles: pattern = lexohub-lambda-execution-* (examples: lexohub-lambda-form-assistant-role, lexohub-lambda-textract-processor-role)
+3. DynamoDB: tables = lexohub-document-metadata-<env>, lexohub-template-cache-<env>; plus [list any others]
+4. SQS: queues = lexohub-tier0-queue-<env>, lexohub-tier1-queue-<env>, lexohub-tier2-queue-<env>, lexohub-tier3-queue-<env>, lexohub-validation-queue-<env>, lexohub-dlq-<env>; plus [any others]
+5. SNS: topics = lexohub-textract-completion-<env>; plus [any others]
+6. S3: buckets = lexohub-documents-<env>; optional: lexohub-uploads-<env>, textract-output-lexohub, lexohub-backups-<env>
+7. Amplify: App ID = d________________
+8. CloudFront: Distribution ID = E________________
+Region: us-east-1
+Environment values: dev/staging/production
+```
+
+Notes
+- Region is set to us-east-1 (see .env.aws.example).
+- Replace <env> with dev, staging, production.
+- If not using Route 53 custom domains yet, remove Route 53 statements entirely.
+
 ### 1. Amazon S3 + CloudFront Setup (Immediate Impact)
 
 #### A. S3 Configuration for File Storage

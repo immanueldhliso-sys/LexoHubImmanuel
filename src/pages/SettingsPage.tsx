@@ -3,6 +3,7 @@ import { X, Plus, Save, RotateCcw, Download, FileText } from 'lucide-react';
 import { Card, CardHeader, CardContent, Button } from '../design-system/components';
 import { toast } from 'react-hot-toast';
 import { DataExportModal } from '../components/data-export';
+import { FirmBrandingSettings } from '../components/settings/FirmBrandingSettings';
 import { matterTemplatesService } from '../services/api/matter-templates.service';
 import type { Page } from '../types';
 
@@ -11,7 +12,7 @@ interface SettingsPageProps {
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
-  const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'templates'>('practice');
+  const [activeTab, setActiveTab] = useState<'practice' | 'integrations' | 'compliance' | 'billing' | 'templates' | 'branding'>('practice');
   const [practiceSettings, setPracticeSettings] = useState({
     firmName: 'Mpondo & Associates',
     practiceAreas: ['Commercial Litigation', 'Employment Law', 'Mining Law'],
@@ -213,7 +214,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-1 bg-neutral-100 rounded-lg p-1">
-          {(['practice', 'integrations', 'compliance', 'billing', 'templates'] as const).map((tab) => (
+          {(['practice', 'branding', 'integrations', 'compliance', 'billing', 'templates'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -224,6 +225,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
               }`}
             >
               {tab === 'practice' ? 'Practice' :
+               tab === 'branding' ? 'Branding' :
                tab === 'integrations' ? 'Integrations' :
                tab === 'compliance' ? 'Compliance' :
                tab === 'billing' ? 'Billing' :
@@ -765,6 +767,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
             </Button>
           </div>
         </div>
+      )}
+
+      {activeTab === 'branding' && (
+        <FirmBrandingSettings />
       )}
 
       {activeTab === 'templates' && (
